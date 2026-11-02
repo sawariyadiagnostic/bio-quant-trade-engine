@@ -4,10 +4,16 @@ Displays gateway status, live margin limits, and order execution journal.
 """
 import json
 import os
+import sys
 from typing import Tuple
 import gradio as gr
 import pandas as pd
 from src.execution.shoonya_gateway import ShoonyaGateway, ShoonyaCredentials
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 def get_shoonya_status_md(mode: str) -> str:
     """Generates markdown status summary for Shoonya paper or live gateway."""
