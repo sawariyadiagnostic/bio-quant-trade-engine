@@ -326,12 +326,13 @@ class MapElitesArchive:
         win_rate = float(np.mean(active > 0) * 100.0) if n_trades > 0 else 0.0
 
         mean_ret = float(np.mean(active))
-        downside = active[active < 0]
-        downside_dev = float(np.std(downside)) if len(downside) > 0 else 0.001
-        sortino = float((mean_ret / (downside_dev + 1e-6)) * np.sqrt(252))
+        # True Institutional Semi-Deviation across all active trades (floored at 20 bps daily vol)
+        downside_sq = np.minimum(0.0, active) ** 2
+        downside_dev = max(0.002, float(np.sqrt(np.mean(downside_sq))))
+        sortino = float((mean_ret / downside_dev) * np.sqrt(252))
 
         gross_gains = float(np.sum(active[active > 0])) if np.any(active > 0) else 0.0
-        gross_losses = abs(float(np.sum(active[active < 0]))) if np.any(active < 0) else 1e-6
+        gross_losses = max(0.001, abs(float(np.sum(active[active < 0]))))
         profit_factor = float(gross_gains / gross_losses)
 
         calmar_ratio = max(0.0, cagr) / max(4.0, max_dd)

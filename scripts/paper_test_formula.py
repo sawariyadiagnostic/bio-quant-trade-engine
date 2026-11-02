@@ -113,6 +113,9 @@ def simulate_horizon(
         gross_returns = (close_p - open_p) / (open_p + 1e-8)
         trade_positions = binary_positions
 
+    # Statutory NSE Circuit Band Winsorization (Filters spurious ETF bad ticks)
+    gross_returns = np.clip(gross_returns, -0.10, 0.10)
+
     pos_flips = np.abs(np.diff(trade_positions, prepend=0))
     net_returns = (trade_positions * gross_returns) - (pos_flips * friction)
 
@@ -130,9 +133,10 @@ def simulate_horizon(
     win_rate = float(np.mean(active_trades > 0) * 100.0) if len(active_trades) > 0 else 0.0
 
     mean_ret = float(np.mean(active_trades)) if len(active_trades) > 0 else 0.0
-    downside_trades = active_trades[active_trades < 0]
-    downside_dev = float(np.std(downside_trades)) if len(downside_trades) > 0 else 0.001
-    sortino = float((mean_ret / (downside_dev + 1e-6)) * np.sqrt(252))
+    # True Institutional Semi-Deviation across all active trades (floored at 20 bps daily vol)
+    downside_sq = np.minimum(0.0, active_trades) ** 2 if len(active_trades) > 0 else np.array([0.0])
+    downside_dev = max(0.002, float(np.sqrt(np.mean(downside_sq))))
+    sortino = float((mean_ret / downside_dev) * np.sqrt(252))
 
     calmar = max(0.0, cagr) / max(4.0, max_drawdown)
     total_friction_bps = float(np.sum(pos_flips * friction) * 10000.0)
