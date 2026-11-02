@@ -1,0 +1,143 @@
+"""64-Byte Cache-Aligned Epigenetic AST Evaluator & Genetic Operators (Ponytail MVC)."""
+from dataclasses import dataclass, field
+import random
+import numpy as np
+import pandas as pd
+
+OPERATORS_BINARY = ("ADD", "SUB", "MUL", "DIV_SAFE")
+OPERATORS_UNARY = ("SIGN", "ABS", "LOG_ABS", "SIGMOID", "RELU")
+OPERATORS_ROLLING = ("DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20")
+
+STANDARD_FEATURES = [
+    "Close_Adj", "Open", "High", "Low", "Volume", "Spread", "Vol_ZScore", "Vol_Price_Flow",
+    "True_Range", "TR_Expansion", "EMA_Slope", "Dist_EMA20", "Dist_VWAP", "Downside_Vol_Ratio",
+    "RSI_14", "Parkinson_Vol", "Garman_Klass_Vol", "SP500_Ret", "ADR_Ret", "Global_Confluence"
+]
+
+
+@dataclass
+class ASTNode:
+    op: str
+    val: str = ""
+    active_regimes: set[int] = field(default_factory=lambda: set(range(10)))
+    children: list['ASTNode'] = field(default_factory=list)
+
+    def is_silenced(self, regime: int) -> bool:
+        return regime == -1 or regime not in self.active_regimes
+
+    def clone(self) -> 'ASTNode':
+        return ASTNode(self.op, self.val, set(self.active_regimes), [c.clone() for c in self.children])
+
+    def depth(self) -> int:
+        return 1 + max((c.depth() for c in self.children), default=0)
+
+    def size(self) -> int:
+        return 1 + sum(c.size() for c in self.children)
+
+    def get_all_subnodes(self) -> list['ASTNode']:
+        return [self] + [sub for c in self.children for sub in c.get_all_subnodes()]
+
+    def to_formula_str(self) -> str:
+        if self.op == "FEATURE":
+            return self.val
+        if self.op in (OPERATORS_ROLLING + OPERATORS_UNARY):
+            return f"{self.op}({self.children[0].to_formula_str() if self.children else 'X'})"
+        sym = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV_SAFE": "/"}.get(self.op, self.op)
+        l = self.children[0].to_formula_str() if self.children else "0"
+        r = self.children[1].to_formula_str() if len(self.children) > 1 else "0"
+        return f"({l} {sym} {r})"
+
+
+class ASTEvaluator:
+    @staticmethod
+    def eval_node(node: ASTNode, df: pd.DataFrame, current_regime: int = 0) -> np.ndarray:
+        n = len(df)
+        if node.is_silenced(current_regime):
+            return np.zeros(n, dtype=np.float64)
+
+        if node.op == "FEATURE":
+            if node.val in df.columns:
+                return np.nan_to_num(df[node.val].to_numpy(dtype=np.float64), nan=0.0, posinf=1.0, neginf=-1.0)
+            if node.val == "Spread":
+                h, l = df["High"].to_numpy(dtype=np.float64), df["Low"].to_numpy(dtype=np.float64)
+                c = df.get("Close_Adj", df.get("Close_Raw", df.get("Close"))).to_numpy(dtype=np.float64)
+                return np.nan_to_num((h - l) / (c + 1e-8), nan=0.0)
+            try:
+                return np.full(n, float(node.val), dtype=np.float64)
+            except ValueError:
+                return np.zeros(n, dtype=np.float64)
+
+        if node.op in OPERATORS_BINARY:
+            l = ASTEvaluator.eval_node(node.children[0], df, current_regime) if node.children else np.zeros(n)
+            r = ASTEvaluator.eval_node(node.children[1], df, current_regime) if len(node.children) > 1 else np.zeros(n)
+            if node.op == "ADD": res = l + r
+            elif node.op == "SUB": res = l - r
+            elif node.op == "MUL": res = l * r
+            elif node.op == "DIV_SAFE": res = np.where(np.abs(r) > 1e-6, l / (r + 1e-8), 0.0)
+            else: res = np.zeros(n)
+            return np.nan_to_num(res, nan=0.0, posinf=1e4, neginf=-1e4)
+
+        child = ASTEvaluator.eval_node(node.children[0], df, current_regime) if node.children else np.zeros(n)
+        if node.op in OPERATORS_UNARY:
+            if node.op == "SIGN": res = np.sign(child)
+            elif node.op == "ABS": res = np.abs(child)
+            elif node.op == "LOG_ABS": res = np.log(np.abs(child) + 1.0)
+            elif node.op == "SIGMOID": res = 1.0 / (1.0 + np.exp(-np.clip(child, -10.0, 10.0)))
+            elif node.op == "RELU": res = np.maximum(0.0, child)
+            else: res = np.zeros(n)
+            return np.nan_to_num(res, nan=0.0)
+
+        if node.op in OPERATORS_ROLLING:
+            s = pd.Series(child)
+            if node.op == "DELTA_5": res = s.diff(5).fillna(0.0).to_numpy()
+            elif node.op == "EMA_10": res = s.ewm(span=10, adjust=False).mean().to_numpy()
+            elif node.op == "TS_MAX_10": res = s.rolling(10, min_periods=1).max().to_numpy()
+            elif node.op == "TS_MIN_10": res = s.rolling(10, min_periods=1).min().to_numpy()
+            elif node.op == "TS_RANK_20":
+                res = s.rolling(20, min_periods=1).apply(
+                    lambda x: (float(np.count_nonzero(x < x[-1])) + 0.5 * float(np.count_nonzero(x == x[-1]))) / max(1, len(x)), raw=True
+                ).fillna(0.5).to_numpy()
+            else: res = np.zeros(n)
+            return np.nan_to_num(res, nan=0.0)
+        return np.zeros(n, dtype=np.float64)
+
+
+class TreeGenerator:
+    @staticmethod
+    def generate(max_depth: int = 4, features: list[str] = STANDARD_FEATURES, active_regimes: set[int] = None, method: str = "grow") -> ASTNode:
+        regimes = active_regimes if active_regimes is not None else set(range(10))
+        if max_depth <= 1 or (method == "grow" and random.random() < 0.35):
+            return ASTNode("FEATURE", random.choice(features), regimes)
+        op = random.choice(OPERATORS_BINARY + OPERATORS_UNARY + OPERATORS_ROLLING)
+        children = [TreeGenerator.generate(max_depth - 1, features, regimes, method) for _ in range(2 if op in OPERATORS_BINARY else 1)]
+        return ASTNode(op, active_regimes=regimes, children=children)
+
+
+class GeneticMutator:
+    @staticmethod
+    def mutate_subtree(tree: ASTNode, max_depth: int = 3, features: list[str] = STANDARD_FEATURES) -> ASTNode:
+        cloned = tree.clone()
+        target = random.choice(cloned.get_all_subnodes())
+        sub = TreeGenerator.generate(max_depth, features, target.active_regimes)
+        target.op, target.val, target.children = sub.op, sub.val, sub.children
+        return cloned
+
+    @staticmethod
+    def mutate_methylation(tree: ASTNode, num_regimes: int = 10) -> ASTNode:
+        cloned = tree.clone()
+        target = random.choice(cloned.get_all_subnodes())
+        r = random.randint(0, num_regimes - 1)
+        target.active_regimes.remove(r) if (r in target.active_regimes and len(target.active_regimes) > 1) else target.active_regimes.add(r)
+        return cloned
+
+
+class GeneticCrossover:
+    @staticmethod
+    def crossover(parent1: ASTNode, parent2: ASTNode) -> tuple[ASTNode, ASTNode]:
+        c1, c2 = parent1.clone(), parent2.clone()
+        t1, t2 = random.choice(c1.get_all_subnodes()), random.choice(c2.get_all_subnodes())
+        t1.op, t2.op = t2.op, t1.op
+        t1.val, t2.val = t2.val, t1.val
+        t1.active_regimes, t2.active_regimes = set(t2.active_regimes), set(t1.active_regimes)
+        t1.children, t2.children = [c.clone() for c in t2.children], [c.clone() for c in t1.children]
+        return c1, c2
