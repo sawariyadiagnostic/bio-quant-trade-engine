@@ -147,7 +147,15 @@ class ShoonyaGateway:
                     set_key(env_file, "SHOONYA_AUTH_CODE", auth_code)
                 logger.success(f"ShoonyaGateway: OAuth exchange succeeded for user {usrid}")
                 return {"stat": "Ok", "access_token": asc_tok, "actid": self.actid}
-            return {"stat": "Not_Ok", "emsg": "Failed to exchange auth code for access token"}
+
+            # Direct fallback inspection if getAccessToken returned None
+            raw_hash = (self.creds.client_id + self.creds.secret_code + auth_code).encode("utf-8")
+            ck = hashlib.sha256(raw_hash).hexdigest()
+            vals = {"code": auth_code, "checksum": ck, "uid": self.creds.user_id}
+            resp = requests.post(f"{self.BASE_URL}/GenAcsTok", data="jData=" + json.dumps(vals), timeout=10)
+            data = resp.json() if resp.status_code == 200 else {}
+            err_msg = data.get("emsg", "Failed to exchange auth code for access token")
+            return {"stat": "Not_Ok", "emsg": err_msg}
         except Exception as e:
             logger.error(f"ShoonyaGateway: OAuth exchange exception: {e}")
             return {"stat": "Not_Ok", "emsg": str(e)}
