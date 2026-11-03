@@ -1,19 +1,23 @@
 """End-to-End Alpha Engine Pipeline Orchestrator (Wave 5: Task 5.1)."""
+import os
+import sys
 from dataclasses import dataclass, field
 from typing import Dict, List, Any, Optional
 import numpy as np
 import pandas as pd
 
-from ..data.vector_lake import VectorDataLake
-from ..domain.formula_ast import ASTNode, TreeGenerator, GeneticMutator, GeneticCrossover, ASTEvaluator
-from ..evolution.nursery import EvolutionaryNursery
-from ..evolution.symbiosis import SymbioticBreeder
-from ..evolution.cvt_archive import CVTArchiveEngine
-from ..backtest.matrix_engine import MatrixSimulator
-from ..clustering.phenotype_extractor import PhenotypeExtractor
-from ..clustering.alpha_manifold import AlphaManifoldPruner
-from ..execution.portfolio_paper_trader import PortfolioPaperTrader
-from ..execution.hrp_allocator import HRPAllocator
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from src.data.vector_lake import VectorDataLake
+from src.domain.formula_ast import ASTNode, TreeGenerator, GeneticMutator, GeneticCrossover, ASTEvaluator
+from src.evolution.nursery import EvolutionaryNursery
+from src.evolution.symbiosis import SymbioticBreeder
+from src.evolution.cvt_archive import CVTArchiveEngine
+from src.backtest.matrix_engine import MatrixSimulator
+from src.clustering.phenotype_extractor import PhenotypeExtractor
+from src.clustering.alpha_manifold import AlphaManifoldPruner
+from src.execution.portfolio_paper_trader import PortfolioPaperTrader
+from src.execution.hrp_allocator import HRPAllocator
 
 
 @dataclass
@@ -25,12 +29,15 @@ class AlphaEnginePipeline:
     """
     dry_run: bool = False
     capital: float = 50000.0
+    initial_cash: float = 50000.0
     nursery: EvolutionaryNursery = field(default_factory=lambda: EvolutionaryNursery(immunity_generations=15))
     pruner: AlphaManifoldPruner = field(default_factory=lambda: AlphaManifoldPruner(min_cluster_size=2))
     archive: CVTArchiveEngine = field(default_factory=lambda: CVTArchiveEngine(cells=100, dims=3))
     paper_trader: PortfolioPaperTrader = field(init=False)
 
     def __post_init__(self):
+        effective_cap = self.initial_cash if self.initial_cash != 50000.0 else self.capital
+        self.capital = effective_cap
         self.paper_trader = PortfolioPaperTrader(initial_capital=self.capital)
 
     def run_cycle(
@@ -145,5 +152,46 @@ class AlphaEnginePipeline:
             "archive_coverage": round(self.archive.coverage(), 4),
             "allocated_weights": asset_weights,
             "executed_trades": executed_trades,
-            "portfolio_equity": round(total_equity, 2)
+            "portfolio_equity": round(total_equity, 2),
+            "pruning_results": prune_res
         }
+
+    def run_pipeline_cycle(
+        self,
+        target_tickers: Optional[List[str]] = None,
+        generations: int = 5,
+        population_size: int = 25,
+        n_bars: int = 100
+    ) -> Dict[str, Any]:
+        """Convenience alias for UI and script orchestrators."""
+        return self.run_cycle(
+            tickers=target_tickers,
+            generations=generations,
+            pop_size=population_size,
+            n_bars=n_bars
+        )
+
+
+if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    print("=" * 70)
+    print("[ALPHA-OS] LAUNCHING BIO-QUANT ALPHA-OS v2.0 UNIFIED ENGINE")
+    print("=" * 70)
+    pipeline = AlphaEnginePipeline(initial_cash=50000.0)
+    res = pipeline.run_pipeline_cycle(
+        target_tickers=["NIFTYBEES.NS", "BANKBEES.NS"],
+        generations=5,
+        population_size=20
+    )
+    print("\n--- Pipeline Execution Report ---")
+    print(f"Candidates Discovered : {res['discovered_candidates']}")
+    print(f"De-cloned Champions   : {len(res['pruned_champions'])}")
+    print(f"Orthogonal Noise Alphas: {res['orthogonal_count']}")
+    print(f"Clone Compression     : {res['compression_ratio'] * 100:.1f}%")
+    print(f"Archive Coverage      : {res['archive_coverage'] * 100:.1f}%")
+    print(f"Portfolio Equity      : Rs {res['portfolio_equity']:,.2f}")
+    print(f"Allocated Weights     : {res['allocated_weights']}")
+    print(f"Executed Trades Count : {len(res['executed_trades'])}")
+    print("=" * 70)
+
