@@ -1,0 +1,115 @@
+"""Vectorized Data Lake with Statutory Circuit Band Winsorization (Wave 1: Task 1.1)."""
+from dataclasses import dataclass
+from typing import Dict, Optional
+import numpy as np
+import pandas as pd
+
+
+@dataclass
+class VectorDataLake:
+    """High-performance vectorized market tensor store."""
+    ticker: str
+    tensors: Dict[str, np.ndarray]
+    dates: pd.DatetimeIndex
+
+    @classmethod
+    def from_dataframe(cls, df: pd.DataFrame, ticker: str = "NIFTYBEES.NS") -> "VectorDataLake":
+        """Builds a vectorized lake from a historical OHLCV DataFrame."""
+        df = df.copy()
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index)
+
+        c = df.get("Close_Adj", df.get("Close", df.get("Close_Raw"))).to_numpy(dtype=np.float64)
+        o = df["Open"].to_numpy(dtype=np.float64)
+        h = df["High"].to_numpy(dtype=np.float64)
+        l = df["Low"].to_numpy(dtype=np.float64)
+        v = df.get("Volume", pd.Series(10000.0, index=df.index)).to_numpy(dtype=np.float64)
+
+        n = len(c)
+        # 1. Statutory Return Vectors (Overnight, Intraday, Close-to-Close)
+        # Overnight Drift: Close[t] to Open[t+1]
+        overnight = np.zeros(n, dtype=np.float64)
+        if n > 1:
+            overnight[:-1] = (o[1:] - c[:-1]) / (c[:-1] + 1e-8)
+
+        # Intraday: Open[t] to Close[t]
+        intraday = (c - o) / (o + 1e-8)
+
+        # Close-to-Close: Close[t-1] to Close[t]
+        c2c = np.zeros(n, dtype=np.float64)
+        if n > 1:
+            c2c[1:] = (c[1:] - c[:-1]) / (c[:-1] + 1e-8)
+
+        # Statutory NSE Circuit Band Winsorization (-10% to +10%)
+        overnight = np.clip(overnight, -0.10, 0.10)
+        intraday = np.clip(intraday, -0.10, 0.10)
+        c2c = np.clip(c2c, -0.10, 0.10)
+
+        # 2. Standard Institutional Factor Computations
+        c_series = pd.Series(c, index=df.index)
+        v_series = pd.Series(v, index=df.index)
+        typical_p = (h + l + c) / 3.0
+        cum_vol = np.cumsum(v)
+        cum_pv = np.cumsum(typical_p * v)
+        vwap = np.where(cum_vol > 0, cum_pv / (cum_vol + 1e-8), typical_p)
+        dist_vwap = (c - vwap) / (vwap + 1e-8)
+
+        # True Range
+        c_prev = np.roll(c, 1)
+        c_prev[0] = c[0]
+        tr = np.maximum(h - l, np.maximum(np.abs(h - c_prev), np.abs(l - c_prev)))
+
+        # Volume Z-Score (20-day rolling)
+        v_roll_mean = v_series.rolling(20, min_periods=1).mean().to_numpy()
+        v_roll_std = v_series.rolling(20, min_periods=1).std(ddof=0).fillna(1.0).to_numpy()
+        vol_zscore = (v - v_roll_mean) / (v_roll_std + 1e-8)
+
+        # Volatilities
+        log_hl = np.log(np.maximum(h / np.maximum(l, 1e-8), 1e-8)) ** 2
+        log_co = np.log(np.maximum(c / np.maximum(o, 1e-8), 1e-8)) ** 2
+        roll_hl = pd.Series(log_hl, index=df.index).rolling(20, min_periods=1).mean().to_numpy()
+        roll_co = pd.Series(log_co, index=df.index).rolling(20, min_periods=1).mean().to_numpy()
+        parkinson_vol = np.sqrt(roll_hl / (4.0 * np.log(2.0))) * np.sqrt(252)
+        gk_raw = 0.5 * roll_hl - (2.0 * np.log(2.0) - 1.0) * roll_co
+        garman_klass_vol = np.sqrt(np.maximum(gk_raw, 0.0)) * np.sqrt(252)
+
+        # Downside Vol Ratio
+        rets_s = pd.Series(c2c, index=df.index)
+        down_rets = rets_s.where(rets_s < 0, 0.0)
+        down_var = down_rets.rolling(20, min_periods=1).var().fillna(0.0).to_numpy()
+        tot_var = rets_s.rolling(20, min_periods=1).var().fillna(1e-6).to_numpy()
+        downside_vol_ratio = np.sqrt(down_var / (tot_var + 1e-8))
+
+        tensors = {
+            "Close_Adj": c.astype(np.float32),
+            "Open": o.astype(np.float32),
+            "High": h.astype(np.float32),
+            "Low": l.astype(np.float32),
+            "Volume": v.astype(np.float32),
+            "gross_overnight_rets": overnight.astype(np.float32),
+            "gross_intraday_rets": intraday.astype(np.float32),
+            "gross_close_to_close_rets": c2c.astype(np.float32),
+            "Dist_VWAP": dist_vwap.astype(np.float32),
+            "True_Range": tr.astype(np.float32),
+            "Vol_ZScore": vol_zscore.astype(np.float32),
+            "Parkinson_Vol": parkinson_vol.astype(np.float32),
+            "Garman_Klass_Vol": garman_klass_vol.astype(np.float32),
+            "Downside_Vol_Ratio": downside_vol_ratio.astype(np.float32),
+        }
+
+        return cls(ticker=ticker, tensors=tensors, dates=df.index)
+
+    @classmethod
+    def load_mock(cls, periods: int = 100, ticker: str = "NIFTYBEES.NS") -> "VectorDataLake":
+        """Generates realistic synthetic OHLCV data lake for testing."""
+        np.random.seed(42)
+        idx = pd.date_range("2024-01-01", periods=periods, freq="B")
+        daily_drift = np.random.normal(0.0005, 0.012, periods)
+        p = 250.0 * np.exp(np.cumsum(daily_drift))
+        df = pd.DataFrame(index=idx)
+        df["Open"] = p * (1.0 + np.random.normal(0.0, 0.003, periods))
+        df["Close_Adj"] = p
+        df["High"] = np.maximum(df["Open"], df["Close_Adj"]) * (1.0 + np.abs(np.random.normal(0.0, 0.005, periods)))
+        df["Low"] = np.minimum(df["Open"], df["Close_Adj"]) * (1.0 - np.abs(np.random.normal(0.0, 0.005, periods)))
+        df["Volume"] = np.random.uniform(50000.0, 200000.0, periods)
+        return cls.from_dataframe(df, ticker=ticker)
