@@ -40,6 +40,11 @@ class ASTNode:
     def to_formula_str(self) -> str:
         if self.op == "FEATURE":
             return self.val
+        if self.op == "MEGA_SWITCH":
+            c = self.children[0].to_formula_str() if len(self.children) > 0 else "0"
+            b = self.children[1].to_formula_str() if len(self.children) > 1 else "0"
+            m = self.children[2].to_formula_str() if len(self.children) > 2 else "0"
+            return f"MEGA_SWITCH({c}, {b}, {m})"
         if self.op in (OPERATORS_ROLLING + OPERATORS_UNARY):
             return f"{self.op}({self.children[0].to_formula_str() if self.children else 'X'})"
         sym = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV_SAFE": "/"}.get(self.op, self.op)
@@ -66,6 +71,12 @@ class ASTEvaluator:
                 return np.full(n, float(node.val), dtype=np.float64)
             except ValueError:
                 return np.zeros(n, dtype=np.float64)
+
+        if node.op == "MEGA_SWITCH":
+            cond = ASTEvaluator.eval_node(node.children[0], df, current_regime) if len(node.children) > 0 else np.zeros(n)
+            base = ASTEvaluator.eval_node(node.children[1], df, current_regime) if len(node.children) > 1 else np.zeros(n)
+            mega = ASTEvaluator.eval_node(node.children[2], df, current_regime) if len(node.children) > 2 else np.zeros(n)
+            return np.nan_to_num(np.where(cond > 0.0, mega, base), nan=0.0)
 
         if node.op in OPERATORS_BINARY:
             l = ASTEvaluator.eval_node(node.children[0], df, current_regime) if node.children else np.zeros(n)
@@ -141,3 +152,11 @@ class GeneticCrossover:
         t1.active_regimes, t2.active_regimes = set(t2.active_regimes), set(t1.active_regimes)
         t1.children, t2.children = [c.clone() for c in t2.children], [c.clone() for c in t1.children]
         return c1, c2
+
+
+class MegaEvolutionNode(ASTNode):
+    """Dual-state AST node that dynamically transitions between base and mega forms."""
+    def __init__(self, condition: ASTNode, base: ASTNode, mega: ASTNode, active_regimes: set[int] = None):
+        regimes = active_regimes if active_regimes is not None else set(range(10))
+        super().__init__(op="MEGA_SWITCH", val="", active_regimes=regimes, children=[condition, base, mega])
+

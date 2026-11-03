@@ -27,14 +27,42 @@ class FormulaParser:
             )
 
         m = re.match(r"^([A-Za-z0-9_]+)\s*\((.*)\)$", s)
-        if m and m.group(1).upper() in (OPERATORS_UNARY + OPERATORS_ROLLING):
-            return ASTNode(
-                op=m.group(1).upper(),
-                active_regimes=set(regimes),
-                children=[FormulaParser.parse(m.group(2), regimes, _depth + 1)]
-            )
+        if m:
+            op_name = m.group(1).upper()
+            if op_name == "MEGA_SWITCH":
+                sub_args = FormulaParser._split_top_level_args(m.group(2))
+                return ASTNode(
+                    op="MEGA_SWITCH",
+                    active_regimes=set(regimes),
+                    children=[FormulaParser.parse(a, regimes, _depth + 1) for a in sub_args]
+                )
+            if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING):
+                return ASTNode(
+                    op=op_name,
+                    active_regimes=set(regimes),
+                    children=[FormulaParser.parse(m.group(2), regimes, _depth + 1)]
+                )
 
         return ASTNode(op="FEATURE", val=s.replace(" ", ""), active_regimes=set(regimes))
+
+    @staticmethod
+    def _split_top_level_args(s: str) -> list[str]:
+        args = []
+        d = 0
+        cur = []
+        for c in s:
+            if c == "(":
+                d += 1
+            elif c == ")":
+                d -= 1
+            if c == "," and d == 0:
+                args.append("".join(cur).strip())
+                cur = []
+            else:
+                cur.append(c)
+        if cur:
+            args.append("".join(cur).strip())
+        return args
 
     @staticmethod
     def _is_balanced(s: str) -> bool:
