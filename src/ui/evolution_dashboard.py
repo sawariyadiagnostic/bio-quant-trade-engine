@@ -57,7 +57,7 @@ def get_available_tickers() -> Tuple[List[str], List[str]]:
     try:
         all_t = loader.list_available_tickers()
         valid_etfs = [t for t in all_t if "BEES" in t or "NIFTY" in t]
-        defaults = valid_etfs[:4] if valid_etfs else ["NIFTYBEES.NS", "BANKBEES.NS", "GOLDBEES.NS"]
+        defaults = valid_etfs if valid_etfs else ["NIFTYBEES", "BANKBEES", "GOLDBEES"]
         return all_t, defaults
     except Exception:
         fallback = ["NIFTYBEES", "BANKBEES", "GOLDBEES", "NIFTY_50"]
@@ -936,21 +936,21 @@ def create_ui():
             with gr.Column(scale=4):
                 with gr.Accordion("🎮 Mission Stance & Universe Selection", open=True):
                     mode_radio = gr.Radio(
-                        choices=["Multi-Asset Alpha-OS Cycle (v2.0)", "Single-Asset Deep Evolution (Phase B / GPU)"],
-                        value="Multi-Asset Alpha-OS Cycle (v2.0)",
+                        choices=["Single-Asset Continual Evolution", "Multi-Asset Alpha-OS Cycle (v2.0)"],
+                        value="Single-Asset Continual Evolution",
                         label="Operation Mode"
                     )
                     ticker_multi = gr.CheckboxGroup(
                         choices=default_liquid_etfs,
                         value=default_liquid_etfs[:3] if len(default_liquid_etfs) >= 3 else default_liquid_etfs,
                         label="Target Liquid ETF Lakes",
-                        visible=True
+                        visible=False
                     )
                     ticker_single = gr.Dropdown(
                         choices=all_tickers,
                         value="NIFTYBEES" if "NIFTYBEES" in all_tickers else all_tickers[0],
                         label="Target Single Asset",
-                        visible=False
+                        visible=True
                     )
                     target_mode_radio = gr.Radio(
                         choices=["overnight", "intraday"],
