@@ -40,6 +40,29 @@ def test_phenotype_matrix_batch_extraction():
     print("[PASS] test_phenotype_matrix_batch_extraction")
 
 
+def test_phenotype_dense_1024_embedding():
+    """Verify continuous 1024D protein-style latent embedding extraction."""
+    from src.clustering.phenotype_extractor import PhenotypeExtractor
+    from src.domain.formula_parser import FormulaParser
+
+    extractor = PhenotypeExtractor.create_mock(n_assets=3, n_bars=100)
+    ast = FormulaParser.parse("MEGA_SWITCH(Garman_Klass_Vol > 0.02, Close_Adj, Open)")
+
+    emb = extractor.extract_dense_embedding(ast, target_dim=1024)
+    assert isinstance(emb, np.ndarray)
+    assert emb.shape == (1024,)
+    # Verify L2 unit norm
+    assert np.isclose(np.linalg.norm(emb), 1.0, atol=1e-4)
+
+    batch_emb = extractor.extract_dense_batch([ast, ast], target_dim=1024)
+    assert batch_emb.shape == (2, 1024)
+    # Cosine similarity between identical strategy embeddings must be 1.0
+    cos_sim = np.dot(batch_emb[0], batch_emb[1])
+    assert np.isclose(cos_sim, 1.0, atol=1e-4)
+    print("[PASS] test_phenotype_dense_1024_embedding")
+
+
 if __name__ == "__main__":
     test_phenotype_vector_extraction()
     test_phenotype_matrix_batch_extraction()
+    test_phenotype_dense_1024_embedding()

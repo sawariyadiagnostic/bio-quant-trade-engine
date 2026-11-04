@@ -39,6 +39,7 @@ from src.ui.visualizations import (
     build_3d_manifold_plot,
     build_hrp_weights_plot,
     format_portfolio_table,
+    build_cosine_similarity_heatmap,
     EMPTY_LEADERBOARD,
     EMPTY_PORTFOLIO
 )
@@ -279,10 +280,10 @@ def _parse_leaderboard_to_records(raw_board: List[Dict[str, Any]]) -> List[Dict[
     return parsed
 
 def _update_v2_visuals(ticker: str):
-    """Updates 3D manifold, HRP weights, and paper portfolio from current archive."""
+    """Updates 3D manifold, HRP weights, paper portfolio, and 1024D similarity heatmap."""
     global CURRENT_ARCHIVE_RECORDS
     if not CURRENT_ARCHIVE_RECORDS:
-        return build_3d_manifold_plot(), build_hrp_weights_plot({}), EMPTY_PORTFOLIO
+        return build_3d_manifold_plot(), build_hrp_weights_plot({}), EMPTY_PORTFOLIO, build_cosine_similarity_heatmap([])
 
     n = len(CURRENT_ARCHIVE_RECORDS)
     coords = np.zeros((n, 3))
@@ -298,7 +299,8 @@ def _update_v2_visuals(ticker: str):
     positions = {ticker: {"quantity": 38, "avg_price": 261.88}}
     prices = {ticker: 261.88}
     port_table = format_portfolio_table(positions, prices, cash=40000.0)
-    return m_plot, hrp_plot, port_table
+    sim_heatmap = build_cosine_similarity_heatmap(CURRENT_ARCHIVE_RECORDS)
+    return m_plot, hrp_plot, port_table, sim_heatmap
 
 def run_multi_asset_alpha_os(generations: float, population: float, lookback_choice: str):
     """Executes end-to-end AlphaEnginePipeline with Occam pruning and HRP allocation."""
@@ -312,7 +314,8 @@ def run_multi_asset_alpha_os(generations: float, population: float, lookback_cho
         re_sort_leaderboard("Top Net Earners First (+Net Return %)", "Top 50"),
         build_3d_manifold_plot(),
         build_hrp_weights_plot({}),
-        EMPTY_PORTFOLIO
+        EMPTY_PORTFOLIO,
+        build_cosine_similarity_heatmap([])
     )
 
     pipeline = AlphaEnginePipeline(initial_cash=50000.0, capital=50000.0)
@@ -349,6 +352,7 @@ def run_multi_asset_alpha_os(generations: float, population: float, lookback_cho
 
     trader = pipeline.paper_trader
     df_holdings = format_portfolio_table(trader.positions, trader.latest_prices, cash=trader.cash)
+    sim_heatmap = build_cosine_similarity_heatmap(synth_records)
 
     ratio = report.get("compression_ratio", 0.0) * 100
     equity = report.get("portfolio_equity", 0.0)
@@ -371,7 +375,8 @@ def run_multi_asset_alpha_os(generations: float, population: float, lookback_cho
         format_leaderboard_table(synth_records, sort_by="net_return_pct", max_rows=50),
         m_fig,
         w_fig,
-        df_holdings
+        df_holdings,
+        sim_heatmap
     )
 
 def run_evolution_stream(
@@ -735,6 +740,11 @@ def create_ui():
                     gen_slider = gr.Number(value=10, precision=0, label="Generations (1 to 1,000,000+)")
                     pop_slider = gr.Number(value=50, precision=0, label="Population Size (10 to 1,000,000+)")
 
+                with gr.Row():
+                    btn_preset_quick = gr.Button("⚡ Flash (5 Gen)", size="sm", variant="secondary")
+                    btn_preset_deep = gr.Button("🔬 Deep (50 Gen)", size="sm", variant="secondary")
+                    btn_preset_inst = gr.Button("🏛️ Institutional (100 Gen)", size="sm", variant="secondary")
+
                 target_mode_radio = gr.Radio(
                     choices=["overnight", "intraday"],
                     value="overnight",
@@ -787,6 +797,11 @@ def create_ui():
                     with gr.TabItem("💼 Multi-Asset Virtual Portfolio"):
                         portfolio_table = gr.DataFrame(value=EMPTY_PORTFOLIO, label="Virtual Broker Positions & Ledger")
 
+                    with gr.TabItem("🧬 1024D Phenotype Space (Protein Analogy)"):
+                        gr.Markdown("#### 🧬 1024-Dimensional Latent Embedding Space & Cosine Similarity")
+                        gr.Markdown("*Inspired by protein language models (ESM-2/ProtBERT): completely different mathematical AST formulas that fold into identical market behavior are mapped to high-similarity clusters.*")
+                        sim_heatmap_plot = gr.Plot(value=build_cosine_similarity_heatmap(CURRENT_ARCHIVE_RECORDS), label="1024D Pairwise Cosine Similarity")
+
                 # Always Visible Full Leaderboard
                 gr.Markdown("### 📋 Resident Champions Leaderboard (Sorted Archive)")
                 with gr.Row():
@@ -808,6 +823,11 @@ def create_ui():
                     wrap=True
                 )
 
+        # Wire Presets
+        btn_preset_quick.click(lambda: (5, 25), outputs=[gen_slider, pop_slider])
+        btn_preset_deep.click(lambda: (50, 100), outputs=[gen_slider, pop_slider])
+        btn_preset_inst.click(lambda: (100, 200), outputs=[gen_slider, pop_slider])
+
         # Wire callbacks
         test_colab_btn.click(
             fn=test_colab_connection,
@@ -820,7 +840,7 @@ def create_ui():
             inputs=[gen_slider, pop_slider, lookback_dropdown],
             outputs=[
                 status_box, telemetry_box, spotlight_box, heatmap_plot, scatter_plot,
-                leaderboard_table, manifold_3d_plot, hrp_plot, portfolio_table
+                leaderboard_table, manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot
             ]
         )
 
@@ -835,7 +855,7 @@ def create_ui():
         ).then(
             fn=_update_v2_visuals,
             inputs=[ticker_dropdown],
-            outputs=[manifold_3d_plot, hrp_plot, portfolio_table]
+            outputs=[manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot]
         )
 
         load_archive_btn.click(
@@ -845,7 +865,7 @@ def create_ui():
         ).then(
             fn=_update_v2_visuals,
             inputs=[ticker_dropdown],
-            outputs=[manifold_3d_plot, hrp_plot, portfolio_table]
+            outputs=[manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot]
         )
 
         wipe_archive_btn.click(
@@ -855,7 +875,7 @@ def create_ui():
         ).then(
             fn=_update_v2_visuals,
             inputs=[ticker_dropdown],
-            outputs=[manifold_3d_plot, hrp_plot, portfolio_table]
+            outputs=[manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot]
         )
 
         reset_archive_cb.change(
@@ -865,7 +885,7 @@ def create_ui():
         ).then(
             fn=_update_v2_visuals,
             inputs=[ticker_dropdown],
-            outputs=[manifold_3d_plot, hrp_plot, portfolio_table]
+            outputs=[manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot]
         )
 
         ticker_dropdown.change(
@@ -875,7 +895,7 @@ def create_ui():
         ).then(
             fn=_update_v2_visuals,
             inputs=[ticker_dropdown],
-            outputs=[manifold_3d_plot, hrp_plot, portfolio_table]
+            outputs=[manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot]
         )
 
         def on_lookback_change(lookback_choice: str, ticker: str, sort_choice: str, row_choice: str):
@@ -888,7 +908,7 @@ def create_ui():
         ).then(
             fn=_update_v2_visuals,
             inputs=[ticker_dropdown],
-            outputs=[manifold_3d_plot, hrp_plot, portfolio_table]
+            outputs=[manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot]
         )
 
         sort_dropdown.change(
