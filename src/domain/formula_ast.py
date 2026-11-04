@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import random
 import numpy as np
 import pandas as pd
+from numpy.lib.stride_tricks import sliding_window_view
 
 OPERATORS_BINARY = ("ADD", "SUB", "MUL", "DIV_SAFE")
 OPERATORS_UNARY = ("SIGN", "ABS", "LOG_ABS", "SIGMOID", "RELU")
@@ -53,6 +54,25 @@ class ASTNode:
         return f"({l} {sym} {r})"
 
 
+def _fast_ts_rank_20(arr: np.ndarray) -> np.ndarray:
+    """Vectorized SIMD sliding-window percentile rank over 20 periods."""
+    n = len(arr)
+    if n == 0:
+        return np.zeros(0, dtype=np.float64)
+    res = np.empty(n, dtype=np.float64)
+    w = 20
+    for i in range(min(n, w)):
+        prefix = arr[:i + 1]
+        res[i] = (np.count_nonzero(prefix < arr[i]) + 0.5 * np.count_nonzero(prefix == arr[i])) / (i + 1)
+    if n > w:
+        windows = sliding_window_view(arr, window_shape=w)
+        target = arr[w - 1:]
+        less = np.count_nonzero(windows < target[:, None], axis=1)
+        eq = np.count_nonzero(windows == target[:, None], axis=1)
+        res[w - 1:] = (less + 0.5 * eq) / float(w)
+    return res
+
+
 class ASTEvaluator:
     @staticmethod
     def eval_node(node: ASTNode, df: pd.DataFrame, current_regime: int = 0) -> np.ndarray:
@@ -61,11 +81,16 @@ class ASTEvaluator:
             return np.zeros(n, dtype=np.float64)
 
         if node.op == "FEATURE":
-            if node.val in df.columns:
-                return np.nan_to_num(df[node.val].to_numpy(dtype=np.float64), nan=0.0, posinf=1.0, neginf=-1.0)
+            cache = df.attrs.get("_col_arrays")
+            if cache is None:
+                cache = {c: np.nan_to_num(df[c].to_numpy(dtype=np.float64), nan=0.0, posinf=1.0, neginf=-1.0) for c in df.columns}
+                df.attrs["_col_arrays"] = cache
+            if node.val in cache:
+                return cache[node.val]
             if node.val == "Spread":
-                h, l = df["High"].to_numpy(dtype=np.float64), df["Low"].to_numpy(dtype=np.float64)
-                c = df.get("Close_Adj", df.get("Close_Raw", df.get("Close"))).to_numpy(dtype=np.float64)
+                h = cache.get("High", df["High"].to_numpy(dtype=np.float64))
+                l = cache.get("Low", df["Low"].to_numpy(dtype=np.float64))
+                c = cache.get("Close_Adj", cache.get("Close_Raw", cache.get("Close", df.get("Close_Adj", df.get("Close")).to_numpy(dtype=np.float64))))
                 return np.nan_to_num((h - l) / (c + 1e-8), nan=0.0)
             try:
                 return np.full(n, float(node.val), dtype=np.float64)
@@ -99,15 +124,13 @@ class ASTEvaluator:
             return np.nan_to_num(res, nan=0.0)
 
         if node.op in OPERATORS_ROLLING:
+            if node.op == "TS_RANK_20":
+                return _fast_ts_rank_20(child)
             s = pd.Series(child)
             if node.op == "DELTA_5": res = s.diff(5).fillna(0.0).to_numpy()
             elif node.op == "EMA_10": res = s.ewm(span=10, adjust=False).mean().to_numpy()
             elif node.op == "TS_MAX_10": res = s.rolling(10, min_periods=1).max().to_numpy()
             elif node.op == "TS_MIN_10": res = s.rolling(10, min_periods=1).min().to_numpy()
-            elif node.op == "TS_RANK_20":
-                res = s.rolling(20, min_periods=1).apply(
-                    lambda x: (float(np.count_nonzero(x < x[-1])) + 0.5 * float(np.count_nonzero(x == x[-1]))) / max(1, len(x)), raw=True
-                ).fillna(0.5).to_numpy()
             else: res = np.zeros(n)
             return np.nan_to_num(res, nan=0.0)
         return np.zeros(n, dtype=np.float64)

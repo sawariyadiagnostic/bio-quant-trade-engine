@@ -326,6 +326,8 @@ class MapElitesArchive:
         Re-evaluates every stored champion on updated market data.
         Evicts outdated or decayed elites that no longer beat statutory friction or Calmar threshold.
         """
+        total_resident = len(self.get_resident_elites())
+        logger.info(f"Auditing {total_resident} resident elites for factor decay against {len(df)} market bars...")
         pruned_count = 0
         for r in range(self.rows):
             for c in range(self.cols):
@@ -369,6 +371,5 @@ class MapElitesArchive:
                     elite.volatility = round(metrics["annual_vol"], 4)
                     elite.turnover = round(metrics["turnover"], 2)
 
-        if pruned_count > 0:
-            logger.info(f"Temporal Decay Filter: Evicted {pruned_count} outdated elites from archive.")
+        logger.info(f"Temporal Decay Audit: {pruned_count} evicted, {total_resident - pruned_count} retained active.")
         return pruned_count

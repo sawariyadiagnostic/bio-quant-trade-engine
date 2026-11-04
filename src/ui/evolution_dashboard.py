@@ -815,8 +815,19 @@ def run_evolution_stream(
         archive_path=archive_file if not reset_archive else None
     )
 
+    res_count = len(engine.archive.get_resident_elites())
+    if res_count > 0:
+        yield (
+            f"### [AUDITING] Loaded {res_count} resident champions from archive `{clean_t}`\n*Auditing factors against latest {lookback_choice} ({len(df)} bars) on Multi-Core CPU...*",
+            f"Auditing {res_count} resident elites for factor decay...",
+            build_spotlight_markdown(CURRENT_ARCHIVE_RECORDS),
+            build_map_elites_heatmap(CURRENT_ARCHIVE_RECORDS),
+            build_pareto_scatter(CURRENT_ARCHIVE_RECORDS),
+            re_sort_leaderboard(sort_choice, row_choice)
+        )
+
     evicted_decayed = 0
-    if len(engine.archive.get_resident_elites()) > 0:
+    if res_count > 0:
         evicted_decayed = engine.archive.prune_decayed_elites(df, current_regime=0, instrument=instrument, target_mode=target_mode)
 
     engine.initialize_population(seed_nodes=seed_nodes)
@@ -829,6 +840,15 @@ def run_evolution_stream(
     CURRENT_ARCHIVE_RECORDS = engine.archive.get_all_elite_records()
     initial_elites = len(CURRENT_ARCHIVE_RECORDS)
 
+    yield (
+        f"### [SEEDING] Audit complete: {evicted_decayed} evicted, {initial_elites} active.\n*Seeding initial gene pool ({len(seed_nodes)} seeds, {compiled_custom} custom)...*",
+        f"Seeded {len(seed_nodes)} initial alphas. Initializing Generation 1 of {generations}...",
+        build_spotlight_markdown(CURRENT_ARCHIVE_RECORDS),
+        build_map_elites_heatmap(CURRENT_ARCHIVE_RECORDS),
+        build_pareto_scatter(CURRENT_ARCHIVE_RECORDS),
+        re_sort_leaderboard(sort_choice, row_choice)
+    )
+
     status_header = (
         f"### 🧬 Continual Evolution Active: `{ticker}`\n"
         f"- **Historical Horizon:** `{lookback_choice}` ({len(df)} sessions) | **Mode:** {target_mode.upper()} | **Friction:** {'1.2 bps (ETF)' if 'BEES' in ticker else '3.0 bps (Futures)'}\n"
@@ -839,7 +859,9 @@ def run_evolution_stream(
 
     for gen in range(1, int(generations) + 1):
         try:
+            print(f"[GEN {gen}/{generations}] Evolving {pop_size} offspring on vectorized CPU...")
             stats = engine.evolve_generation(df, current_regime=0, target_mode=target_mode)
+            print(f"[GEN {gen}/{generations}] Complete: {stats['thymic_survivors']} survived, {stats['archive_inserted']} new elites added.")
             CURRENT_ARCHIVE_RECORDS = engine.archive.get_all_elite_records()
 
             telemetry_md = (
