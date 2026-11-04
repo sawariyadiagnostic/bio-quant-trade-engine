@@ -374,12 +374,14 @@ def build_3d_manifold_plot(
 def build_hrp_weights_plot(weights: Dict[str, float]) -> go.Figure:
     """Generate bar chart of Hierarchical Risk Parity capital distribution."""
     fig = go.Figure()
-    if weights:
+    if weights and any(v > 0 for v in weights.values()):
         tickers = list(weights.keys())
         allocations = [weights[t] * 100 for t in tickers]
+        palette = ["#00CC96", "#636EFA", "#EF553B", "#AB63FA", "#FFA15A", "#19D3F3", "#FF6692", "#B6E880"]
+        colors = [palette[i % len(palette)] for i in range(len(tickers))]
         fig.add_trace(go.Bar(
             x=tickers, y=allocations,
-            marker=dict(color=["#00CC96", "#636EFA", "#EF553B", "#AB63FA"][:len(tickers)])
+            marker=dict(color=colors)
         ))
         fig.update_layout(
             title="HRP Optimal Capital Allocation (%)",
@@ -422,15 +424,31 @@ def build_cosine_similarity_heatmap(records: List[Dict[str, Any]]) -> go.Figure:
     """Renders a pairwise cosine similarity matrix across top resident champions in 1024D embedding space."""
     fig = go.Figure()
     if records and len(records) >= 2:
-        n = min(len(records), 8)
-        matrix = np.eye(n)
+        from ..domain.formula_parser import FormulaParser
+        from ..clustering.phenotype_extractor import PhenotypeExtractor
+
+        n = min(len(records), 10)
+        parsed_nodes = []
+        valid_indices = []
         for i in range(n):
-            for j in range(i + 1, n):
-                r_diff = abs(records[i].get("row", i) - records[j].get("row", j))
-                sim = max(0.08, 1.0 - r_diff * 0.09)
-                matrix[i, j] = sim
-                matrix[j, i] = sim
-        names = [f"#{i+1} {records[i].get('formula_str', '')[:16]}.." for i in range(n)]
+            f_str = records[i].get("formula_str", "")
+            try:
+                node = FormulaParser.parse(f_str)
+                parsed_nodes.append(node)
+                valid_indices.append(i)
+            except Exception:
+                pass
+
+        if len(parsed_nodes) >= 2:
+            extractor = PhenotypeExtractor.create_mock(n_assets=3, n_bars=100)
+            embeddings = extractor.extract_dense_batch(parsed_nodes, target_dim=1024)
+            # Dot product of unit-norm vectors = exact cosine similarity
+            matrix = np.clip(embeddings @ embeddings.T, 0.0, 1.0)
+            names = [f"#{valid_indices[i]+1} {records[valid_indices[i]].get('formula_str', '')[:16]}.." for i in range(len(valid_indices))]
+        else:
+            matrix = np.eye(n)
+            names = [f"#{i+1} {records[i].get('formula_str', '')[:16]}.." for i in range(n)]
+
         fig.add_trace(go.Heatmap(
             z=matrix, x=names, y=names, colorscale="Viridis", zmin=0.0, zmax=1.0,
             colorbar=dict(title="Cosine Sim")

@@ -296,7 +296,7 @@ def _parse_leaderboard_to_records(raw_board: List[Dict[str, Any]]) -> List[Dict[
         })
     return parsed
 
-def _update_v2_visuals(ticker: str):
+def _update_v2_visuals(ticker: str, initial_cash: float = 50000.0):
     """Updates 3D manifold, HRP weights, paper portfolio, and 1024D similarity heatmap."""
     global CURRENT_ARCHIVE_RECORDS
     if not CURRENT_ARCHIVE_RECORDS:
@@ -312,10 +312,8 @@ def _update_v2_visuals(ticker: str):
     texts = [r.get("formula_str", f"Alpha #{i}") for i, r in enumerate(CURRENT_ARCHIVE_RECORDS)]
 
     m_plot = build_3d_manifold_plot(coords=coords, labels=labels, texts=texts)
-    hrp_plot = build_hrp_weights_plot({ticker: 0.5, "BANKBEES": 0.3, "GOLDBEES": 0.2})
-    positions = {ticker: {"quantity": 38, "avg_price": 261.88}}
-    prices = {ticker: 261.88}
-    port_table = format_portfolio_table(positions, prices, cash=40000.0)
+    hrp_plot = build_hrp_weights_plot({ticker: 1.0})
+    port_table = format_portfolio_table({}, {}, cash=initial_cash)
     sim_heatmap = build_cosine_similarity_heatmap(CURRENT_ARCHIVE_RECORDS)
     return m_plot, hrp_plot, port_table, sim_heatmap
 
@@ -495,12 +493,13 @@ def run_master_dispatch_stream(
         ratio = report.get("compression_ratio", 0.0) * 100
         equity = report.get("portfolio_equity", float(initial_cash))
         noise_count = report.get("orthogonal_count", 0)
+        multi_sharpe = round(float(np.mean([r.get("fitness", 1.5) for r in synth_records])), 2) if synth_records else 0.0
 
         final_hud = build_avionics_hud_markdown(
             equity=equity,
             elites_count=len(champions),
             compression_ratio=ratio,
-            sharpe=2.45,
+            sharpe=multi_sharpe,
             overheat_level="LOW (Optimal)",
             status_msg="CYCLE COMPLETE"
         )
@@ -548,12 +547,16 @@ def run_master_dispatch_stream(
 
     for item in stream:
         status_h, telem_md, spot_md, heat_fig, p_fig, board_df = item
-        m_fig, w_fig, p_df, s_heat = _update_v2_visuals(ticker_single)
+        m_fig, w_fig, p_df, s_heat = _update_v2_visuals(ticker_single, initial_cash=float(initial_cash))
+        elites_n = len(CURRENT_ARCHIVE_RECORDS)
+        # Compute dynamic stats from actual archive records
+        sharpe_val = round(float(np.mean([r.get("fitness", 1.0) for r in CURRENT_ARCHIVE_RECORDS])), 2) if CURRENT_ARCHIVE_RECORDS else 0.0
+        comp_ratio = round(max(0.0, (1.0 - elites_n / max(1, pop_size * generations))) * 100.0, 1)
         curr_hud = build_avionics_hud_markdown(
             equity=float(initial_cash),
-            elites_count=len(CURRENT_ARCHIVE_RECORDS),
-            compression_ratio=94.2,
-            sharpe=2.10,
+            elites_count=elites_n,
+            compression_ratio=comp_ratio,
+            sharpe=sharpe_val,
             overheat_level="LOW (Optimal)",
             status_msg="EVOLUTION ACTIVE"
         )
@@ -856,6 +859,7 @@ def run_evolution_stream(
         f"- **Persistent Archive:** {initial_elites} resident champions active ({evicted_decayed} outdated evicted)\n"
         f"- **Initial Pool:** {len(seed_nodes)} seeds injected ({compiled_custom} user-defined, {len(seed_nodes) - compiled_custom} literature alphas)\n"
     )
+    telemetry_md = f"Starting Generation 1/{generations}..."
 
     for gen in range(1, int(generations) + 1):
         try:
@@ -1055,7 +1059,7 @@ def create_ui():
                 gr.update(visible=is_multi),
                 gr.update(visible=not is_multi),
                 gr.update(visible=not is_multi),
-                gr.update(visible=is_multi)
+                gr.update(visible=True)
             )
 
         mode_radio.change(
