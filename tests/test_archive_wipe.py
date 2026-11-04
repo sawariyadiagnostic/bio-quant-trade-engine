@@ -6,7 +6,11 @@ Test suite verifying instant archive wiping and reset functionality:
 4. run_evolution_stream with reset_archive=True wipes prior records on yield 1.
 """
 import os
+import sys
 import json
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from src.ui.evolution_dashboard import (
     wipe_and_reset_archive,
     on_reset_checkbox_change,

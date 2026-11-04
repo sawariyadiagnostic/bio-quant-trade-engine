@@ -317,3 +317,83 @@ def format_leaderboard_table(
         })
 
     return pd.DataFrame(rows) if rows else EMPTY_LEADERBOARD
+
+
+EMPTY_PORTFOLIO = pd.DataFrame([{
+    "Ticker": "-", "Lots": 0, "Price (₹)": "₹0.00", "Value (₹)": "₹0.00", "Weight": "0.0%"
+}])
+
+
+def build_3d_manifold_plot(
+    coords: Optional[np.ndarray] = None,
+    labels: Optional[List[int]] = None,
+    texts: Optional[List[str]] = None
+) -> go.Figure:
+    """Render interactive 3D UMAP manifold scatter plot."""
+    fig = go.Figure()
+    if coords is not None and len(coords) > 0 and coords.shape[1] >= 3:
+        colors = labels if labels is not None else [0] * len(coords)
+        hover = texts if texts is not None else [f"Alpha #{i}" for i in range(len(coords))]
+        fig.add_trace(go.Scatter3d(
+            x=coords[:, 0], y=coords[:, 1], z=coords[:, 2],
+            mode="markers",
+            marker=dict(size=6, color=colors, colorscale="Viridis", opacity=0.85, showscale=True),
+            text=hover, hoverinfo="text"
+        ))
+        fig.update_layout(
+            title="3D UMAP Strategy Manifold (HDBSCAN Clustered)",
+            scene=dict(xaxis_title="UMAP 1", yaxis_title="UMAP 2", zaxis_title="UMAP 3"),
+            margin=dict(l=0, r=0, b=0, t=30), template="plotly_dark"
+        )
+    else:
+        fig.add_annotation(text="No Manifold Data Yet — Launch Evolution to Populate", showarrow=False, font=dict(size=14, color="gray"))
+        fig.update_layout(template="plotly_dark", height=450)
+    return fig
+
+
+def build_hrp_weights_plot(weights: Dict[str, float]) -> go.Figure:
+    """Generate bar chart of Hierarchical Risk Parity capital distribution."""
+    fig = go.Figure()
+    if weights:
+        tickers = list(weights.keys())
+        allocations = [weights[t] * 100 for t in tickers]
+        fig.add_trace(go.Bar(
+            x=tickers, y=allocations,
+            marker=dict(color=["#00CC96", "#636EFA", "#EF553B", "#AB63FA"][:len(tickers)])
+        ))
+        fig.update_layout(
+            title="HRP Optimal Capital Allocation (%)",
+            yaxis_title="Allocation %", yaxis_range=[0, 100],
+            template="plotly_dark", margin=dict(l=20, r=20, t=35, b=20), height=320
+        )
+    else:
+        fig.update_layout(template="plotly_dark", height=320)
+    return fig
+
+
+def format_portfolio_table(
+    positions: Dict[str, Any],
+    prices: Dict[str, float],
+    cash: float = 50000.0
+) -> pd.DataFrame:
+    """Format active positions and ledger into presentation dataframe."""
+    rows = []
+    total_val = cash
+    for sym, pos in positions.items():
+        qty = pos.get("quantity", 0) if isinstance(pos, dict) else int(pos)
+        px = prices.get(sym, pos.get("avg_price", 0.0) if isinstance(pos, dict) else 0.0)
+        val = qty * px
+        total_val += val
+        rows.append({
+            "Ticker": sym, "Lots": qty, "Price (₹)": f"₹{px:,.2f}",
+            "Value (₹)": f"₹{val:,.2f}", "Weight": "Pending"
+        })
+    for r in rows:
+        val_num = float(r["Value (₹)"].replace("₹", "").replace(",", ""))
+        r["Weight"] = f"{val_num / total_val * 100:.1f}%" if total_val > 0 else "0.0%"
+    rows.append({
+        "Ticker": "💵 CASH_RESERVE", "Lots": 1, "Price (₹)": f"₹{cash:,.2f}",
+        "Value (₹)": f"₹{cash:,.2f}", "Weight": f"{cash / total_val * 100:.1f}%" if total_val > 0 else "100.0%"
+    })
+    return pd.DataFrame(rows) if rows else EMPTY_PORTFOLIO
+

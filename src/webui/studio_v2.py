@@ -513,4 +513,4 @@ def create_dashboard_app() -> gr.Blocks:
 
 if __name__ == "__main__":
     app = create_dashboard_app()
-    app.launch(server_name="127.0.0.1", server_port=7862)
+    app.queue().launch(server_name="127.0.0.1", server_port=7862)
