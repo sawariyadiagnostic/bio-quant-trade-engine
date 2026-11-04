@@ -918,6 +918,7 @@ def run_evolution_stream(
     )
 
 def create_ui():
+    init_m_plot, init_hrp_plot, init_port_table, init_sim_heatmap = _update_v2_visuals("NIFTYBEES", 50000.0)
     with gr.Blocks(title="Bio-Quant Alpha-OS v2.0: Master Cockpit", theme=gr.themes.Soft()) as demo:
         hud_box = gr.Markdown(
             build_avionics_hud_markdown(
@@ -1014,22 +1015,22 @@ def create_ui():
                 )
 
                 with gr.Tabs():
-                    with gr.TabItem("🌌 3D Phenotype Manifold (Fog-of-War & HDBSCAN)"):
-                        manifold_3d_plot = gr.Plot(value=build_3d_manifold_plot(), label="3D Phenotype Strategy Manifold")
-
                     with gr.TabItem("🗺️ 2D Tactical View (MAP-Elites & Pareto Side-by-Side)"):
                         with gr.Row():
                             heatmap_plot = gr.Plot(value=build_map_elites_heatmap(CURRENT_ARCHIVE_RECORDS), label="MAP-Elites 400-Niche Map")
                             scatter_plot = gr.Plot(value=build_pareto_scatter(CURRENT_ARCHIVE_RECORDS), label="Pareto Frontier (Drawdown vs Net Return)")
 
+                    with gr.TabItem("🌌 3D Phenotype Manifold (Fog-of-War & HDBSCAN)"):
+                        manifold_3d_plot = gr.Plot(value=init_m_plot, label="3D Phenotype Strategy Manifold")
+
                     with gr.TabItem("⚖️ Hierarchical Risk Parity (HRP)"):
-                        hrp_plot = gr.Plot(value=build_hrp_weights_plot({}), label="Optimal Capital Allocation")
+                        hrp_plot = gr.Plot(value=init_hrp_plot, label="Optimal Capital Allocation")
 
                     with gr.TabItem("💼 Multi-Asset Virtual Portfolio & Ledger"):
-                        portfolio_table = gr.DataFrame(value=EMPTY_PORTFOLIO, label="Virtual Broker Positions & Ledger")
+                        portfolio_table = gr.DataFrame(value=init_port_table, label="Virtual Broker Positions & Ledger")
 
                     with gr.TabItem("🧬 1024D Protein Latent Space (Cosine Heatmap)"):
-                        sim_heatmap_plot = gr.Plot(value=build_cosine_similarity_heatmap(CURRENT_ARCHIVE_RECORDS), label="1024D Pairwise Cosine Similarity")
+                        sim_heatmap_plot = gr.Plot(value=init_sim_heatmap, label="1024D Pairwise Cosine Similarity")
 
                     with gr.TabItem("🏆 Resident Champions Leaderboard (Sortable Archive)"):
                         spotlight_box = gr.Markdown(build_spotlight_markdown(CURRENT_ARCHIVE_RECORDS))
