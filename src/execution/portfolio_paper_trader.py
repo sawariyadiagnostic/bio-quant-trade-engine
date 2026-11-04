@@ -15,12 +15,14 @@ class PortfolioPaperTrader:
     cash: float = field(init=False)
     positions: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     trade_history: List[Dict[str, Any]] = field(default_factory=list)
+    latest_prices: Dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self):
         self.cash = float(self.initial_capital)
 
     def get_total_equity(self, current_prices: Dict[str, float]) -> float:
         """Calculates mark-to-market total portfolio equity."""
+        self.latest_prices.update(current_prices)
         pos_val = sum(
             pos["quantity"] * current_prices.get(sym, pos["avg_price"])
             for sym, pos in self.positions.items()
@@ -36,6 +38,7 @@ class PortfolioPaperTrader:
         Executes a portfolio-wide target allocation rebalance.
         Sells are processed first to free up liquidity before executing buys.
         """
+        self.latest_prices.update(current_prices)
         executed_trades: List[Dict[str, Any]] = []
         friction = self.friction_bps / 10000.0
         total_equity = self.get_total_equity(current_prices)
