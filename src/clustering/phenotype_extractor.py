@@ -1,5 +1,5 @@
 """Multi-Asset Phenotype Vector Extractor (Wave 3: Task 3.1)."""
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 from ..data.vector_lake import VectorDataLake
@@ -78,6 +78,40 @@ class PhenotypeExtractor:
         """Extracts dense [N, target_dim] continuous latent matrix across formulas."""
         embeddings = [self.extract_dense_embedding(ast, target_dim=target_dim) for ast in ast_list]
         return np.stack(embeddings, axis=0) if embeddings else np.empty((0, target_dim), dtype=np.float32)
+
+    @staticmethod
+    def extract_simhash_bitmask(embedding: np.ndarray, n_bits: int = 64) -> np.ndarray:
+        """
+        Quantizes continuous embedding into a compact 1-bit SimHash boolean bitmask.
+        Allows sub-millisecond clone screening via SIMD popcount Hamming distance.
+        """
+        if len(embedding) == 0:
+            return np.zeros(n_bits, dtype=np.uint8)
+        indices = np.linspace(0, len(embedding) - 1, n_bits, dtype=int)
+        sampled = embedding[indices]
+        return (sampled > 0.0).astype(np.uint8)
+
+    @staticmethod
+    def compute_simhash_hamming_distance(mask_a: np.ndarray, mask_b: np.ndarray) -> int:
+        """Computes Hamming distance between two 1-bit SimHash bitmasks."""
+        return int(np.sum(mask_a ^ mask_b))
+
+    @staticmethod
+    def calculate_crowding_tripwire(embeddings: np.ndarray, threshold: float = 0.88) -> Tuple[float, str]:
+        """
+        Calculates maximum pairwise cosine similarity and returns crowding tripwire status:
+        'LOW (Optimal)', 'MED (Watchlist)', or 'TRIPWIRE (Triggered)'.
+        """
+        if len(embeddings) < 2:
+            return 0.0, "LOW (Optimal)"
+        sim_matrix = np.dot(embeddings, embeddings.T)
+        np.fill_diagonal(sim_matrix, 0.0)
+        max_sim = float(np.max(sim_matrix))
+        if max_sim >= threshold:
+            return max_sim, "TRIPWIRE (Triggered)"
+        elif max_sim >= 0.75:
+            return max_sim, "MED (Watchlist)"
+        return max_sim, "LOW (Optimal)"
 
     @classmethod
     def create_mock(cls, n_assets: int = 3, n_bars: int = 100) -> "PhenotypeExtractor":

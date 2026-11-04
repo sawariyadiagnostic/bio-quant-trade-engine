@@ -329,25 +329,45 @@ def build_3d_manifold_plot(
     labels: Optional[List[int]] = None,
     texts: Optional[List[str]] = None
 ) -> go.Figure:
-    """Render interactive 3D UMAP manifold scatter plot."""
+    """Render interactive 3D UMAP manifold scatter plot with ambient Fog-of-War grid."""
     fig = go.Figure()
     if coords is not None and len(coords) > 0 and coords.shape[1] >= 3:
         colors = labels if labels is not None else [0] * len(coords)
         hover = texts if texts is not None else [f"Alpha #{i}" for i in range(len(coords))]
+        # Ambient Fog-of-War bounding shell (unexplored latent space)
+        x_min, x_max = np.min(coords[:, 0]), np.max(coords[:, 0])
+        y_min, y_max = np.min(coords[:, 1]), np.max(coords[:, 1])
+        z_min, z_max = np.min(coords[:, 2]), np.max(coords[:, 2])
+        fig.add_trace(go.Scatter3d(
+            x=[x_min, x_max, x_max, x_min, x_min],
+            y=[y_min, y_min, y_max, y_max, y_min],
+            z=[z_min, z_min, z_min, z_min, z_min],
+            mode="lines",
+            line=dict(color="rgba(100, 150, 255, 0.25)", width=2),
+            name="Explored Perimeter",
+            hoverinfo="skip"
+        ))
+        # Active illuminated strategy clusters
         fig.add_trace(go.Scatter3d(
             x=coords[:, 0], y=coords[:, 1], z=coords[:, 2],
             mode="markers",
-            marker=dict(size=6, color=colors, colorscale="Viridis", opacity=0.85, showscale=True),
-            text=hover, hoverinfo="text"
+            marker=dict(size=7, color=colors, colorscale="Viridis", opacity=0.9, showscale=True),
+            text=hover, hoverinfo="text",
+            name="Alpha Clusters"
         ))
         fig.update_layout(
-            title="3D UMAP Strategy Manifold (HDBSCAN Clustered)",
-            scene=dict(xaxis_title="UMAP 1", yaxis_title="UMAP 2", zaxis_title="UMAP 3"),
-            margin=dict(l=0, r=0, b=0, t=30), template="plotly_dark"
+            title="🌌 3D Phenotype Strategy Manifold (Fog-of-War & HDBSCAN Clustered)",
+            scene=dict(
+                xaxis_title="UMAP 1 (Factor Harmonic)",
+                yaxis_title="UMAP 2 (Downside Vol)",
+                zaxis_title="UMAP 3 (Return Trajectory)",
+                bgcolor="rgba(10, 15, 25, 0.95)"
+            ),
+            margin=dict(l=0, r=0, b=0, t=30), template="plotly_dark", height=440
         )
     else:
-        fig.add_annotation(text="No Manifold Data Yet — Launch Evolution to Populate", showarrow=False, font=dict(size=14, color="gray"))
-        fig.update_layout(template="plotly_dark", height=450)
+        fig.add_annotation(text="🌌 3D Fog-of-War: Launch Engine to Illuminate Uncharted Alpha Sectors", showarrow=False, font=dict(size=13, color="gray"))
+        fig.update_layout(template="plotly_dark", height=440)
     return fig
 
 
@@ -423,5 +443,66 @@ def build_cosine_similarity_heatmap(records: List[Dict[str, Any]]) -> go.Figure:
         fig.add_annotation(text="Launch Evolution or Load Archive to Compute 1024D Similarity Matrix", showarrow=False, font=dict(color="gray"))
         fig.update_layout(template="plotly_dark", height=380)
     return fig
+
+
+def build_avionics_hud_markdown(
+    equity: float = 100000.0,
+    elites_count: int = 0,
+    compression_ratio: float = 0.0,
+    sharpe: float = 0.0,
+    overheat_level: str = "LOW (Optimal)",
+    status_msg: str = "SYSTEM ARMED & READY"
+) -> str:
+    """Renders a top fixed-aspect avionics annunciator HUD ribbon with live KPI cards."""
+    overheat_color = "#00CC96" if "LOW" in overheat_level else ("#FFA500" if "MED" in overheat_level else "#FF3366")
+    comp_pct = compression_ratio * 100 if compression_ratio <= 1.0 else compression_ratio
+    return f"""
+<div style="background: linear-gradient(135deg, #0d1117 0%, #161b22 100%); border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #21262d; padding-bottom: 8px; margin-bottom: 10px;">
+    <div style="font-weight: 700; font-size: 1.1rem; color: #58a6ff; letter-spacing: 0.5px;">
+      🧬 BIO-QUANT ALPHA-OS <span style="font-size: 0.85rem; color: #8b949e;">v2.0 MASTER COCKPIT</span>
+    </div>
+    <div style="display: flex; gap: 12px; font-size: 0.8rem; font-family: monospace;">
+      <span style="background: #238636; color: #fff; padding: 2px 8px; border-radius: 4px;">🟢 {status_msg}</span>
+      <span style="background: #1f6feb; color: #fff; padding: 2px 8px; border-radius: 4px;">⚡ SIMD/CUDA ACTIVE</span>
+      <span style="background: #8957e5; color: #fff; padding: 2px 8px; border-radius: 4px;">🛡️ SHOONYA GATEWAY</span>
+    </div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; text-align: center;">
+    <div style="background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px;">
+      <div style="font-size: 0.75rem; color: #8b949e;">TOTAL CAPITAL (₹)</div>
+      <div style="font-size: 1.15rem; font-weight: 700; color: #39d353;">₹{equity:,.2f}</div>
+    </div>
+    <div style="background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px;">
+      <div style="font-size: 0.75rem; color: #8b949e;">ARCHIVE CHAMPIONS</div>
+      <div style="font-size: 1.15rem; font-weight: 700; color: #58a6ff;">{elites_count} Elites</div>
+    </div>
+    <div style="background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px;">
+      <div style="font-size: 0.75rem; color: #8b949e;">CLONE PRUNED %</div>
+      <div style="font-size: 1.15rem; font-weight: 700; color: #d2a8ff;">{comp_pct:.1f}%</div>
+    </div>
+    <div style="background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px;">
+      <div style="font-size: 0.75rem; color: #8b949e;">PORTFOLIO SHARPE</div>
+      <div style="font-size: 1.15rem; font-weight: 700; color: #f0883e;">{sharpe:.2f}</div>
+    </div>
+    <div style="background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px;">
+      <div style="font-size: 0.75rem; color: #8b949e;">OVERHEAT TRIPWIRE</div>
+      <div style="font-size: 1.15rem; font-weight: 700; color: {overheat_color};">{overheat_level}</div>
+    </div>
+  </div>
+</div>
+"""
+
+
+def build_combat_telemetry_markdown(title: str, lines: List[str]) -> str:
+    """Formats live execution ticks and generational throughput into an RPG combat log style."""
+    rendered_lines = "<br>".join([f"› {line}" for line in lines]) if lines else "› Ready to engage master engine."
+    return f"""
+<div style="background: #090d13; border: 1px solid #30363d; border-left: 4px solid #58a6ff; border-radius: 4px; padding: 8px 12px; font-family: monospace; font-size: 0.85rem; color: #c9d1d9;">
+  <div style="font-weight: 600; color: #79c0ff; margin-bottom: 4px;">📜 TELEMETRY COMBAT STRIP: {title}</div>
+  <div style="line-height: 1.4;">{rendered_lines}</div>
+</div>
+"""
+
 
 

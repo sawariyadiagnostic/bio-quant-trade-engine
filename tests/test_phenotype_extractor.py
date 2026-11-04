@@ -62,7 +62,36 @@ def test_phenotype_dense_1024_embedding():
     print("[PASS] test_phenotype_dense_1024_embedding")
 
 
+def test_phenotype_simhash_and_crowding_tripwire():
+    """Verify 1-bit SimHash bitmask extraction and crowding tripwire detection."""
+    from src.clustering.phenotype_extractor import PhenotypeExtractor
+    from src.domain.formula_parser import FormulaParser
+
+    extractor = PhenotypeExtractor.create_mock(n_assets=2, n_bars=50)
+    ast1 = FormulaParser.parse("MEGA_SWITCH(Garman_Klass_Vol > 0.02, Close_Adj, Open)")
+    ast2 = FormulaParser.parse("MEGA_SWITCH(Garman_Klass_Vol > 0.02, Close_Adj, Open)")
+
+    emb1 = extractor.extract_dense_embedding(ast1, target_dim=1024)
+    emb2 = extractor.extract_dense_embedding(ast2, target_dim=1024)
+
+    mask1 = extractor.extract_simhash_bitmask(emb1, n_bits=64)
+    mask2 = extractor.extract_simhash_bitmask(emb2, n_bits=64)
+
+    assert mask1.shape == (64,)
+    # Identical strategies must have zero Hamming distance
+    ham_dist = extractor.compute_simhash_hamming_distance(mask1, mask2)
+    assert ham_dist == 0
+
+    # Test crowding tripwire on clone embeddings
+    matrix = np.stack([emb1, emb2], axis=0)
+    max_sim, status = extractor.calculate_crowding_tripwire(matrix, threshold=0.88)
+    assert np.isclose(max_sim, 1.0, atol=1e-3)
+    assert status == "TRIPWIRE (Triggered)"
+    print("[PASS] test_phenotype_simhash_and_crowding_tripwire")
+
+
 if __name__ == "__main__":
     test_phenotype_vector_extraction()
     test_phenotype_matrix_batch_extraction()
     test_phenotype_dense_1024_embedding()
+    test_phenotype_simhash_and_crowding_tripwire()
