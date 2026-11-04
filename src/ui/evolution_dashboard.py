@@ -1135,8 +1135,11 @@ def create_ui():
 
     return demo
 
-    return demo
-
 if __name__ == "__main__":
     demo = create_ui()
-    demo.queue().launch(server_name="127.0.0.1", server_port=7860, share=False)
+    port = int(os.environ.get("GRADIO_SERVER_PORT", 7860))
+    try:
+        demo.queue().launch(server_name="127.0.0.1", server_port=port, share=False)
+    except OSError:
+        print(f"[PORT WARNING] Port {port} is busy or in TIME_WAIT. Auto-binding to next available free port...")
+        demo.queue().launch(server_name="127.0.0.1", server_port=None, share=False)
