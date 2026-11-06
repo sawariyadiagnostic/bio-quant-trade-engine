@@ -87,7 +87,37 @@ def test_ast_canonical_hash_and_bounded_math():
     print("[PASS] test_ast_canonical_hash_and_bounded_math")
 
 
+def test_cross_sectional_operators():
+    """Verify CS_Rank and CS_Demean compute cross-sectional alpha across multi-asset slices."""
+    from src.domain.formula_ast import cs_rank, cs_demean, OPERATORS_CROSS_SECTIONAL
+
+    assert "CS_RANK" in OPERATORS_CROSS_SECTIONAL
+    assert "CS_DEMEAN" in OPERATORS_CROSS_SECTIONAL
+
+    # 3 assets (N=3), 4 time bars (T=4)
+    raw_slice = np.array([
+        [10.0, 20.0, 30.0, 40.0],
+        [20.0, 10.0, 10.0, 50.0],
+        [30.0, 30.0, 20.0, 10.0]
+    ], dtype=np.float64)
+
+    ranked = cs_rank(raw_slice)
+    assert ranked.shape == (3, 4)
+    # At t=0: values are 10, 20, 30 -> ranks should be 0.5/3, 1.5/3, 2.5/3
+    assert np.isclose(ranked[0, 0], 0.5 / 3.0)
+    assert np.isclose(ranked[1, 0], 1.5 / 3.0)
+    assert np.isclose(ranked[2, 0], 2.5 / 3.0)
+
+    demeaned = cs_demean(raw_slice)
+    assert demeaned.shape == (3, 4)
+    # Cross-sectional mean at every time step t must be exactly 0.0
+    cs_sums = np.sum(demeaned, axis=0)
+    assert np.allclose(cs_sums, [0.0, 0.0, 0.0, 0.0])
+    print("[PASS] test_cross_sectional_operators")
+
+
 if __name__ == "__main__":
     test_mega_evolution_ast_evaluation()
     test_mega_evolution_formula_string_and_parsing()
     test_ast_canonical_hash_and_bounded_math()
+    test_cross_sectional_operators()

@@ -24,7 +24,7 @@
 | **P0** | **Task 3** | AST Math Clamping (`EXP/LOG/POW_SAFE`) & MurmurHash | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[x]` Complete | `feat(ast)` |
 | **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[x]` Complete | `fix(pipeline)` |
 | **P1** | **Task 5** | Multi-Asset 3D Tensor Simulation `(B, N, T)` | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[x]` Complete | `feat(backtest)` |
-| **P1** | **Task 6** | Cross-Sectional Alpha Operators (`CS_Rank`, `CS_Demean`) | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[ ]` Not Started | - |
+| **P1** | **Task 6** | Cross-Sectional Alpha Operators (`CS_Rank`, `CS_Demean`) | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[x]` Complete | `feat(ast)` |
 | **P1** | **Task 7** | Ward/Average Linkage HRP & Ledoit-Wolf Shrinkage | `src/execution/hrp_allocator.py`, `tests/test_hrp_allocator.py`| `[ ]` Not Started | - |
 | **P1** | **Task 8** | Purged & Embargoed Walk-Forward Validation | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[ ]` Not Started | - |
 | **P1** | **Task 9** | MAP-Elites 2-Objective Pareto & 2x Friction Stress Test | `src/evolution/map_elites.py`, `tests/test_lookback_cagr_partitioning.py` | `[ ]` Not Started | - |
@@ -171,19 +171,19 @@
 - Modify: `src/domain/formula_ast.py:60-120`
 - Test: `tests/test_mega_evolution_ast.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_mega_evolution_ast.py`, assert that `CS_Rank` normalizes across assets to $[0.0, 1.0]$, and `CS_Demean` centers values to zero mean.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_mega_evolution_ast.py`  
   Expected: FAIL (`KeyError: 'CS_Rank'`).
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/domain/formula_ast.py`:
   - Implement `CS_Rank` using `scipy.stats.rankdata(axis=0)`.
   - Implement `CS_Demean`: `arr - np.mean(arr, axis=0)`.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_mega_evolution_ast.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "feat(ast): add cross-sectional rank and demean operators"`
 
 ---

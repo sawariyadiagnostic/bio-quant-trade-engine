@@ -9,6 +9,27 @@ from numpy.lib.stride_tricks import sliding_window_view
 OPERATORS_BINARY = ("ADD", "SUB", "MUL", "DIV_SAFE")
 OPERATORS_UNARY = ("SIGN", "ABS", "LOG_ABS", "SIGMOID", "RELU", "EXP_SAFE", "LOG_SAFE")
 OPERATORS_ROLLING = ("DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20")
+OPERATORS_CROSS_SECTIONAL = ("CS_RANK", "CS_DEMEAN")
+
+
+def cs_rank(matrix: np.ndarray) -> np.ndarray:
+    """Cross-sectional rank across asset axis (axis=0) normalized to [0, 1]."""
+    arr = np.asarray(matrix, dtype=np.float64)
+    if arr.ndim == 1:
+        return np.full_like(arr, 0.5)
+    n_assets = arr.shape[0]
+    if n_assets <= 1:
+        return np.full_like(arr, 0.5)
+    ranks = np.argsort(np.argsort(arr, axis=0), axis=0).astype(np.float64)
+    return (ranks + 0.5) / float(n_assets)
+
+
+def cs_demean(matrix: np.ndarray) -> np.ndarray:
+    """Cross-sectional de-meaning across asset axis (axis=0) so sum(alpha)=0."""
+    arr = np.asarray(matrix, dtype=np.float64)
+    if arr.ndim == 1:
+        return np.zeros_like(arr)
+    return arr - np.mean(arr, axis=0, keepdims=True)
 
 STANDARD_FEATURES = [
     "Close_Adj", "Open", "High", "Low", "Volume", "Spread", "Vol_ZScore", "Vol_Price_Flow",
@@ -61,7 +82,7 @@ class ASTNode:
             b = self.children[1].to_formula_str() if len(self.children) > 1 else "0"
             m = self.children[2].to_formula_str() if len(self.children) > 2 else "0"
             return f"MEGA_SWITCH({c}, {b}, {m})"
-        if self.op in (OPERATORS_ROLLING + OPERATORS_UNARY):
+        if self.op in (OPERATORS_ROLLING + OPERATORS_UNARY + OPERATORS_CROSS_SECTIONAL):
             return f"{self.op}({self.children[0].to_formula_str() if self.children else 'X'})"
         sym = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV_SAFE": "/"}.get(self.op, self.op)
         l = self.children[0].to_formula_str() if self.children else "0"
@@ -139,6 +160,11 @@ class ASTEvaluator:
             elif node.op == "LOG_SAFE": res = np.log(np.maximum(1e-8, np.abs(child)))
             else: res = np.zeros(n)
             return np.nan_to_num(res, nan=0.0)
+
+        if node.op in OPERATORS_CROSS_SECTIONAL:
+            if node.op == "CS_RANK": return cs_rank(child)
+            elif node.op == "CS_DEMEAN": return cs_demean(child)
+            return np.nan_to_num(child, nan=0.0)
 
         if node.op in OPERATORS_ROLLING:
             if node.op == "TS_RANK_20":

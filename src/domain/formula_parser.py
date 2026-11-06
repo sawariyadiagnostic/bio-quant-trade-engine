@@ -1,7 +1,7 @@
 """Mathematical Formula String Parser & AST Compiler (Ponytail MVC)."""
 import re
 from typing import Optional
-from .formula_ast import ASTNode, OPERATORS_UNARY, OPERATORS_ROLLING
+from .formula_ast import ASTNode, OPERATORS_UNARY, OPERATORS_ROLLING, OPERATORS_CROSS_SECTIONAL
 
 OP_MAP = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV_SAFE"}
 
@@ -36,7 +36,7 @@ class FormulaParser:
                     active_regimes=set(regimes),
                     children=[FormulaParser.parse(a, regimes, _depth + 1) for a in sub_args]
                 )
-            if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING):
+            if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING + OPERATORS_CROSS_SECTIONAL):
                 return ASTNode(
                     op=op_name,
                     active_regimes=set(regimes),
