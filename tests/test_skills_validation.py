@@ -121,9 +121,23 @@ def test_empirical_dynamic_tax_schedule():
     print("[PASS] test_empirical_dynamic_tax_schedule")
 
 
+def test_real_data_enforced_in_live_pipeline():
+    """Verify AlphaEnginePipeline rejects synthetic/mock data when dry_run=False."""
+    from src.pipeline.alpha_engine import AlphaEnginePipeline
+    pipeline = AlphaEnginePipeline(dry_run=False)
+    raised = False
+    try:
+        pipeline.run_cycle(tickers=["NON_EXISTENT_TICKER.NS"], generations=1, pop_size=2)
+    except FileNotFoundError:
+        raised = True
+    assert raised is True, "Pipeline failed to enforce real data files in live execution mode (dry_run=False)"
+    print("[PASS] test_real_data_enforced_in_live_pipeline")
+
+
 if __name__ == "__main__":
     test_backtesting_frameworks_no_lookahead_leakage()
     test_risk_metrics_calculation_semi_deviation_and_sortino_floor()
     test_monte_carlo_return_shuffle_stress()
     test_empirical_dynamic_tax_schedule()
+    test_real_data_enforced_in_live_pipeline()
     print("ALL INSTITUTIONAL SKILL TESTS PASSED!")

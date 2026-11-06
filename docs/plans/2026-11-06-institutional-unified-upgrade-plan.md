@@ -22,7 +22,7 @@
 | **P0** | **Task 1** | Fix Causality Check & Empirical Fat-Tailed DSR | `src/domain/invariants.py`, `tests/test_invariants.py` | `[x]` Complete | `fix(invariants)` |
 | **P0** | **Task 2** | Daily-Resetting VWAP & Auction Jump Decomposition | `src/data/vector_lake.py`, `tests/test_vector_lake.py` | `[x]` Complete | `feat(data)` |
 | **P0** | **Task 3** | AST Math Clamping (`EXP/LOG/POW_SAFE`) & MurmurHash | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[x]` Complete | `feat(ast)` |
-| **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[ ]` Not Started | - |
+| **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[x]` Complete | `fix(pipeline)` |
 | **P1** | **Task 5** | Multi-Asset 3D Tensor Simulation `(B, N, T)` | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[ ]` Not Started | - |
 | **P1** | **Task 6** | Cross-Sectional Alpha Operators (`CS_Rank`, `CS_Demean`) | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[ ]` Not Started | - |
 | **P1** | **Task 7** | Ward/Average Linkage HRP & Ledoit-Wolf Shrinkage | `src/execution/hrp_allocator.py`, `tests/test_hrp_allocator.py`| `[ ]` Not Started | - |
@@ -121,18 +121,18 @@
 - Modify: `src/pipeline/alpha_engine.py:40-70`
 - Test: `tests/test_skills_validation.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_skills_validation.py`, assert that `AlphaEnginePipeline.run_cycle(dry_run=False)` raises `FileNotFoundError` if Parquet files are missing, banning random geometric Brownian motion in live mode.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_skills_validation.py`  
   Expected: FAIL if live mock suppression is not enforced.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/pipeline/alpha_engine.py`:
   - When `live_mode` or `dry_run=False`, throw explicit error if `data/lake/` Parquet files are missing.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_skills_validation.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "fix(pipeline): enforce real data requirements and statutory tax schedules"`
 
 ---

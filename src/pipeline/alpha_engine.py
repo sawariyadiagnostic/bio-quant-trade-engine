@@ -9,6 +9,7 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from src.data.vector_lake import VectorDataLake
+from src.domain.models import TaxSchedule, InstrumentType
 from src.domain.formula_ast import ASTNode, TreeGenerator, GeneticMutator, GeneticCrossover, ASTEvaluator
 from src.evolution.nursery import EvolutionaryNursery
 from src.evolution.symbiosis import SymbioticBreeder
@@ -30,6 +31,7 @@ class AlphaEnginePipeline:
     dry_run: bool = False
     capital: float = 50000.0
     initial_cash: float = 50000.0
+    tax_schedule: TaxSchedule = field(default_factory=TaxSchedule)
     nursery: EvolutionaryNursery = field(default_factory=lambda: EvolutionaryNursery(immunity_generations=15))
     pruner: AlphaManifoldPruner = field(default_factory=lambda: AlphaManifoldPruner(min_cluster_size=2))
     archive: CVTArchiveEngine = field(default_factory=lambda: CVTArchiveEngine(cells=100, dims=3))
@@ -50,11 +52,25 @@ class AlphaEnginePipeline:
         """Executes a full evolutionary search and execution cycle."""
         target_tickers = tickers or ["NIFTYBEES.NS", "GOLDBEES.NS"]
 
-        # 1. Ingestion: VectorDataLake creation
+        # 1. Ingestion: VectorDataLake creation with real-data enforcement in live mode
         lakes: Dict[str, VectorDataLake] = {}
         current_prices: Dict[str, float] = {}
         for t in target_tickers:
-            lake = VectorDataLake.load_mock(periods=n_bars, ticker=t)
+            parquet_path = os.path.join("data", "lake", f"{t}.parquet")
+            if not self.dry_run:
+                if not os.path.exists(parquet_path):
+                    raise FileNotFoundError(
+                        f"Real data required for live execution ({t}): {parquet_path} not found. "
+                        "Synthetic GBM fallback is strictly prohibited in live mode."
+                    )
+                df_real = pd.read_parquet(parquet_path)
+                lake = VectorDataLake.from_dataframe(df_real, ticker=t)
+            else:
+                if os.path.exists(parquet_path):
+                    df_real = pd.read_parquet(parquet_path)
+                    lake = VectorDataLake.from_dataframe(df_real, ticker=t)
+                else:
+                    lake = VectorDataLake.load_mock(periods=n_bars, ticker=t)
             lakes[t] = lake
             current_prices[t] = float(lake.tensors["Close_Adj"][-1])
 
@@ -62,7 +78,8 @@ class AlphaEnginePipeline:
         returns = primary_lake.tensors["gross_overnight_rets"]
 
         # 2. Sheltered Evolution with Nursery & Symbiogenesis
-        sim = MatrixSimulator(friction_bps=1.2)
+        friction_bps = self.tax_schedule.get_friction_rate(InstrumentType.ETF_CASH) * 10000.0
+        sim = MatrixSimulator(friction_bps=friction_bps)
         pop: List[ASTNode] = [TreeGenerator.generate(max_depth=3) for _ in range(pop_size)]
 
         for gen in range(generations):
