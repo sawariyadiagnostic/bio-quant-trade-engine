@@ -108,6 +108,36 @@ class TestCockpitServerApi(unittest.TestCase):
         self.assertIn("event: tick", text)
         self.assertIn("data:", text)
 
+    def test_sse_handles_bytes_without_type_error(self):
+        """Proves SSE event generator safely serializes BLOB/bytes fields without TypeError."""
+        raw_elite_with_bytes = {
+            "ticker": "NIFTYBEES",
+            "lookback": "1y",
+            "niche_row": 5,
+            "niche_col": 7,
+            "fitness": 12.34,
+            "net_return_pct": 56.78,
+            "cagr_pct": 56.78,
+            "max_drawdown": 4.5,
+            "win_rate": 65.0,
+            "turnover": 0.5,
+            "volatility": 0.15,
+            "sortino": 2.1,
+            "profit_factor": 1.8,
+            "trades_count": 42,
+            "formula_str": "RSI_14 + EMA_10",
+            "behavior_signature": b"\x01\x02\x03\x04\xff\xfe"  # raw bytes
+        }
+        with patch.object(supervisor.archive_store, "count_champions", side_effect=[0, 1, 1]):
+            with patch.object(supervisor.archive_store, "get_recent_elites", return_value=[raw_elite_with_bytes]):
+                response = self.client.get("/api/stream/evolution?max_ticks=2")
+                self.assertEqual(response.status_code, 200)
+                text = response.text
+                self.assertIn("event: elite_added", text)
+                self.assertIn("data:", text)
+                # Ensure no unhandled 500 error occurred
+                self.assertNotIn("Internal Server Error", text)
+
 
 if __name__ == "__main__":
     unittest.main()

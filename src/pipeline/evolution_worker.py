@@ -102,6 +102,19 @@ def run_evolution_process(
                 formula_str=e["formula_str"]
             )
 
+        # Broadcast initial warm-start telemetry to shared memory bus immediately
+        warm_residents = engine.archive.get_resident_elites()
+        top_elite = max(warm_residents, key=lambda el: el.fitness, default=None)
+        bus.update_header(
+            current_gen=0,
+            total_gens=generations,
+            resident_count=len(warm_residents),
+            occupancy_pct=float(len(warm_residents)) / float(engine.archive.rows * engine.archive.cols) * 100.0,
+            top_sharpe=top_elite.fitness if top_elite else 0.0,
+            best_net_return=top_elite.net_return_pct if top_elite else 0.0,
+            worker_status=1 # RUNNING
+        )
+
         for gen in range(1, generations + 1):
             bus.update_heartbeat()
 
@@ -173,14 +186,15 @@ def run_evolution_process(
                 worker_status=1 # RUNNING
             )
 
+        final_count = len(engine.archive.get_resident_elites())
         bus.update_header(
             current_gen=generations,
             total_gens=generations,
-            resident_count=len(engine.archive.get_resident_elites()),
+            resident_count=final_count,
             worker_status=3 # COMPLETED
         )
-        logger.success(f"[Worker] Evolution complete: {len(archive.archive)} resident champions.")
-        return {"status": "SUCCESS", "resident_elites": len(archive.archive)}
+        logger.success(f"[Worker] Evolution complete: {final_count} resident champions.")
+        return {"status": "SUCCESS", "resident_elites": final_count}
 
     except Exception as err:
         logger.error(f"[Worker PID {my_pid}] Unhandled exception: {err}")

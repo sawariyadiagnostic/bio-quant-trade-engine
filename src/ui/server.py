@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
 import json
+import math
 import os
 import time
 from typing import Any, AsyncGenerator, Dict, Optional
@@ -52,6 +53,24 @@ class WorkerSupervisor:
         self.lookback_years: float = 1.0
         self.generations: int = 10
         self.population_size: int = 50
+
+        # Seed shared memory header from archive store on startup
+        try:
+            initial_count = self.archive_store.count_champions()
+            top_elites = self.archive_store.get_top_elites(limit=1)
+            top_fitness = top_elites[0]["fitness"] if top_elites else 0.0
+            best_return = top_elites[0]["net_return_pct"] if top_elites else 0.0
+            self.shm_bus.update_header(
+                current_gen=0,
+                total_gens=self.generations,
+                resident_count=initial_count,
+                occupancy_pct=(initial_count / 400.0 * 100.0) if initial_count else 0.0,
+                top_sharpe=top_fitness,
+                best_net_return=best_return,
+                worker_status=0
+            )
+        except Exception:
+            pass
 
     def start_worker(
         self,
@@ -109,15 +128,27 @@ class WorkerSupervisor:
         if not self.shm_bus:
             return {}
         hdr = self.shm_bus.header
+
+        def safe_float(v: Any, default: float = 0.0) -> float:
+            try:
+                f = float(v)
+                if math.isinf(f):
+                    return 999999.0 if f > 0 else -999999.0
+                if math.isnan(f):
+                    return default
+                return f
+            except Exception:
+                return default
+
         return {
             "current_gen": int(hdr.current_gen),
             "total_gens": int(hdr.total_gens),
             "resident_count": int(hdr.resident_count),
             "survivor_count": int(hdr.survivor_count),
             "quarantined_count": int(hdr.quarantined_count),
-            "occupancy_pct": float(hdr.occupancy_pct),
-            "top_sharpe": float(hdr.top_sharpe),
-            "best_net_return": float(hdr.best_net_return),
+            "occupancy_pct": safe_float(hdr.occupancy_pct),
+            "top_sharpe": safe_float(hdr.top_sharpe),
+            "best_net_return": safe_float(hdr.best_net_return),
             "worker_status": int(hdr.worker_status),
             "abort_requested": int(hdr.abort_requested),
             "heartbeat_ns": int(hdr.heartbeat_ns),
@@ -280,14 +311,14 @@ async def sse_event_generator(
         # Ping keepalive every 1 second (satisfies 5s dead-man switch)
         if now - last_ping >= 1.0:
             last_ping = now
-            yield f"event: ping\ndata: {json.dumps({'time': now, 'healthy': True})}\n\n"
+            yield f"event: ping\ndata: {json.dumps({'time': now, 'healthy': True}, default=str)}\n\n"
 
         # Telemetry tick
         hdr = supervisor.shm_bus.header if supervisor.shm_bus else None
         if hdr:
             current_gen = int(hdr.current_gen)
             total_gens = int(hdr.total_gens)
-            yield f"event: tick\ndata: {json.dumps(supervisor.get_telemetry())}\n\n"
+            yield f"event: tick\ndata: {json.dumps(supervisor.get_telemetry(), default=str)}\n\n"
             tick_count += 1
 
             # Check if new elites were saved
@@ -295,14 +326,17 @@ async def sse_event_generator(
             if current_elites_count > seen_elites_count:
                 delta = current_elites_count - seen_elites_count
                 seen_elites_count = current_elites_count
-                recent_elites = supervisor.archive_store.get_top_elites(limit=delta)
+                recent_elites = supervisor.archive_store.get_recent_elites(limit=delta)
                 for elite in recent_elites:
-                    yield f"event: elite_added\ndata: {json.dumps(elite)}\n\n"
+                    try:
+                        yield f"event: elite_added\ndata: {json.dumps(elite, default=str)}\n\n"
+                    except Exception as err:
+                        logger.error(f"[SSE] Failed to serialize elite: {err}")
 
             # Check for completion or abort
             if (total_gens > 0 and current_gen >= total_gens) or hdr.abort_requested == 1:
                 if not supervisor.is_worker_running():
-                    yield f"event: complete\ndata: {json.dumps({'status': 'COMPLETE', 'gen': current_gen})}\n\n"
+                    yield f"event: complete\ndata: {json.dumps({'status': 'COMPLETE', 'gen': current_gen}, default=str)}\n\n"
                     break
 
         await asyncio.sleep(0.05)  # 20Hz streaming tick rate

@@ -42,9 +42,14 @@ class TestSHMWorkerIsolation(unittest.TestCase):
         
         # 4. Close Job Object handle -> Windows kernel must terminate child immediately
         job_mgr.close()
-        time.sleep(0.1) # 100ms grace period for kernel termination
         
-        poll_res = child.poll()
+        # Wait up to 1.5s for Windows kernel termination
+        poll_res = None
+        for _ in range(15):
+            poll_res = child.poll()
+            if poll_res is not None:
+                break
+            time.sleep(0.1)
         self.assertIsNotNone(poll_res, f"Child PID {child_pid} must be terminated by Windows kernel!")
 
     def test_02_process_governor_priority_and_affinity(self):

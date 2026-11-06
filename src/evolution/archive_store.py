@@ -5,6 +5,7 @@ Supports concurrent readers from FastAPI without WinError 32 file lock contentio
 Protects against power-loss and abort corruption with ACID single-transaction batch commits.
 """
 import json
+import math
 import sqlite3
 import time
 from typing import Any, Dict, List, Optional
@@ -59,21 +60,32 @@ class ArchiveStore:
                 updated_at = excluded.updated_at;
         """
         rows = []
+        def safe_float(v: Any, default: float = 0.0) -> float:
+            try:
+                f = float(v)
+                if math.isinf(f):
+                    return 999999.0 if f > 0 else -999999.0
+                if math.isnan(f):
+                    return default
+                return f
+            except Exception:
+                return default
+
         for e in elites:
             rows.append({
                 "ticker": ticker,
                 "lookback": lookback,
                 "row": int(e.get("row", 0)),
                 "col": int(e.get("col", 0)),
-                "fitness": float(e.get("fitness", 0.0)),
-                "net_return_pct": float(e.get("net_return_pct", 0.0)),
-                "cagr_pct": float(e.get("cagr_pct", e.get("net_return_pct", 0.0))),
-                "max_drawdown": float(e.get("max_drawdown", 0.0)),
-                "win_rate": float(e.get("win_rate", 0.0)),
-                "turnover": float(e.get("turnover", 0.0)),
-                "volatility": float(e.get("volatility", 0.0)),
-                "sortino": float(e.get("sortino", 0.0)),
-                "profit_factor": float(e.get("profit_factor", 0.0)),
+                "fitness": safe_float(e.get("fitness", 0.0)),
+                "net_return_pct": safe_float(e.get("net_return_pct", 0.0)),
+                "cagr_pct": safe_float(e.get("cagr_pct", e.get("net_return_pct", 0.0))),
+                "max_drawdown": safe_float(e.get("max_drawdown", 0.0)),
+                "win_rate": safe_float(e.get("win_rate", 0.0)),
+                "turnover": safe_float(e.get("turnover", 0.0)),
+                "volatility": safe_float(e.get("volatility", 0.0)),
+                "sortino": safe_float(e.get("sortino", 0.0)),
+                "profit_factor": safe_float(e.get("profit_factor", 0.0)),
                 "trades_count": int(e.get("trades_count", 0)),
                 "formula_str": str(e.get("formula_str", "")),
                 "active_regimes": json.dumps(e.get("active_regimes", [])),
@@ -84,6 +96,23 @@ class ArchiveStore:
         with self._get_connection() as conn:
             conn.executemany(sql, rows)
             conn.commit()
+
+    @staticmethod
+    def _sanitize_row(row: Any) -> Dict[str, Any]:
+        """Ensures all fields are JSON compliant (decodes BLOB/bytes, sanitizes inf/nan)."""
+        res = dict(row)
+        for k, v in res.items():
+            if isinstance(v, (bytes, bytearray, memoryview)):
+                try:
+                    res[k] = bytes(v).decode("utf-8")
+                except Exception:
+                    res[k] = bytes(v).hex()
+            elif isinstance(v, float):
+                if math.isinf(v):
+                    res[k] = 999999.0 if v > 0 else -999999.0
+                elif math.isnan(v):
+                    res[k] = 0.0
+        return res
 
     def query_leaderboard(
         self,
@@ -105,7 +134,7 @@ class ArchiveStore:
         """
         with self._get_connection() as conn:
             cursor = conn.execute(sql, (ticker, lookback, limit))
-            return [dict(row) for row in cursor.fetchall()]
+            return [self._sanitize_row(row) for row in cursor.fetchall()]
 
     def get_top_elites(
         self,
@@ -141,7 +170,35 @@ class ArchiveStore:
         params.append(limit)
         with self._get_connection() as conn:
             cursor = conn.execute(sql, tuple(params))
-            return [dict(row) for row in cursor.fetchall()]
+            return [self._sanitize_row(row) for row in cursor.fetchall()]
+
+    def get_recent_elites(
+        self,
+        limit: int = 50,
+        ticker: Optional[str] = None,
+        lookback: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Returns most recently updated resident elites, ensuring JSON serializability."""
+        where_clauses = []
+        params = []
+        if ticker:
+            where_clauses.append("ticker = ?")
+            params.append(ticker)
+        if lookback:
+            where_clauses.append("lookback = ?")
+            params.append(lookback)
+
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        sql = f"""
+            SELECT * FROM resident_elites
+            {where_sql}
+            ORDER BY updated_at DESC
+            LIMIT ?;
+        """
+        params.append(limit)
+        with self._get_connection() as conn:
+            cursor = conn.execute(sql, tuple(params))
+            return [self._sanitize_row(row) for row in cursor.fetchall()]
 
     def count_champions(self, ticker: Optional[str] = None, lookback: Optional[str] = None) -> int:
         """Returns total champion count."""
