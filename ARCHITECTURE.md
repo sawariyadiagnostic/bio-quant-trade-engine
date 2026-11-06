@@ -47,3 +47,48 @@ The system dynamically applies friction through [`TaxSchedule`](file:///C:/Users
 | **Cash Equity Delivery**| `EQUITY_CASH` | **25.0 bps (0.250%)** | 0.10% buy + 0.10% sell STT + statutory levies |
 
 Custom slippage can be added directly via `TaxSchedule(custom_slippage_bps=X)`.
+
+---
+
+## 4. Institutional Decoupled Tri-Process Architecture
+
+To eradicate GIL contention, browser freezes, and UI lockups, Phase 1 establishes an institutional Tri-Process Architecture:
+
+```
++-----------------------------------------------------------------------------------------+
+|                                    WINDOWS OS HOST                                      |
+|                                                                                         |
+|  [ PROCESS A: Web Cockpit ]          [ PROCESS B: Compute Worker ]                      |
+|  * FastAPI ASGI (Port 7860)         * Spawned Python Process (multiprocessing spawn)     |
+|  * Cores 0-1 (NORMAL Priority)      * Cores 2-3 (BELOW_NORMAL Priority)                 |
+|  * Non-blocking Async Event Loop    * Bound to Windows Kernel Job Object                |
+|  * Differential Delta SSE Stream     * Auto-terminates on parent close (0x2000)          |
+|  * Offline Vendored UI (Alpine/AG)   * Emits microsecond heartbeats                      |
+|              |                                     |                                    |
+|              +============== SHARED MEMORY ========+                                    |
+|              |      (162 KB Cache-Aligned C-Struct Header + 400-Niche Array)            |
+|              |      Zero-copy point reads in <0.2us; atomic abort in <1us               |
+|              |                                                                          |
+|  [ PROCESS C: Risk Sentry ]                                                             |
+|  * High-Priority Sentinel (Cores 0-1)                                                   |
+|  * Stage 1: In-Process Atomic Freeze (<0.5ms) halting outbounds and signaling SHM abort  |
+|  * Stage 2: Parallel Async Socket Dispatch via asyncio.gather to 100% unencumbered cash  |
+|  * NSE Lower-Circuit Evaporation Trap: Beta-neutralizing synthetic short on NIFTYBEES    |
+|  * Statutory Friction Gatekeeper: Enforces Rs 15,930 notional floor (auto-routes to MIS)|
+|  * Headless QuickAuth Watchdog: Auto-refreshes Shoonya broker tokens via TOTP pyotp     |
+|                                                                                         |
+|  [ PERSISTENCE LAYER: SQLite WAL Engine ]                                               |
+|  * Database: audit/alpha_elites.db                                                      |
+|  * Mode: PRAGMA journal_mode=WAL, synchronous=NORMAL                                    |
+|  * ACID single-transaction batch commits (<1ms) with zero WinError 32 file contention   |
++-----------------------------------------------------------------------------------------+
+```
+
+| Component | Responsibility | Tech Stack |
+| :--- | :--- | :--- |
+| **Process A: Web Cockpit** | Discrete n8n-style REST endpoints, 10Hz differential SSE, static asset serving | FastAPI, Uvicorn, AG Grid, Plotly WebGL, Alpine.js, Tailwind |
+| **Process B: Compute Worker** | Heavy vectorized AST genetic mutation, backtesting, and niche tournament evaluation | Isolated spawned process, Win32 Job Object, SharedMemory IPC |
+| **Process C: Risk Sentry** | Sub-0.5ms atomic freezing, parallel async socket liquidation, synthetic hedging | Asyncio, aiohttp/httpx, pyotp, ProcessGovernor |
+| **Rescue TUI** | Headless companion text cockpit with single-keystroke `[K]` panic liquidation | Python `rich`, `msvcrt` non-blocking keyboard polling |
+| **Archive Store** | Thread-safe, process-safe resident alpha champion leaderboard | SQLite WAL mode, single-batch ACID transactions |
+

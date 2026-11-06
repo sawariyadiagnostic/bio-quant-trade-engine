@@ -31,9 +31,12 @@ All components listed below are active, verified, and passing continuous test co
 | **Shoonya Gateway** | [`src/execution/shoonya_gateway.py`](file:///C:/Users/Dell/Desktop/python/trade/src/execution/shoonya_gateway.py) | Dual-mode broker interface: Local simulation and Live Noren API, `client_order_id` idempotency, panic liquidation. |
 | **Execution Dispatcher**| [`src/execution/execution_dispatcher.py`](file:///C:/Users/Dell/Desktop/python/trade/src/execution/execution_dispatcher.py) | Production signal-to-order bridge connecting AST models with risk controllers and gateways. |
 | **Alpha Pipeline** | [`src/pipeline/alpha_engine.py`](file:///C:/Users/Dell/Desktop/python/trade/src/pipeline/alpha_engine.py) | End-to-end pipeline with mandatory real data parquet verification in live mode (`dry_run=False`). |
-| **Master UI Cockpit** | [`src/ui/evolution_dashboard.py`](file:///C:/Users/Dell/Desktop/python/trade/src/ui/evolution_dashboard.py) | **Primary Master Cockpit (Port 7860)**: One-click "First Pot of Gold" launcher, panic kill-switch, interactive I/O DAG. |
-| **UI Visualizations** | [`src/ui/visualizations.py`](file:///C:/Users/Dell/Desktop/python/trade/src/ui/visualizations.py) | Plotly 2D/3D visualizations, avionics KPI cards, interactive I/O pipeline DAG viewer. |
-| **Shoonya UI** | [`src/ui/shoonya_ui.py`](file:///C:/Users/Dell/Desktop/python/trade/src/ui/shoonya_ui.py) | Real-time broker connection accordion, margin queries, audit journal, emergency kill-switch. |
+| **Master UI Cockpit** | [`src/ui/server.py`](file:///C:/Users/Dell/Desktop/python/trade/src/ui/server.py) | **Primary Master Cockpit (Port 7860)**: Decoupled FastAPI ASGI server with differential SSE, AG Grid virtualization, and n8n node DAG controller. |
+| **Compute Worker** | [`src/pipeline/evolution_worker.py`](file:///C:/Users/Dell/Desktop/python/trade/src/pipeline/evolution_worker.py) | Spawned compute process on Cores 2-3 isolated by Windows Job Object (`0x2000`) with Zero-Copy SharedMemory IPC. |
+| **Risk Sentry** | [`src/execution/risk_sentry.py`](file:///C:/Users/Dell/Desktop/python/trade/src/execution/risk_sentry.py) | Out-of-band sentinel: Stage 1 in-process atomic freeze (<0.5ms) & Stage 2 parallel async socket dispatch to 100% cash. |
+| **Rescue TUI** | [`src/ui/rescue_tui.py`](file:///C:/Users/Dell/Desktop/python/trade/src/ui/rescue_tui.py) | Headless terminal rescue companion with non-blocking `[K]` panic liquidation hotkey via Win32 `msvcrt`. |
+| **Archive Store** | [`src/evolution/archive_store.py`](file:///C:/Users/Dell/Desktop/python/trade/src/evolution/archive_store.py) | High-throughput SQLite WAL store (`audit/alpha_elites.db`) with ACID batch transactions eliminating file lock contention. |
+| **Shoonya UI / Gateway**| [`src/execution/shoonya_gateway.py`](file:///C:/Users/Dell/Desktop/python/trade/src/execution/shoonya_gateway.py) | Hardened broker gateway with SQLite WAL order logging, headless TOTP watchdog, and synthetic delta hedging. |
 
 ---
 

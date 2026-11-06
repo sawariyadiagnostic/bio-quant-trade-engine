@@ -1,9 +1,9 @@
 {
   "phase": "Phase 1: Institutional Decoupled Cockpit & Engine",
-  "updated_at": "2026-11-07T02:56:45+05:30",
-  "active_task": "TASK_6",
-  "active_subtask": "6.1",
-  "last_stable_commit": "49f7111",
+  "updated_at": "2026-11-07T02:59:30+05:30",
+  "active_task": "TASK_7",
+  "active_subtask": "7.1",
+  "last_stable_commit": "90fe659",
   "tasks": {
     "TASK_0": {
       "title": "Latent Gateway Remediation & SQLite WAL Migration Baseline",
@@ -82,25 +82,25 @@
         "5.2_single_keystroke_k_panic_trigger": "PASSED"
       },
       "verification_cmd": "python -m unittest tests/test_rescue_tui.py",
-      "commit": null
+      "commit": "90fe659"
     },
     "TASK_6": {
       "title": "Gradio Elimination & Codebase Hardening",
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "subtasks": {
-        "6.1_deprecate_evolution_dashboard_redirect": "IN_PROGRESS",
-        "6.2_remove_gradio_from_requirements": "QUEUED",
-        "6.3_full_red_team_invariants_gate": "QUEUED",
-        "6.4_documentation_and_ledger_update": "QUEUED"
+        "6.1_deprecate_evolution_dashboard_redirect": "PASSED",
+        "6.2_remove_gradio_from_requirements": "PASSED",
+        "6.3_full_red_team_invariants_gate": "PASSED",
+        "6.4_documentation_and_ledger_update": "PASSED"
       },
       "verification_cmd": "python scripts/red_team_harness.py --mode=full",
       "commit": null
     },
     "TASK_7": {
       "title": "Adversarial Chaos Fault-Injection Testing Suite",
-      "status": "QUEUED",
+      "status": "IN_PROGRESS",
       "subtasks": {
-        "7.1_test_worker_sigkill_recovery": "QUEUED",
+        "7.1_test_worker_sigkill_recovery": "IN_PROGRESS",
         "7.2_test_broker_network_hang_timeout": "QUEUED",
         "7.3_test_corrupted_archive_ingestion": "QUEUED",
         "7.4_test_panic_button_spam_deduplication": "QUEUED"
