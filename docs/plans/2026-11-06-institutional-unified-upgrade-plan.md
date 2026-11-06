@@ -33,7 +33,7 @@
 | **P2** | **Task 12**| Shoonya Gateway Hardening (`clordid`, Retries, Sell Fix)| `src/execution/shoonya_gateway.py`, `src/execution/execution_dispatcher.py` | `[x]` Complete | `feat(gateway)` |
 | **P2** | **Task 13**| Two-Pass Atomic Rebalancing & Liquid BeES Auto-Sweep | `src/execution/portfolio_paper_trader.py`, `tests/test_portfolio_paper_trader.py` | `[x]` Complete | `feat(execution)` |
 | **P3** | **Task 14**| Thread-Safe State & Interactive I/O DAG in Master Cockpit| `src/ui/evolution_dashboard.py`, `src/ui/visualizations.py` | `[x]` Completed | Commit: `4977457` |
-| **P3** | **Task 15**| One-Click "First Pot of Gold" Launcher & Panic Switch | `src/ui/evolution_dashboard.py`, `src/ui/shoonya_ui.py` | `[x]` Completed | Commit: Pending |
+| **P3** | **Task 15**| One-Click "First Pot of Gold" Launcher & Panic Switch | `src/ui/evolution_dashboard.py`, `src/ui/shoonya_ui.py` | `[x]` Completed | Commit: `65fbcdf` |
 
 ---
 
