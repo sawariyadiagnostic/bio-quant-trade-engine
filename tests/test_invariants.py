@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from src.domain.invariants import (
     calculate_deflated_sharpe_ratio,
+    estimate_return_moments,
     verify_point_in_time_causality,
     check_covariance_conditioning,
     assert_circuit_headroom,
@@ -40,8 +41,30 @@ def test_deflated_sharpe_ratio():
     assert dsr_mult < 0.50
 
 
+def test_estimate_return_moments():
+    """Verify empirical moment estimation handles normal and fat-tailed series."""
+    np.random.seed(42)
+    # Normal returns
+    normal_rets = np.random.normal(0.0005, 0.015, 2000)
+    mu, var, skew, kurt = estimate_return_moments(normal_rets)
+    assert abs(mu - 0.0005) < 0.002
+    assert abs(skew) < 0.25
+    assert abs(kurt - 3.0) < 0.50
+
+    # Fat-tailed series with negative shock (crashes)
+    fat_rets = normal_rets.copy()
+    fat_rets[10:15] = -0.08  # 8% gap crash down
+    _, _, fat_skew, fat_kurt = estimate_return_moments(fat_rets)
+    assert fat_skew < -0.50  # Left skewed
+    assert fat_kurt > 5.0    # Leptokurtic / fat-tailed
+
+    # Edge cases
+    mu_0, var_0, skew_0, kurt_0 = estimate_return_moments(np.array([]))
+    assert (mu_0, var_0, skew_0, kurt_0) == (0.0, 0.0, 0.0, 3.0)
+
+
 def test_point_in_time_causality():
-    """Verify lookahead detector catches future return leakage."""
+    """Verify lookahead detector distinguishes valid predictive alpha from leakage."""
     T = 200
     np.random.seed(42)
     clean_signal = np.random.randn(T)
@@ -51,11 +74,17 @@ def test_point_in_time_causality():
     is_valid_clean, lead_corr = verify_point_in_time_causality(clean_signal, future_rets, max_lead_corr=0.30)
     assert is_valid_clean is True
 
-    # Leaked signal directly correlates with future return T+1
+    # Leaked signal directly correlates with future return T+1 identically
     leaked_signal = future_rets.copy()
     is_valid_leak, leak_corr = verify_point_in_time_causality(leaked_signal, future_rets, max_lead_corr=0.30)
     assert is_valid_leak is False
     assert leak_corr > 0.90
+
+    # Predictive signal with realistic positive forward IC (e.g. r=0.15) should pass
+    predictive_signal = 0.15 * future_rets + np.random.randn(T) * 0.98
+    is_valid_pred, pred_corr = verify_point_in_time_causality(predictive_signal, future_rets, max_lead_corr=0.50)
+    assert is_valid_pred is True
+    assert pred_corr < 0.50
 
 
 def test_covariance_conditioning():

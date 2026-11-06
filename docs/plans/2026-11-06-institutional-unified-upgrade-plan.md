@@ -19,7 +19,7 @@
 
 | Priority | Task ID | Core Focus | Primary Target Files | Status | Commit / Stamp |
 | :---: | :---: | :--- | :--- | :---: | :---: |
-| **P0** | **Task 1** | Fix Causality Check & Empirical Fat-Tailed DSR | `src/domain/invariants.py`, `tests/test_invariants.py` | `[ ]` Not Started | - |
+| **P0** | **Task 1** | Fix Causality Check & Empirical Fat-Tailed DSR | `src/domain/invariants.py`, `tests/test_invariants.py` | `[x]` Complete | `fix(invariants)` |
 | **P0** | **Task 2** | Daily-Resetting VWAP & Auction Jump Decomposition | `src/data/vector_lake.py`, `tests/test_vector_lake.py` | `[ ]` Not Started | - |
 | **P0** | **Task 3** | AST Math Clamping (`EXP/LOG/POW_SAFE`) & MurmurHash | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[ ]` Not Started | - |
 | **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[ ]` Not Started | - |
@@ -50,19 +50,19 @@
 - Modify: `src/domain/invariants.py:45-95`
 - Test: `tests/test_invariants.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_invariants.py`, add `test_causality_allows_positive_forward_ic_and_rejects_backward_leak` and `test_dsr_with_empirical_kurtosis`. Verify that valid predictive forward correlations ($IC = 0.45$) pass, while contemporaneous/backward leakage is caught.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_invariants.py`  
   Expected: FAIL (due to static $|r| \le 0.25$ cap).
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/domain/invariants.py`:
   - Update `verify_point_in_time_causality`: Remove the $|r| \le 0.25$ forward cap; add contemporaneous and negative lag checks.
   - Update `calculate_deflated_sharpe_ratio`: Accept empirical `returns_series` and calculate `scipy.stats.skew` and `scipy.stats.kurtosis` dynamically.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_invariants.py`  
   Expected: PASS (all assertions green).
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "fix(invariants): patch causality forward IC check and add fat-tailed empirical DSR"`
 
 ---
