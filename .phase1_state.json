@@ -1,9 +1,9 @@
 {
-  "phase": "Phase 1: Institutional Decoupled Cockpit & Engine",
-  "updated_at": "2026-11-07T02:59:30+05:30",
-  "active_task": "TASK_7",
-  "active_subtask": "7.1",
-  "last_stable_commit": "90fe659",
+  "phase": "Phase 1: Institutional Decoupled Cockpit & Engine - COMPLETED",
+  "updated_at": "2026-11-07T03:03:30+05:30",
+  "active_task": "COMPLETED",
+  "active_subtask": "ALL_PASSED",
+  "last_stable_commit": "4746c87",
   "tasks": {
     "TASK_0": {
       "title": "Latent Gateway Remediation & SQLite WAL Migration Baseline",
@@ -94,16 +94,16 @@
         "6.4_documentation_and_ledger_update": "PASSED"
       },
       "verification_cmd": "python scripts/red_team_harness.py --mode=full",
-      "commit": null
+      "commit": "4746c87"
     },
     "TASK_7": {
       "title": "Adversarial Chaos Fault-Injection Testing Suite",
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "subtasks": {
-        "7.1_test_worker_sigkill_recovery": "IN_PROGRESS",
-        "7.2_test_broker_network_hang_timeout": "QUEUED",
-        "7.3_test_corrupted_archive_ingestion": "QUEUED",
-        "7.4_test_panic_button_spam_deduplication": "QUEUED"
+        "7.1_test_worker_sigkill_recovery": "PASSED",
+        "7.2_test_broker_network_hang_timeout": "PASSED",
+        "7.3_test_corrupted_archive_ingestion": "PASSED",
+        "7.4_test_panic_button_spam_deduplication": "PASSED"
       },
       "verification_cmd": "python -m unittest tests/test_chaos_fault_injection.py",
       "commit": null

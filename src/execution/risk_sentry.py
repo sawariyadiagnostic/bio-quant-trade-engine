@@ -19,6 +19,7 @@ class RiskSentry:
 
     STATUTORY_DP_FEE: float = 15.93  # Flat CDSL DP charge on delivery sells
     MIN_DELIVERY_NOTIONAL_FLOOR: float = 15930.0  # Floor ensuring DP fee <= 0.10% (10 bps)
+    SOCKET_TIMEOUT_SECONDS: float = 3.0  # Max socket wait time for emergency broker operations
 
     def __init__(
         self,
@@ -30,6 +31,7 @@ class RiskSentry:
         self.shm_bus = shm_bus
         self.auto_reroute_dp = auto_reroute_dp
         self.is_frozen: bool = False
+        self._is_liquidating: bool = False
         self.hedge_mgr = SyntheticDeltaHedgeManager()
         self._executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="RiskSentryWorker")
 
@@ -109,28 +111,40 @@ class RiskSentry:
         """Stage 2: Parallel Async Socket Dispatch.
 
         Concurrently cancels all open orders and liquidates active positions
-        to 100% unencumbered cash in parallel via asyncio.gather.
+        to 100% unencumbered cash in parallel via asyncio.gather with deduplication lock.
         """
-        t0 = time.perf_counter()
-        self.is_frozen = True
+        if self._is_liquidating:
+            logger.warning("[RiskSentry] Stage 2 liquidation already in flight. Deduplicating request.")
+            return {
+                "status": "LIQUIDATION_IN_PROGRESS",
+                "message": "Emergency liquidation already in flight",
+                "cash_secured": True
+            }
 
-        cancelled_orders = await self._cancel_all_orders_parallel()
-        liquidated_symbols, hedge_count = await self._liquidate_positions_parallel(force_hedge_if_circuit)
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        self._is_liquidating = True
+        try:
+            t0 = time.perf_counter()
+            self.is_frozen = True
 
-        logger.warning(
-            f"[RiskSentry] STAGE 2 LIQUIDATION COMPLETE in {elapsed_ms:.2f}ms. "
-            f"Orders cancelled: {len(cancelled_orders)}, Positions liquidated: {len(liquidated_symbols)}"
-        )
-        return {
-            "status": "LIQUIDATION_COMPLETE",
-            "elapsed_ms": elapsed_ms,
-            "orders_cancelled_count": len(cancelled_orders),
-            "positions_liquidated_count": len(liquidated_symbols),
-            "liquidated_symbols": liquidated_symbols,
-            "synthetic_hedges_count": hedge_count,
-            "cash_secured": True
-        }
+            cancelled_orders = await self._cancel_all_orders_parallel()
+            liquidated_symbols, hedge_count = await self._liquidate_positions_parallel(force_hedge_if_circuit)
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+            logger.warning(
+                f"[RiskSentry] STAGE 2 LIQUIDATION COMPLETE in {elapsed_ms:.2f}ms. "
+                f"Orders cancelled: {len(cancelled_orders)}, Positions liquidated: {len(liquidated_symbols)}"
+            )
+            return {
+                "status": "LIQUIDATION_COMPLETE",
+                "elapsed_ms": elapsed_ms,
+                "orders_cancelled_count": len(cancelled_orders),
+                "positions_liquidated_count": len(liquidated_symbols),
+                "liquidated_symbols": liquidated_symbols,
+                "synthetic_hedges_count": hedge_count,
+                "cash_secured": True
+            }
+        finally:
+            self._is_liquidating = False
 
     async def _cancel_all_orders_parallel(self) -> list[str]:
         """Cancels open orders concurrently."""
@@ -142,9 +156,15 @@ class RiskSentry:
             open_orders = self.gateway.get_open_orders() or []
         elif hasattr(self.gateway, "api") and self.gateway.api:
             loop = asyncio.get_running_loop()
-            orders_raw = await loop.run_in_executor(self._executor, self.gateway.api.get_order_book)
-            if isinstance(orders_raw, list):
-                open_orders = [o for o in orders_raw if o.get("status") in ["OPEN", "TRIGGER_PENDING"]]
+            try:
+                orders_raw = await asyncio.wait_for(
+                    loop.run_in_executor(self._executor, self.gateway.api.get_order_book),
+                    timeout=self.SOCKET_TIMEOUT_SECONDS
+                )
+                if isinstance(orders_raw, list):
+                    open_orders = [o for o in orders_raw if o.get("status") in ["OPEN", "TRIGGER_PENDING"]]
+            except asyncio.TimeoutError:
+                logger.error("[RiskSentry] Timeout querying order book during cancel.")
 
         if not open_orders:
             return []
@@ -163,7 +183,13 @@ class RiskSentry:
                 tasks.append(loop.run_in_executor(self._executor, self.gateway.api.cancel_order, orderno))
 
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=self.SOCKET_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"[RiskSentry] Timeout ({self.SOCKET_TIMEOUT_SECONDS}s) during parallel cancellations!")
 
         return cancelled_ids
 
@@ -230,6 +256,12 @@ class RiskSentry:
                 ))
 
         if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=self.SOCKET_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"[RiskSentry] Timeout ({self.SOCKET_TIMEOUT_SECONDS}s) during parallel liquidation orders!")
 
         return liquidated_symbols, hedge_count

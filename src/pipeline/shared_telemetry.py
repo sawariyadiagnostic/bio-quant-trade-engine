@@ -93,6 +93,10 @@ class SharedMemoryBus:
             buffer=self.shm.buf[HEADER_SIZE:TOTAL_SHM_SIZE]
         )
 
+    @property
+    def shm_name(self) -> str:
+        return self.name
+
     def update_header(
         self,
         current_gen: int = 0,
