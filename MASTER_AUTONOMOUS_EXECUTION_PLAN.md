@@ -1,6 +1,12 @@
 # Master Autonomous Execution Plan: Bio-Quant Autonomous Trading System (NSE India)
 ## Architecture: 18D Manifold Lake, UMAP-HDBSCAN Regime Classifier, Phylogenetic Clades, Epigenetic Formula Evolution & MAP-Elites Behavioral Archive
 
+> [!IMPORTANT]
+> **ACTIVE OPERATIONAL EXECUTION PLAN:**  
+> For the current active development and production implementation, refer exclusively to:  
+> 🔗 [`docs/plans/2026-11-07-phase1-institutional-cockpit-bootstrap-plan.md`](file:///c:/Users/Dell/Desktop/python/trade/docs/plans/2026-11-07-phase1-institutional-cockpit-bootstrap-plan.md)  
+> *(All other legacy plans in `docs/plans/archive/` are archived and superseded).*
+
 ---
 
 ## Executive Summary & System Blueprint
