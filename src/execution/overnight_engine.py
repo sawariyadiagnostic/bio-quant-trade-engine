@@ -13,20 +13,24 @@ from ..domain.models import (
     ExecutionTier,
     InstrumentType,
     ADRLeadSignal,
-    OvernightExecutionRecord
+    OvernightExecutionRecord,
+    TaxSchedule
 )
 
 class TaxCalculator:
-    """Calculates exact Indian statutory friction across instrument tiers."""
+    """Calculates exact Indian statutory friction across instrument tiers with optional dynamic tax schedule."""
     @staticmethod
-    def calculate(trade_value: float, instrument: InstrumentType) -> float:
+    def calculate(trade_value: float, instrument: InstrumentType, schedule: Optional[TaxSchedule] = None) -> float:
         """
         Computes statutory exchange friction:
-        - ETF_CASH: 0.001% delivery STT + fees = 1.2 bps (0.012%)
-        - FUTURES: 0.02% sell STT + fees = 3.0 bps (0.030%)
-        - EQUITY_CASH: 0.10% buy + 0.10% sell STT + fees = 25.0 bps (0.250%)
-        - MTF_LEVERAGED: Equity fees + daily interest
+        - ETF_CASH: 0.001% delivery STT + fees = 1.2 bps (0.012%) default
+        - FUTURES: 0.02% sell STT + fees = 3.0 bps (0.030%) default
+        - EQUITY_CASH: 0.10% buy + 0.10% sell STT + fees = 25.0 bps (0.250%) default
+        - Custom schedules can be injected dynamically.
         """
+        if schedule is not None:
+            return schedule.calculate_tax(trade_value, instrument)
+
         if instrument == InstrumentType.ETF_CASH:
             return trade_value * 0.00012
         if instrument == InstrumentType.FUTURES:

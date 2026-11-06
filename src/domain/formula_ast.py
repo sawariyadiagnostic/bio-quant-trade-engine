@@ -88,9 +88,9 @@ class ASTEvaluator:
             if node.val in cache:
                 return cache[node.val]
             if node.val == "Spread":
-                h = cache.get("High", df["High"].to_numpy(dtype=np.float64))
-                l = cache.get("Low", df["Low"].to_numpy(dtype=np.float64))
-                c = cache.get("Close_Adj", cache.get("Close_Raw", cache.get("Close", df.get("Close_Adj", df.get("Close")).to_numpy(dtype=np.float64))))
+                h = cache.get("High", df["High"].to_numpy(dtype=np.float64) if "High" in df.columns else np.zeros(n, dtype=np.float64))
+                l = cache.get("Low", df["Low"].to_numpy(dtype=np.float64) if "Low" in df.columns else np.zeros(n, dtype=np.float64))
+                c = cache.get("Close_Adj", cache.get("Close_Raw", cache.get("Close", df.get("Close_Adj", df.get("Close", pd.Series(np.ones(n)))).to_numpy(dtype=np.float64))))
                 return np.nan_to_num((h - l) / (c + 1e-8), nan=0.0)
             try:
                 return np.full(n, float(node.val), dtype=np.float64)

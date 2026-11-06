@@ -193,9 +193,16 @@ class ShoonyaGateway:
         return clean if clean.endswith("-EQ") else f"{clean}-EQ"
 
     @staticmethod
-    def calculate_friction(trade_value: float, is_etf: bool) -> float:
-        """Computes exact statutory friction (1.2 bps for ETFs, 25 bps for equities)."""
-        rate = 0.00012 if is_etf else 0.00250
+    def calculate_friction(trade_value: float, is_etf: bool, custom_bps: Optional[float] = None) -> float:
+        """
+        Computes statutory friction:
+        - Default: 1.2 bps for ETFs, 25 bps for equities
+        - Or dynamic custom_bps if specified
+        """
+        if custom_bps is not None:
+            rate = custom_bps / 10000.0
+        else:
+            rate = 0.00012 if is_etf else 0.00250
         return float(trade_value * rate)
 
     def place_order(

@@ -80,10 +80,42 @@ class ExecutionTier(str, Enum):
 
 class InstrumentType(str, Enum):
     """Statutory instrument class determining tax and leverage constraints."""
-    ETF_CASH = "ETF_CASH"         # 0.001% STT delivery (1.2 bps total friction)
+    ETF_CASH = "ETF_CASH"         # 0.001% STT delivery (1.2 bps default baseline)
     EQUITY_CASH = "EQUITY_CASH"   # 0.10% buy + 0.10% sell STT (25 bps total friction)
     MTF_LEVERAGED = "MTF_LEVERAGED" # 2x-4x broker margin + ~12% annual interest
-    FUTURES = "FUTURES"           # 0.02% sell STT only (3 bps friction, 5x-6x leverage)
+    FUTURES = "FUTURES"           # 0.02% sell STT only (3 bps friction baseline)
+    INTRADAY_EQUITY = "INTRADAY_EQUITY" # 0.025% sell STT + turnover (~3.5 bps)
+
+
+@dataclass(frozen=True)
+class TaxSchedule:
+    """
+    Configurable dynamic statutory tax and friction schedule (in basis points).
+    Enables custom and dynamic parameterization across Indian Equities, ETFs, and Futures.
+    1 bps = 0.0001 (0.01%).
+    """
+    etf_cash_bps: float = 1.2          # 0.00012 (0.012%) for ETF delivery
+    futures_bps: float = 3.0           # 0.00030 (0.030%) for Single-Stock Futures
+    equity_cash_bps: float = 25.0      # 0.00250 (0.250%) for Equity Delivery
+    intraday_bps: float = 3.5          # 0.00035 (0.035%) for Intraday cash
+    custom_slippage_bps: float = 0.0   # Optional market impact / slippage buffer
+
+    def get_friction_rate(self, instrument: InstrumentType | str) -> float:
+        """Returns the decimal friction rate (e.g., 0.00012 for 1.2 bps)."""
+        inst = instrument.value if isinstance(instrument, InstrumentType) else str(instrument).upper()
+        if inst in ("ETF_CASH", "ETF"):
+            base = self.etf_cash_bps
+        elif inst in ("FUTURES", "FUT"):
+            base = self.futures_bps
+        elif inst in ("INTRADAY_EQUITY", "INTRADAY"):
+            base = self.intraday_bps
+        else:
+            base = self.equity_cash_bps
+        return float((base + self.custom_slippage_bps) / 10000.0)
+
+    def calculate_tax(self, trade_value: float, instrument: InstrumentType | str) -> float:
+        """Calculates total friction in currency units."""
+        return float(trade_value * self.get_friction_rate(instrument))
 
 @dataclass(frozen=True)
 class ADRLeadSignal:

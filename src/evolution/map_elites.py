@@ -16,7 +16,7 @@ import pandas as pd
 from loguru import logger
 from ..domain.formula_ast import ASTNode, ASTEvaluator
 from ..domain.formula_parser import FormulaParser
-from ..domain.models import InstrumentType
+from ..domain.models import InstrumentType, TaxSchedule
 
 @dataclass
 class EliteIndividual:
@@ -35,9 +35,10 @@ class EliteIndividual:
     lookback: str = "5y"
 
 class MapElitesArchive:
-    def __init__(self, grid_size: tuple[int, int] = (20, 20)):
+    def __init__(self, grid_size: tuple[int, int] = (20, 20), tax_schedule: Optional[TaxSchedule] = None):
         self.rows, self.cols = grid_size
         self.grid = np.empty(grid_size, dtype=object)
+        self.tax_schedule = tax_schedule or TaxSchedule()
 
         # Behavioral boundary bins
         self.vol_bins = np.linspace(0.05, 0.60, self.rows)
@@ -49,6 +50,8 @@ class MapElitesArchive:
         return r, c
 
     def _get_statutory_friction(self, instrument: InstrumentType) -> float:
+        if self.tax_schedule:
+            return self.tax_schedule.get_friction_rate(instrument)
         if instrument == InstrumentType.ETF_CASH:
             return 0.00012
         if instrument == InstrumentType.FUTURES:
