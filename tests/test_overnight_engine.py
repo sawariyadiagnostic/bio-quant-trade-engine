@@ -30,6 +30,60 @@ def test_gift_nifty_premarket_implied_gap():
     print("[PASS] test_gift_nifty_premarket_implied_gap")
 
 
+def test_preopen_auction_limit_order_routing():
+    """Verify PreOpenAuctionRouter generates limit orders with slippage bounds."""
+    from src.execution.overnight_engine import PreOpenAuctionRouter
+
+    router = PreOpenAuctionRouter()
+    order_buy = router.route_auction_order(
+        ticker="NIFTYBEES.NS",
+        side="BUY",
+        indicative_price=250.0,
+        quantity=100,
+        slippage_ceiling_bps=15.0
+    )
+    assert order_buy["ticker"] == "NIFTYBEES.NS"
+    assert order_buy["side"] == "BUY"
+    assert order_buy["quantity"] == 100
+    assert order_buy["limit_price"] == 250.38
+    assert order_buy["time_in_force"] == "PRE_OPEN_AUCTION"
+
+    order_sell = router.route_auction_order(
+        ticker="NIFTYBEES.NS",
+        side="SELL",
+        indicative_price=250.0,
+        quantity=100,
+        slippage_ceiling_bps=15.0
+    )
+    assert order_sell["limit_price"] == 249.62
+    print("[PASS] test_preopen_auction_limit_order_routing")
+
+
+def test_trailing_stop_decay():
+    """Verify trailing stop tightens from 25 bps down to 10 bps as minutes elapse."""
+    from src.execution.overnight_engine import TrailingStopSimulator
+
+    entry_price = 250.0
+    open_price = 251.0
+    high_price = 251.5
+    low_price = 251.2
+
+    # At minute 0 (09:15), wide buffer does not trigger
+    exit_p_0, reason_0 = TrailingStopSimulator.resolve_decaying_exit(
+        entry_price, open_price, high_price, low_price, minutes_elapsed=0
+    )
+    assert reason_0 == "OPEN_AUCTION_EXIT"
+
+    # At minute 30 (09:45), tight buffer triggers
+    exit_p_30, reason_30 = TrailingStopSimulator.resolve_decaying_exit(
+        entry_price, open_price, high_price, low_price, minutes_elapsed=30
+    )
+    assert reason_30 == "TRAILING_STOP_HIT"
+    print("[PASS] test_trailing_stop_decay")
+
+
 if __name__ == "__main__":
     test_gift_nifty_premarket_implied_gap()
+    test_preopen_auction_limit_order_routing()
+    test_trailing_stop_decay()
     print("OVERNIGHT ENGINE TESTS PASSED!")

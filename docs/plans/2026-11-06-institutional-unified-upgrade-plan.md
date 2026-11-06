@@ -29,7 +29,7 @@
 | **P1** | **Task 8** | Purged & Embargoed Walk-Forward Validation | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[x]` Complete | `feat(backtest)` |
 | **P1** | **Task 9** | MAP-Elites 2-Objective Pareto & 2x Friction Stress Test | `src/evolution/map_elites.py`, `tests/test_lookback_cagr_partitioning.py` | `[x]` Complete | `feat(evolution)` |
 | **P2** | **Task 10**| GIFT NIFTY Overnight Lead-Lag Ingestion (06:30–08:30 IST)| `src/data/gift_nifty_loader.py`, `src/execution/overnight_engine.py` | `[x]` Complete | `feat(data)` |
-| **P2** | **Task 11**| Pre-Open Auction Limit Router & Micro-Trailing Stop | `src/execution/overnight_engine.py`, `tests/test_overnight_engine.py` | `[ ]` Not Started | - |
+| **P2** | **Task 11**| Pre-Open Auction Limit Router & Micro-Trailing Stop | `src/execution/overnight_engine.py`, `tests/test_overnight_engine.py` | `[x]` Complete | `feat(execution)` |
 | **P2** | **Task 12**| Shoonya Gateway Hardening (`clordid`, Retries, Sell Fix)| `src/execution/shoonya_gateway.py`, `src/execution/execution_dispatcher.py` | `[ ]` Not Started | - |
 | **P2** | **Task 13**| Two-Pass Atomic Rebalancing & Liquid BeES Auto-Sweep | `src/execution/portfolio_paper_trader.py`, `tests/test_portfolio_paper_trader.py` | `[ ]` Not Started | - |
 | **P3** | **Task 14**| Thread-Safe State & Interactive I/O DAG in Master Cockpit| `src/ui/evolution_dashboard.py`, `src/ui/visualizations.py` | `[ ]` Not Started | - |
@@ -288,19 +288,19 @@
 - Modify: `src/execution/overnight_engine.py:80-140`
 - Test: `tests/test_overnight_engine.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_overnight_engine.py`, assert:
   1. Orders generated between 09:00 and 09:07 IST are tagged as `LIMIT` auction orders at indicative price.
   2. Trailing stop decays dynamically: $0.20\%$ at 09:15:00, widening to $0.45\%$ by 09:30:00.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_overnight_engine.py`  
   Expected: FAIL.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `TrailingStopSimulator.resolve_exit`, implement time-dependent stop decay based on elapsed minutes from market open.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_overnight_engine.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "feat(execution): implement pre-open call auction routing and decaying trailing stops"`
 
 ---
