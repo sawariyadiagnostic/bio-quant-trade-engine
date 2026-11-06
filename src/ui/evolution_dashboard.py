@@ -312,23 +312,28 @@ def _parse_leaderboard_to_records(raw_board: List[Dict[str, Any]]) -> List[Dict[
 def _update_v2_visuals(ticker: str, initial_cash: float = 50000.0):
     """Updates 3D manifold, HRP weights, paper portfolio, and 1024D similarity heatmap."""
     global CURRENT_ARCHIVE_RECORDS
-    if not CURRENT_ARCHIVE_RECORDS:
+    try:
+        cash_val = float(initial_cash) if initial_cash is not None else 50000.0
+        if not CURRENT_ARCHIVE_RECORDS:
+            return build_3d_manifold_plot(), build_hrp_weights_plot({}), EMPTY_PORTFOLIO, build_cosine_similarity_heatmap([])
+
+        n = len(CURRENT_ARCHIVE_RECORDS)
+        coords = np.zeros((n, 3))
+        for i, r in enumerate(CURRENT_ARCHIVE_RECORDS):
+            coords[i, 0] = float(r.get("row", i % 20)) / 20.0
+            coords[i, 1] = float(r.get("col", (i * 2) % 20)) / 20.0
+            coords[i, 2] = float(r.get("fitness", 1.0)) / 10.0
+        labels = [int(r.get("row", 0)) % 5 for r in CURRENT_ARCHIVE_RECORDS]
+        texts = [r.get("formula_str", f"Alpha #{i}") for i, r in enumerate(CURRENT_ARCHIVE_RECORDS)]
+
+        m_plot = build_3d_manifold_plot(coords=coords, labels=labels, texts=texts)
+        hrp_plot = build_hrp_weights_plot({ticker: 1.0})
+        port_table = format_portfolio_table({}, {}, cash=cash_val)
+        sim_heatmap = build_cosine_similarity_heatmap(CURRENT_ARCHIVE_RECORDS)
+        return m_plot, hrp_plot, port_table, sim_heatmap
+    except Exception as e:
+        print(f"[VISUAL WARNING] Error updating v2 visuals: {e}")
         return build_3d_manifold_plot(), build_hrp_weights_plot({}), EMPTY_PORTFOLIO, build_cosine_similarity_heatmap([])
-
-    n = len(CURRENT_ARCHIVE_RECORDS)
-    coords = np.zeros((n, 3))
-    for i, r in enumerate(CURRENT_ARCHIVE_RECORDS):
-        coords[i, 0] = float(r.get("row", i % 20)) / 20.0
-        coords[i, 1] = float(r.get("col", (i * 2) % 20)) / 20.0
-        coords[i, 2] = float(r.get("fitness", 1.0)) / 10.0
-    labels = [int(r.get("row", 0)) % 5 for r in CURRENT_ARCHIVE_RECORDS]
-    texts = [r.get("formula_str", f"Alpha #{i}") for i, r in enumerate(CURRENT_ARCHIVE_RECORDS)]
-
-    m_plot = build_3d_manifold_plot(coords=coords, labels=labels, texts=texts)
-    hrp_plot = build_hrp_weights_plot({ticker: 1.0})
-    port_table = format_portfolio_table({}, {}, cash=initial_cash)
-    sim_heatmap = build_cosine_similarity_heatmap(CURRENT_ARCHIVE_RECORDS)
-    return m_plot, hrp_plot, port_table, sim_heatmap
 
 def run_multi_asset_alpha_os(
     generations: float = 10,
@@ -460,11 +465,7 @@ def run_master_dispatch_stream(
             build_spotlight_markdown(CURRENT_ARCHIVE_RECORDS),
             build_map_elites_heatmap(CURRENT_ARCHIVE_RECORDS),
             build_pareto_scatter(CURRENT_ARCHIVE_RECORDS),
-            re_sort_leaderboard(sort_choice, row_choice),
-            build_3d_manifold_plot(),
-            build_hrp_weights_plot({}),
-            EMPTY_PORTFOLIO,
-            build_cosine_similarity_heatmap([])
+            re_sort_leaderboard(sort_choice, row_choice)
         )
 
         pipeline = AlphaEnginePipeline(initial_cash=float(initial_cash), capital=float(initial_cash))
@@ -534,11 +535,7 @@ def run_master_dispatch_stream(
             build_spotlight_markdown(synth_records),
             build_map_elites_heatmap(synth_records),
             build_pareto_scatter(synth_records),
-            format_leaderboard_table(synth_records, sort_by=sort_key, max_rows=max_rows),
-            m_fig,
-            w_fig,
-            df_holdings,
-            sim_heatmap
+            format_leaderboard_table(synth_records, sort_by=sort_key, max_rows=max_rows)
         )
         return
 
@@ -560,7 +557,6 @@ def run_master_dispatch_stream(
 
     for item in stream:
         status_h, telem_md, spot_md, heat_fig, p_fig, board_df = item
-        m_fig, w_fig, p_df, s_heat = _update_v2_visuals(ticker_single, initial_cash=float(initial_cash))
         elites_n = len(CURRENT_ARCHIVE_RECORDS)
         # Compute dynamic stats from actual archive records
         sharpe_val = round(float(np.mean([r.get("fitness", 1.0) for r in CURRENT_ARCHIVE_RECORDS])), 2) if CURRENT_ARCHIVE_RECORDS else 0.0
@@ -583,11 +579,7 @@ def run_master_dispatch_stream(
             spot_md,
             heat_fig,
             p_fig,
-            board_df,
-            m_fig,
-            w_fig,
-            p_df,
-            s_heat
+            board_df
         )
 
 def run_evolution_stream(
@@ -1113,9 +1105,12 @@ def create_ui():
                 target_mode_radio, sort_dropdown, row_count_dropdown, reset_archive_cb
             ],
             outputs=[
-                hud_box, telemetry_box, spotlight_box, heatmap_plot, scatter_plot,
-                leaderboard_table, manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot
+                hud_box, telemetry_box, spotlight_box, heatmap_plot, scatter_plot, leaderboard_table
             ]
+        ).then(
+            fn=_update_v2_visuals,
+            inputs=[ticker_single, initial_cash_input],
+            outputs=[manifold_3d_plot, hrp_plot, portfolio_table, sim_heatmap_plot]
         )
 
         load_archive_btn.click(
@@ -1189,7 +1184,7 @@ if __name__ == "__main__":
     demo = create_ui()
     port = int(os.environ.get("GRADIO_SERVER_PORT", 7860))
     try:
-        demo.queue().launch(server_name="127.0.0.1", server_port=port, share=False)
+        demo.queue(concurrency_count=5).launch(server_name="127.0.0.1", server_port=port, share=False)
     except OSError:
         print(f"[PORT WARNING] Port {port} is busy or in TIME_WAIT. Auto-binding to next available free port...")
-        demo.queue().launch(server_name="127.0.0.1", server_port=None, share=False)
+        demo.queue(concurrency_count=5).launch(server_name="127.0.0.1", server_port=None, share=False)
