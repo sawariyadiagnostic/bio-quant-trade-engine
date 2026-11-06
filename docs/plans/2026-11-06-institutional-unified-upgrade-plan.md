@@ -23,7 +23,7 @@
 | **P0** | **Task 2** | Daily-Resetting VWAP & Auction Jump Decomposition | `src/data/vector_lake.py`, `tests/test_vector_lake.py` | `[x]` Complete | `feat(data)` |
 | **P0** | **Task 3** | AST Math Clamping (`EXP/LOG/POW_SAFE`) & MurmurHash | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[x]` Complete | `feat(ast)` |
 | **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[x]` Complete | `fix(pipeline)` |
-| **P1** | **Task 5** | Multi-Asset 3D Tensor Simulation `(B, N, T)` | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[ ]` Not Started | - |
+| **P1** | **Task 5** | Multi-Asset 3D Tensor Simulation `(B, N, T)` | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[x]` Complete | `feat(backtest)` |
 | **P1** | **Task 6** | Cross-Sectional Alpha Operators (`CS_Rank`, `CS_Demean`) | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[ ]` Not Started | - |
 | **P1** | **Task 7** | Ward/Average Linkage HRP & Ledoit-Wolf Shrinkage | `src/execution/hrp_allocator.py`, `tests/test_hrp_allocator.py`| `[ ]` Not Started | - |
 | **P1** | **Task 8** | Purged & Embargoed Walk-Forward Validation | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[ ]` Not Started | - |
@@ -148,19 +148,19 @@
 - Modify: `src/backtest/matrix_engine.py:10-70`
 - Test: `tests/test_matrix_engine.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_matrix_engine.py`, add `test_matrix_simulator_3d_multi_asset` testing `positions` of shape `(B, N, T)` and `returns` of shape `(N, T)` across `NIFTYBEES`, `BANKBEES`, and `GOLDBEES`.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_matrix_engine.py`  
   Expected: FAIL (`ValueError: positions must be 2D`).
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/backtest/matrix_engine.py`:
   - Support both 2D and 3D inputs. For 3D, compute cross-sectional portfolio net return at bar $t$:
     $$R_{port, b, t} = \sum_{n=1}^N (P_{b, n, t} \times R_{n, t}) - \text{friction} \times \sum_{n=1}^N |\Delta P_{b, n, t}|$$
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_matrix_engine.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "feat(backtest): implement vectorized 3D tensor simulation for multi-asset portfolios"`
 
 ---

@@ -53,6 +53,29 @@ def test_matrix_simulator_friction_deduction():
     print("[PASS] test_matrix_simulator_friction_deduction")
 
 
+def test_matrix_simulator_3d_multi_asset():
+    """Verify 3D tensor simulation (B, N, T) across multi-asset ETF portfolio."""
+    from src.backtest.matrix_engine import MatrixSimulator
+
+    sim = MatrixSimulator(friction_bps=1.2)
+    B, N, T = 10, 3, 100  # 10 strategies, 3 assets (NIFTYBEES, BANKBEES, GOLDBEES), 100 bars
+    positions = np.zeros((B, N, T), dtype=np.float32)
+    positions[:, 0, :] = 0.33
+    positions[:, 1, :] = 0.33
+    positions[:, 2, :] = 0.34
+
+    np.random.seed(42)
+    returns = np.random.normal(0.001, 0.01, (N, T)).astype(np.float32)
+
+    res = sim.simulate_batch(positions, returns, lookback_years=1.0)
+    assert res["cagr"].shape == (B,)
+    assert res["sortino"].shape == (B,)
+    assert res["net_returns"].shape == (B, T)
+    assert np.all(np.isfinite(res["cagr"]))
+    print("[PASS] test_matrix_simulator_3d_multi_asset")
+
+
 if __name__ == "__main__":
     test_matrix_simulator_batch_speed_and_sortino()
     test_matrix_simulator_friction_deduction()
+    test_matrix_simulator_3d_multi_asset()

@@ -19,25 +19,47 @@ class MatrixSimulator:
         Simulates an entire batch of formulas simultaneously without Python loops.
 
         Args:
-            positions: 2D array of binary trade decisions (shape: [B, T]).
-            returns: 1D array of gross market returns (shape: [T]).
+            positions: 2D array [B, T] or 3D multi-asset array [B, N, T].
+            returns: 1D array [T] or 2D multi-asset array [N, T].
             lookback_years: Historical horizon duration for CAGR normalization.
 
         Returns:
             Dictionary of performance metric arrays (each of shape: [B]).
         """
-        if positions.ndim != 2:
-            raise ValueError(f"positions must be 2D [B, T], got shape {positions.shape}")
-        B, T = positions.shape
-        if len(returns) != T:
-            raise ValueError(f"returns length ({len(returns)}) must match positions columns ({T})")
-
         friction = self.friction_bps / 10000.0
 
-        # 1. Vectorized Position Flips & Friction
-        zero_col = np.zeros((B, 1), dtype=positions.dtype)
-        flips = np.abs(np.diff(positions, axis=1, prepend=zero_col))
-        net_rets = (positions * returns[np.newaxis, :]) - (flips * friction)
+        if positions.ndim == 2:
+            B, T = positions.shape
+            if len(returns) != T:
+                raise ValueError(f"returns length ({len(returns)}) must match positions columns ({T})")
+            zero_col = np.zeros((B, 1), dtype=positions.dtype)
+            flips = np.abs(np.diff(positions, axis=1, prepend=zero_col))
+            net_rets = (positions * returns[np.newaxis, :]) - (flips * friction)
+            active_mask = positions > 0.0
+
+        elif positions.ndim == 3:
+            B, N, T = positions.shape
+            rets_arr = np.asarray(returns)
+            if rets_arr.ndim == 1:
+                if len(rets_arr) != T:
+                    raise ValueError(f"returns length ({len(rets_arr)}) must match columns ({T})")
+                rets_2d = np.broadcast_to(rets_arr[np.newaxis, :], (N, T))
+            elif rets_arr.ndim == 2:
+                if rets_arr.shape != (N, T):
+                    raise ValueError(f"returns shape {rets_arr.shape} must match (N={N}, T={T})")
+                rets_2d = rets_arr
+            else:
+                raise ValueError(f"returns must be 1D [T] or 2D [N, T], got shape {rets_arr.shape}")
+
+            zero_col = np.zeros((B, N, 1), dtype=positions.dtype)
+            flips = np.abs(np.diff(positions, axis=2, prepend=zero_col))
+            turnover_loss = np.sum(flips, axis=1) * friction
+            gross_port_rets = np.sum(positions * rets_2d[np.newaxis, :, :], axis=1)
+            net_rets = gross_port_rets - turnover_loss
+            active_mask = np.sum(np.abs(positions) > 0.0, axis=1) > 0.0
+
+        else:
+            raise ValueError(f"positions must be 2D [B, T] or 3D [B, N, T], got shape {positions.shape}")
 
         # 2. Cumulative Equity & Drawdowns
         cum_eq = np.cumprod(1.0 + net_rets, axis=1)
@@ -53,7 +75,6 @@ class MatrixSimulator:
         cagr = (final_eq ** (1.0 / years) - 1.0) * 100.0
 
         # 4. Institutional Sortino Semi-Deviation with 20 bps Volatility Floor
-        active_mask = positions > 0.0
         n_active = np.maximum(1.0, np.sum(active_mask, axis=1))
         active_rets = np.where(active_mask, net_rets, 0.0)
         mean_ret = np.sum(active_rets, axis=1) / n_active
