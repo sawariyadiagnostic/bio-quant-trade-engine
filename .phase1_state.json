@@ -1,9 +1,9 @@
 {
   "phase": "Phase 1: Institutional Decoupled Cockpit & Engine",
-  "updated_at": "2026-11-07T02:20:30+05:30",
-  "active_task": "TASK_1",
-  "active_subtask": "1.1",
-  "last_stable_commit": "b33f5f5",
+  "updated_at": "2026-11-07T02:33:30+05:30",
+  "active_task": "TASK_2",
+  "active_subtask": "2.1",
+  "last_stable_commit": "39201a5",
   "tasks": {
     "TASK_0": {
       "title": "Latent Gateway Remediation & SQLite WAL Migration Baseline",
@@ -21,25 +21,25 @@
         "0.10_build_archive_migrator": "PASSED"
       },
       "verification_cmd": "python -m unittest tests/test_gateway_hardening.py && python scripts/red_team_harness.py --mode=full",
-      "commit": null
+      "commit": "39201a5"
     },
     "TASK_1": {
       "title": "Windows Job Guard & Zero-Copy SharedMemory IPC",
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "subtasks": {
-        "1.1_windows_job_manager": "IN_PROGRESS",
-        "1.2_cpu_affinity_priority_governor": "QUEUED",
-        "1.3_shared_memory_ipc_bus": "QUEUED",
-        "1.4_spawned_evolution_worker": "QUEUED"
+        "1.1_windows_job_manager": "PASSED",
+        "1.2_cpu_affinity_priority_governor": "PASSED",
+        "1.3_shared_memory_ipc_bus": "PASSED",
+        "1.4_spawned_evolution_worker": "PASSED"
       },
       "verification_cmd": "python -m unittest tests/test_shm_worker_isolation.py",
       "commit": null
     },
     "TASK_2": {
       "title": "Two-Stage Risk Sentry & Market Microstructure Protection",
-      "status": "QUEUED",
+      "status": "IN_PROGRESS",
       "subtasks": {
-        "2.1_stage1_in_process_atomic_freeze": "QUEUED",
+        "2.1_stage1_in_process_atomic_freeze": "IN_PROGRESS",
         "2.2_stage2_parallel_async_socket_dispatch": "QUEUED",
         "2.3_lower_circuit_synthetic_delta_hedge": "QUEUED",
         "2.4_statutory_dp_charge_floor": "QUEUED",

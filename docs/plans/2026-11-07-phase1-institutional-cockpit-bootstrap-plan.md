@@ -19,7 +19,7 @@
 
 | Task ID | Task Scope | Status | Verification Gate | Commit |
 | :--- | :--- | :---: | :--- | :---: |
-| **TASK 0** | **Latent Gateway Remediation & SQLite WAL Migration Baseline** | `[x] COMPLETED` | `unittest tests/test_gateway_hardening.py` | *Pending Commit* |
+| **TASK 0** | **Latent Gateway Remediation & SQLite WAL Migration Baseline** | `[x] COMPLETED` | `unittest tests/test_gateway_hardening.py` | `39201a5` |
 | ↳ Subtask 0.1 | Fix `place_order` keyword mismatch (`symbol=sym`) in lines 408 & 420 | `[x]` | Unit test passed | *Verified* |
 | ↳ Subtask 0.2 | Fix undefined variable `sym` (`NameError`) in lines 420 & 421 | `[x]` | Unit test passed | *Verified* |
 | ↳ Subtask 0.3 | Fix `price <= 0.0` check in line 232 to allow market order liquidation | `[x]` | Unit test passed | *Verified* |
