@@ -20,7 +20,7 @@
 | Priority | Task ID | Core Focus | Primary Target Files | Status | Commit / Stamp |
 | :---: | :---: | :--- | :--- | :---: | :---: |
 | **P0** | **Task 1** | Fix Causality Check & Empirical Fat-Tailed DSR | `src/domain/invariants.py`, `tests/test_invariants.py` | `[x]` Complete | `fix(invariants)` |
-| **P0** | **Task 2** | Daily-Resetting VWAP & Auction Jump Decomposition | `src/data/vector_lake.py`, `tests/test_vector_lake.py` | `[ ]` Not Started | - |
+| **P0** | **Task 2** | Daily-Resetting VWAP & Auction Jump Decomposition | `src/data/vector_lake.py`, `tests/test_vector_lake.py` | `[x]` Complete | `feat(data)` |
 | **P0** | **Task 3** | AST Math Clamping (`EXP/LOG/POW_SAFE`) & MurmurHash | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[ ]` Not Started | - |
 | **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[ ]` Not Started | - |
 | **P1** | **Task 5** | Multi-Asset 3D Tensor Simulation `(B, N, T)` | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[ ]` Not Started | - |
@@ -73,20 +73,20 @@
 - Modify: `src/data/vector_lake.py:65-115`
 - Test: `tests/test_vector_lake.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_vector_lake.py`, assert that `VectorDataLake` contains `overnight_auction_jump` ($Close_{t-1} \to Open_t$), `intraday_core_return` ($Open_t \to Close_t$), and that VWAP resets at session day boundaries.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_vector_lake.py`  
   Expected: FAIL (`KeyError: 'overnight_auction_jump'`).
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/data/vector_lake.py`:
   - Compute `overnight_auction_jump = (df["Open"] - df["Close"].shift(1)) / df["Close"].shift(1)`.
   - Compute `intraday_core_return = (df["Close"] - df["Open"]) / df["Open"]`.
   - Reset cumulative volume and typical price arrays when dates change.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_vector_lake.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "feat(data): implement daily session-resetting VWAP and overnight auction jump decomposition"`
 
 ---

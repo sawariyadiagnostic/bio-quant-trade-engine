@@ -50,6 +50,45 @@ def test_vector_lake_standard_features():
     print("[PASS] test_vector_lake_standard_features")
 
 
+def test_daily_resetting_vwap_and_auction_jump():
+    """Verify overnight auction jump decomposition and session-resetting VWAP."""
+    from src.data.vector_lake import VectorDataLake
+
+    lake = VectorDataLake.load_mock(periods=50)
+    assert "overnight_auction_jump" in lake.tensors
+    assert "intraday_core_return" in lake.tensors
+
+    o_jump = lake.tensors["overnight_auction_jump"]
+    i_core = lake.tensors["intraday_core_return"]
+    assert len(o_jump) == 50
+    assert len(i_core) == 50
+    assert o_jump[0] == 0.0
+
+    # Multi-day intraday series test: VWAP must reset daily
+    idx = pd.date_range("2024-01-01 09:15", periods=10, freq="15min").union(
+        pd.date_range("2024-01-02 09:15", periods=10, freq="15min")
+    )
+    df_intra = pd.DataFrame(index=idx)
+    df_intra["Open"] = 100.0
+    df_intra["High"] = 105.0
+    df_intra["Low"] = 95.0
+    df_intra["Close"] = 100.0
+    df_intra["Volume"] = 1000.0
+    # Day 2 first bar has price 200.0, volume 1000.0
+    df_intra.loc[df_intra.index >= "2024-01-02", "Close"] = 200.0
+    df_intra.loc[df_intra.index >= "2024-01-02", "High"] = 205.0
+    df_intra.loc[df_intra.index >= "2024-01-02", "Low"] = 195.0
+    df_intra.loc[df_intra.index >= "2024-01-02", "Open"] = 200.0
+
+    lake_intra = VectorDataLake.from_dataframe(df_intra, ticker="NIFTYBEES.NS")
+    # At start of Day 2, Dist_VWAP should be near 0 because typical price is 200 and daily VWAP reset to 200
+    day2_first_bar_dist = lake_intra.tensors["Dist_VWAP"][10]
+    assert abs(day2_first_bar_dist) < 0.01, f"VWAP did not reset on Day 2: dist={day2_first_bar_dist}"
+
+    print("[PASS] test_daily_resetting_vwap_and_auction_jump")
+
+
 if __name__ == "__main__":
     test_vector_lake_returns_and_statutory_clipping()
     test_vector_lake_standard_features()
+    test_daily_resetting_vwap_and_auction_jump()

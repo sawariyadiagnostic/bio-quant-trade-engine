@@ -27,13 +27,19 @@ class VectorDataLake:
 
         n = len(c)
         # 1. Statutory Return Vectors (Overnight, Intraday, Close-to-Close)
-        # Overnight Drift: Close[t] to Open[t+1]
+        # Forward Overnight Drift: Close[t] to Open[t+1] (for forward horizon simulation)
         overnight = np.zeros(n, dtype=np.float64)
         if n > 1:
             overnight[:-1] = (o[1:] - c[:-1]) / (c[:-1] + 1e-8)
 
+        # Realized Overnight Auction Jump: Close[t-1] to Open[t] (lagged auction return)
+        auction_jump = np.zeros(n, dtype=np.float64)
+        if n > 1:
+            auction_jump[1:] = (o[1:] - c[:-1]) / (c[:-1] + 1e-8)
+
         # Intraday: Open[t] to Close[t]
         intraday = (c - o) / (o + 1e-8)
+        intraday_core = intraday.copy()
 
         # Close-to-Close: Close[t-1] to Close[t]
         c2c = np.zeros(n, dtype=np.float64)
@@ -42,16 +48,26 @@ class VectorDataLake:
 
         # Statutory NSE Circuit Band Winsorization (-10% to +10%)
         overnight = np.clip(overnight, -0.10, 0.10)
+        auction_jump = np.clip(auction_jump, -0.10, 0.10)
         intraday = np.clip(intraday, -0.10, 0.10)
+        intraday_core = np.clip(intraday_core, -0.10, 0.10)
         c2c = np.clip(c2c, -0.10, 0.10)
 
         # 2. Standard Institutional Factor Computations
         c_series = pd.Series(c, index=df.index)
         v_series = pd.Series(v, index=df.index)
         typical_p = (h + l + c) / 3.0
-        cum_vol = np.cumsum(v)
-        cum_pv = np.cumsum(typical_p * v)
-        vwap = np.where(cum_vol > 0, cum_pv / (cum_vol + 1e-8), typical_p)
+        pv = typical_p * v
+        if isinstance(df.index, pd.DatetimeIndex) and len(np.unique(df.index.date)) < len(df):
+            # Intraday bars spanning multiple dates: reset VWAP at session day boundaries
+            df_vwap = pd.DataFrame({"pv": pv, "v": v, "date": df.index.date})
+            grouped = df_vwap.groupby("date")
+            cum_pv = grouped["pv"].cumsum().to_numpy()
+            cum_vol = grouped["v"].cumsum().to_numpy()
+            vwap = np.where(cum_vol > 0, cum_pv / (cum_vol + 1e-8), typical_p)
+        else:
+            # Single bar per day or homogeneous daily series
+            vwap = typical_p
         dist_vwap = (c - vwap) / (vwap + 1e-8)
 
         # True Range
@@ -87,7 +103,9 @@ class VectorDataLake:
             "Low": l.astype(np.float32),
             "Volume": v.astype(np.float32),
             "gross_overnight_rets": overnight.astype(np.float32),
+            "overnight_auction_jump": auction_jump.astype(np.float32),
             "gross_intraday_rets": intraday.astype(np.float32),
+            "intraday_core_return": intraday_core.astype(np.float32),
             "gross_close_to_close_rets": c2c.astype(np.float32),
             "Dist_VWAP": dist_vwap.astype(np.float32),
             "True_Range": tr.astype(np.float32),
