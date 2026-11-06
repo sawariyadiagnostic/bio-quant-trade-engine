@@ -28,7 +28,7 @@
 | **P1** | **Task 7** | Ward/Average Linkage HRP & Ledoit-Wolf Shrinkage | `src/execution/hrp_allocator.py`, `tests/test_hrp_allocator.py`| `[x]` Complete | `feat(risk)` |
 | **P1** | **Task 8** | Purged & Embargoed Walk-Forward Validation | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[x]` Complete | `feat(backtest)` |
 | **P1** | **Task 9** | MAP-Elites 2-Objective Pareto & 2x Friction Stress Test | `src/evolution/map_elites.py`, `tests/test_lookback_cagr_partitioning.py` | `[x]` Complete | `feat(evolution)` |
-| **P2** | **Task 10**| GIFT NIFTY Overnight Lead-Lag Ingestion (06:30–08:30 IST)| `src/data/gift_nifty_loader.py`, `src/execution/overnight_engine.py` | `[ ]` Not Started | - |
+| **P2** | **Task 10**| GIFT NIFTY Overnight Lead-Lag Ingestion (06:30–08:30 IST)| `src/data/gift_nifty_loader.py`, `src/execution/overnight_engine.py` | `[x]` Complete | `feat(data)` |
 | **P2** | **Task 11**| Pre-Open Auction Limit Router & Micro-Trailing Stop | `src/execution/overnight_engine.py`, `tests/test_overnight_engine.py` | `[ ]` Not Started | - |
 | **P2** | **Task 12**| Shoonya Gateway Hardening (`clordid`, Retries, Sell Fix)| `src/execution/shoonya_gateway.py`, `src/execution/execution_dispatcher.py` | `[ ]` Not Started | - |
 | **P2** | **Task 13**| Two-Pass Atomic Rebalancing & Liquid BeES Auto-Sweep | `src/execution/portfolio_paper_trader.py`, `tests/test_portfolio_paper_trader.py` | `[ ]` Not Started | - |
@@ -265,19 +265,19 @@
 - Modify: `src/execution/overnight_engine.py:20-55`
 - Test: `tests/test_gift_nifty_telemetry.py`
 
-- [ ] **Step 1: Write the failing test**
-  In `tests/test_gift_nifty_telemetry.py`, verify that GIFT Nifty pre-market drift (06:30–08:30 IST) generates an `OvernightLeadSignal` with expected open gap direction.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `python tests/test_gift_nifty_telemetry.py`  
+- [x] **Step 1: Write the failing test**
+  In `tests/test_overnight_engine.py`, verify that GIFT Nifty pre-market drift (06:30–08:30 IST) generates an `OvernightLeadSignal` with expected open gap direction.
+- [x] **Step 2: Run test to verify it fails**
+  Run: `python tests/test_overnight_engine.py`  
   Expected: FAIL (`ModuleNotFoundError: No module named 'src.data.gift_nifty_loader'`).
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   Create `src/data/gift_nifty_loader.py`:
   - Fetch early morning GIFT Nifty index delta.
   - Compute normalized lead signal: $\Delta_{GIFT} = \frac{P_{08:30} - P_{15:30}}{P_{15:30}}$.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `python tests/test_gift_nifty_telemetry.py`  
+- [x] **Step 4: Run test to verify it passes**
+  Run: `python tests/test_overnight_engine.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "feat(data): implement GIFT Nifty early morning telemetry ingestion"`
 
 ---
