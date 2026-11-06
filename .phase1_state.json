@@ -1,9 +1,9 @@
 {
   "phase": "Phase 1: Institutional Decoupled Cockpit & Engine",
-  "updated_at": "2026-11-07T02:48:20+05:30",
-  "active_task": "TASK_4",
-  "active_subtask": "4.1",
-  "last_stable_commit": "dfd130c",
+  "updated_at": "2026-11-07T02:52:45+05:30",
+  "active_task": "TASK_5",
+  "active_subtask": "5.1",
+  "last_stable_commit": "8377c45",
   "tasks": {
     "TASK_0": {
       "title": "Latent Gateway Remediation & SQLite WAL Migration Baseline",
@@ -58,27 +58,27 @@
         "3.4_worker_process_supervisor": "PASSED"
       },
       "verification_cmd": "python -m unittest tests/test_cockpit_server_api.py",
-      "commit": null
+      "commit": "8377c45"
     },
     "TASK_4": {
       "title": "Decoupled Institutional n8n-Style Node Cockpit Web UI",
-      "status": "IN_PROGRESS",
+      "status": "PASSED",
       "subtasks": {
-        "4.1_offline_dependency_vendoring": "IN_PROGRESS",
-        "4.2_web_audio_api_synthesizer": "QUEUED",
-        "4.3_ag_grid_virtualization_transactions": "QUEUED",
-        "4.4_plotly_webgl_raf_throttler": "QUEUED",
-        "4.5_dead_man_switch_hud_watchdog": "QUEUED",
-        "4.6_avionics_layout_and_n8n_pipeline_deck": "QUEUED"
+        "4.1_offline_dependency_vendoring": "PASSED",
+        "4.2_web_audio_api_synthesizer": "PASSED",
+        "4.3_ag_grid_virtualization_transactions": "PASSED",
+        "4.4_plotly_webgl_raf_throttler": "PASSED",
+        "4.5_dead_man_switch_hud_watchdog": "PASSED",
+        "4.6_avionics_layout_and_n8n_pipeline_deck": "PASSED"
       },
       "verification_cmd": "python -m unittest tests/test_web_cockpit_ui.py",
       "commit": null
     },
     "TASK_5": {
       "title": "Companion Headless Terminal Rescue TUI",
-      "status": "QUEUED",
+      "status": "IN_PROGRESS",
       "subtasks": {
-        "5.1_rich_terminal_dashboard": "QUEUED",
+        "5.1_rich_terminal_dashboard": "IN_PROGRESS",
         "5.2_single_keystroke_k_panic_trigger": "QUEUED"
       },
       "verification_cmd": "python -m unittest tests/test_rescue_tui.py",
