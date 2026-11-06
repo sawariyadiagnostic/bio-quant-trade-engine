@@ -102,3 +102,84 @@ class MatrixSimulator:
             "mean_return": mean_ret,
             "n_active_bars": n_active
         }
+
+    def walk_forward_cv(
+        self,
+        positions: np.ndarray,
+        returns: np.ndarray,
+        n_splits: int = 5,
+        purge_bars: int = 5,
+        embargo_bars: int = 2,
+        min_train_bars: int = 60
+    ) -> Dict[str, Any]:
+        """
+        Executes Purged & Embargoed Walk-Forward Cross Validation (López de Prado, 2018).
+        Ensures out-of-sample slices have strict temporal isolation:
+        test_start >= train_end + purge_bars + embargo_bars.
+        """
+        T = positions.shape[-1]
+        buffer_bars = purge_bars + embargo_bars
+        available_t = T - min_train_bars - buffer_bars
+        if available_t <= 0 or n_splits < 1:
+            raise ValueError(f"Insufficient time steps T={T} for n_splits={n_splits} with buffer={buffer_bars}")
+
+        test_chunk = max(10, available_t // n_splits)
+        folds = []
+        test_sortinos = []
+        test_cagrs = []
+        test_dds = []
+
+        for split in range(n_splits):
+            test_start = min_train_bars + (split * test_chunk) + buffer_bars
+            test_end = min(T, test_start + test_chunk)
+            train_end = test_start - buffer_bars
+
+            if test_start >= T or train_end <= 0:
+                break
+
+            if positions.ndim == 2:
+                pos_train, pos_test = positions[:, :train_end], positions[:, test_start:test_end]
+                ret_train, ret_test = returns[:train_end], returns[test_start:test_end]
+            else:
+                pos_train, pos_test = positions[:, :, :train_end], positions[:, :, test_start:test_end]
+                ret_train = returns[:, :train_end] if returns.ndim == 2 else returns[:train_end]
+                ret_test = returns[:, test_start:test_end] if returns.ndim == 2 else returns[test_start:test_end]
+
+            train_res = self.simulate_batch(pos_train, ret_train, lookback_years=max(0.1, train_end / 252.0))
+            test_res = self.simulate_batch(pos_test, ret_test, lookback_years=max(0.1, (test_end - test_start) / 252.0))
+
+            folds.append({
+                "split": split,
+                "train_range": (0, train_end),
+                "test_range": (test_start, test_end),
+                "train_sortino": train_res["sortino"],
+                "test_sortino": test_res["sortino"],
+                "test_cagr": test_res["cagr"],
+                "test_drawdown": test_res["max_drawdown"],
+            })
+            test_sortinos.append(test_res["sortino"])
+            test_cagrs.append(test_res["cagr"])
+            test_dds.append(test_res["max_drawdown"])
+
+        mean_sortino = np.mean(test_sortinos, axis=0) if test_sortinos else np.zeros(positions.shape[0])
+        mean_cagr = np.mean(test_cagrs, axis=0) if test_cagrs else np.zeros(positions.shape[0])
+        mean_dd = np.mean(test_dds, axis=0) if test_dds else np.zeros(positions.shape[0])
+
+        return {
+            "folds": folds,
+            "mean_test_sortino": mean_sortino,
+            "mean_test_cagr": mean_cagr,
+            "mean_test_drawdown": mean_dd
+        }
+
+    @staticmethod
+    def purged_walk_forward_split(
+        n_bars: int,
+        train_ratio: float = 0.7,
+        purge_window: int = 5,
+        embargo_window: int = 5
+    ) -> tuple[tuple[int, int], tuple[int, int]]:
+        """Generates train and test slice boundaries with strict purge and embargo buffers."""
+        train_end = int(n_bars * train_ratio)
+        test_start = min(n_bars, train_end + purge_window + embargo_window)
+        return (0, train_end), (test_start, n_bars)

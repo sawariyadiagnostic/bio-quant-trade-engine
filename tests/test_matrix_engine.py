@@ -75,7 +75,39 @@ def test_matrix_simulator_3d_multi_asset():
     print("[PASS] test_matrix_simulator_3d_multi_asset")
 
 
+def test_purged_embargoed_walk_forward_cv():
+    """Verify Purged & Embargoed Walk-Forward Cross Validation eliminates label overlap."""
+    from src.backtest.matrix_engine import MatrixSimulator
+
+    sim = MatrixSimulator(friction_bps=1.2)
+    B, T = 10, 300
+    np.random.seed(42)
+    positions = (np.random.randn(B, T) > 0.0).astype(np.float32)
+    returns = np.random.normal(0.0005, 0.01, T).astype(np.float32)
+
+    cv_res = sim.walk_forward_cv(positions, returns, n_splits=3, purge_bars=5, embargo_bars=2)
+
+    assert "folds" in cv_res
+    assert len(cv_res["folds"]) == 3
+    assert "mean_test_sortino" in cv_res
+    assert "mean_test_cagr" in cv_res
+    assert cv_res["mean_test_sortino"].shape == (B,)
+    assert cv_res["mean_test_cagr"].shape == (B,)
+
+    for fold in cv_res["folds"]:
+        train_end = fold["train_range"][1]
+        test_start = fold["test_range"][0]
+        assert test_start >= train_end + 5 + 2, f"Leakage: test_start {test_start} < train_end {train_end} + 7"
+
+    # Static helper test
+    tr, ts = MatrixSimulator.purged_walk_forward_split(100, train_ratio=0.7, purge_window=5, embargo_window=5)
+    assert tr == (0, 70)
+    assert ts == (80, 100)
+    print("[PASS] test_purged_embargoed_walk_forward_cv")
+
+
 if __name__ == "__main__":
     test_matrix_simulator_batch_speed_and_sortino()
     test_matrix_simulator_friction_deduction()
     test_matrix_simulator_3d_multi_asset()
+    test_purged_embargoed_walk_forward_cv()
