@@ -1,38 +1,38 @@
 {
   "phase": "Phase 1: Institutional Decoupled Cockpit & Engine",
-  "updated_at": "2026-11-07T02:13:00+05:30",
-  "active_task": "TASK_0",
-  "active_subtask": "0.1",
-  "last_stable_commit": "c8bb3dd",
+  "updated_at": "2026-11-07T02:20:30+05:30",
+  "active_task": "TASK_1",
+  "active_subtask": "1.1",
+  "last_stable_commit": "b33f5f5",
   "tasks": {
     "TASK_0": {
       "title": "Latent Gateway Remediation & SQLite WAL Migration Baseline",
-      "status": "QUEUED",
+      "status": "PASSED",
       "subtasks": {
-        "0.1_fix_place_order_symbol_kwarg": "QUEUED",
-        "0.2_fix_undefined_sym_name_error": "QUEUED",
-        "0.3_fix_zero_price_market_order_guard": "QUEUED",
-        "0.4_fix_short_position_square_off": "QUEUED",
-        "0.5_pass_product_type_prd": "QUEUED",
-        "0.6_fix_cancel_order_orderno_kwarg": "QUEUED",
-        "0.7_fix_send_live_order_rejection_masking": "QUEUED",
-        "0.8_normalize_symbols_cleanly": "QUEUED",
-        "0.9_migrate_audit_to_sqlite_wal": "QUEUED",
-        "0.10_build_archive_migrator": "QUEUED"
+        "0.1_fix_place_order_symbol_kwarg": "PASSED",
+        "0.2_fix_undefined_sym_name_error": "PASSED",
+        "0.3_fix_zero_price_market_order_guard": "PASSED",
+        "0.4_fix_short_position_square_off": "PASSED",
+        "0.5_pass_product_type_prd": "PASSED",
+        "0.6_fix_cancel_order_orderno_kwarg": "PASSED",
+        "0.7_fix_send_live_order_rejection_masking": "PASSED",
+        "0.8_normalize_symbols_cleanly": "PASSED",
+        "0.9_migrate_audit_to_sqlite_wal": "PASSED",
+        "0.10_build_archive_migrator": "PASSED"
       },
-      "verification_cmd": "pytest tests/test_gateway_hardening.py -v && python scripts/red_team_harness.py --mode=full",
+      "verification_cmd": "python -m unittest tests/test_gateway_hardening.py && python scripts/red_team_harness.py --mode=full",
       "commit": null
     },
     "TASK_1": {
       "title": "Windows Job Guard & Zero-Copy SharedMemory IPC",
-      "status": "QUEUED",
+      "status": "IN_PROGRESS",
       "subtasks": {
-        "1.1_windows_job_manager": "QUEUED",
+        "1.1_windows_job_manager": "IN_PROGRESS",
         "1.2_cpu_affinity_priority_governor": "QUEUED",
         "1.3_shared_memory_ipc_bus": "QUEUED",
         "1.4_spawned_evolution_worker": "QUEUED"
       },
-      "verification_cmd": "pytest tests/test_shm_worker_isolation.py -v",
+      "verification_cmd": "python -m unittest tests/test_shm_worker_isolation.py",
       "commit": null
     },
     "TASK_2": {
@@ -45,7 +45,7 @@
         "2.4_statutory_dp_charge_floor": "QUEUED",
         "2.5_headless_quickauth_session_watchdog": "QUEUED"
       },
-      "verification_cmd": "pytest tests/test_risk_sentry_isolation.py -v",
+      "verification_cmd": "python -m unittest tests/test_risk_sentry_isolation.py",
       "commit": null
     },
     "TASK_3": {
@@ -57,7 +57,7 @@
         "3.3_differential_sse_streaming": "QUEUED",
         "3.4_worker_process_supervisor": "QUEUED"
       },
-      "verification_cmd": "pytest tests/test_cockpit_server_api.py -v",
+      "verification_cmd": "python -m unittest tests/test_cockpit_server_api.py",
       "commit": null
     },
     "TASK_4": {
@@ -71,7 +71,7 @@
         "4.5_dead_man_switch_hud_watchdog": "QUEUED",
         "4.6_avionics_layout_and_n8n_pipeline_deck": "QUEUED"
       },
-      "verification_cmd": "pytest tests/test_web_cockpit_ui.py -v",
+      "verification_cmd": "python -m unittest tests/test_web_cockpit_ui.py",
       "commit": null
     },
     "TASK_5": {
@@ -81,7 +81,7 @@
         "5.1_rich_terminal_dashboard": "QUEUED",
         "5.2_single_keystroke_k_panic_trigger": "QUEUED"
       },
-      "verification_cmd": "pytest tests/test_rescue_tui.py -v",
+      "verification_cmd": "python -m unittest tests/test_rescue_tui.py",
       "commit": null
     },
     "TASK_6": {
@@ -105,7 +105,7 @@
         "7.3_test_corrupted_archive_ingestion": "QUEUED",
         "7.4_test_panic_button_spam_deduplication": "QUEUED"
       },
-      "verification_cmd": "pytest tests/test_chaos_fault_injection.py -v",
+      "verification_cmd": "python -m unittest tests/test_chaos_fault_injection.py",
       "commit": null
     }
   }

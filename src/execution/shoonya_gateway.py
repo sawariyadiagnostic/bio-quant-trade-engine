@@ -15,6 +15,8 @@ import math
 import numpy as np
 import pyotp
 import requests
+import sqlite3
+import time
 
 # Load environment configuration
 load_dotenv()
@@ -189,9 +191,11 @@ class ShoonyaGateway:
 
     @staticmethod
     def format_trading_symbol(symbol: str) -> str:
-        """Converts raw symbol to NSE trading symbol (e.g. NIFTYBEES -> NIFTYBEES-EQ)."""
+        """Converts raw symbol to NSE trading symbol (e.g. NIFTYBEES -> NIFTYBEES-EQ). Preserves futures and series."""
         clean = symbol.replace(".NS", "").strip().upper()
-        return clean if clean.endswith("-EQ") else f"{clean}-EQ"
+        if clean.endswith("FUT") or clean.endswith("-EQ") or clean.endswith("-BE") or clean.endswith("-BZ"):
+            return clean
+        return f"{clean}-EQ"
 
     @staticmethod
     def calculate_friction(trade_value: float, is_etf: bool, custom_bps: Optional[float] = None) -> float:
@@ -229,8 +233,12 @@ class ShoonyaGateway:
         if not isinstance(quantity, (int, np.integer)) or quantity <= 0:
             return {"stat": "Not_Ok", "emsg": "Quantity must be a positive integer"}
 
-        if not np.isfinite(price) or price <= 0.0:
-            return {"stat": "Not_Ok", "emsg": f"Price must be a positive finite number, got {price}"}
+        if order_type.upper() == "MKT":
+            if not np.isfinite(price) or price < 0.0:
+                return {"stat": "Not_Ok", "emsg": f"Price must be a non-negative finite number for MKT orders, got {price}"}
+        else:
+            if not np.isfinite(price) or price <= 0.0:
+                return {"stat": "Not_Ok", "emsg": f"Price must be a positive finite number, got {price}"}
 
         clean_action = action.strip().upper()
         if clean_action not in ("BUY", "SELL"):
@@ -329,6 +337,9 @@ class ShoonyaGateway:
                     retention="DAY",
                     remarks="auto_trade"
                 )
+                if ret is None or (isinstance(ret, dict) and ret.get("stat") != "Ok"):
+                    emsg = ret.get("emsg", "Order rejected by broker (None response)") if isinstance(ret, dict) else "Order rejected by broker (None response)"
+                    return {"stat": "Not_Ok", "emsg": emsg}
                 return ret if isinstance(ret, dict) else {"stat": "Ok", "result": ret}
 
             # Direct REST fallback
@@ -388,7 +399,8 @@ class ShoonyaGateway:
                 if isinstance(orders, list):
                     for o in orders:
                         if o.get("status") in ["OPEN", "TRIGGER_PENDING"]:
-                            self.api.cancel_order(norenordno=o["norenordno"])
+                            orderno = o.get("norenordno") or o.get("orderno")
+                            self.api.cancel_order(orderno=orderno)
                             cancelled += 1
                 return {"stat": "Ok", "cancelled_orders": cancelled}
             except Exception as e:
@@ -402,11 +414,17 @@ class ShoonyaGateway:
             symbols = list(self.paper_positions.keys())
             for sym in symbols:
                 pos = self.paper_positions.get(sym)
-                if pos and pos.get("quantity", 0) > 0:
-                    qty = pos["quantity"]
-                    price = pos.get("avg_price", 100.0)
-                    res = self.place_order(trading_symbol=sym, quantity=qty, price=price, action="SELL", is_etf="BEES" in sym)
-                    liquidated.append({"symbol": sym, "quantity": qty, "result": res})
+                if pos:
+                    qty = int(pos.get("quantity", 0))
+                    price = float(pos.get("avg_price", 100.0))
+                    if qty > 0:
+                        res = self.place_order(symbol=sym, quantity=qty, price=price, action="SELL", is_etf="BEES" in sym)
+                        liquidated.append({"symbol": sym, "quantity": qty, "result": res})
+                    elif qty < 0:
+                        res = self.place_order(symbol=sym, quantity=abs(qty), price=price, action="BUY", is_etf="BEES" in sym)
+                        liquidated.append({"symbol": sym, "quantity": abs(qty), "result": res})
+            # Clear paper positions to prevent residual exposure
+            self.paper_positions.clear()
             return {"stat": "Ok", "liquidated_count": len(liquidated), "liquidated": liquidated, "balance": self.balance}
         if self.api and self.susertoken:
             try:
@@ -415,24 +433,67 @@ class ShoonyaGateway:
                 if isinstance(positions, list):
                     for p in positions:
                         netqty = int(p.get("netqty", 0))
-                        if netqty > 0:
+                        if netqty != 0:
                             tsym = p.get("tsym", "")
-                            res = self.place_order(trading_symbol=tsym, quantity=netqty, price=0.0, action="SELL", order_type="MKT", is_etf="BEES" in sym)
-                            liquidated.append({"symbol": sym, "quantity": netqty, "result": res})
+                            prd = p.get("prd", "C")
+                            action = "SELL" if netqty > 0 else "BUY"
+                            is_etf = "BEES" in tsym
+                            res = self.place_order(
+                                symbol=tsym,
+                                quantity=abs(netqty),
+                                price=0.0,
+                                action=action,
+                                product=prd,
+                                order_type="MKT",
+                                is_etf=is_etf
+                            )
+                            liquidated.append({"symbol": tsym, "quantity": abs(netqty), "result": res})
                 return {"stat": "Ok", "liquidated_count": len(liquidated), "liquidated": liquidated}
             except Exception as e:
                 return {"stat": "Not_Ok", "emsg": str(e)}
         return {"stat": "Ok", "liquidated_count": 0, "message": "Gateway offline or paper mode."}
 
     def _record_audit(self, record: dict[str, Any]) -> None:
-        """Appends order execution to persistent audit log."""
+        """Appends order execution to persistent audit log (SQLite WAL or append-only JSONL)."""
         try:
-            data = []
-            if os.path.exists(self.audit_file):
-                with open(self.audit_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            data.append(record)
-            with open(self.audit_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+            if self.audit_file.endswith(".db"):
+                os.makedirs(os.path.dirname(self.audit_file) or ".", exist_ok=True)
+                with sqlite3.connect(self.audit_file, timeout=5.0) as conn:
+                    conn.execute("PRAGMA journal_mode = WAL;")
+                    conn.execute("PRAGMA synchronous = NORMAL;")
+                    conn.execute("""
+                        CREATE TABLE IF NOT EXISTS order_audit_journal (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            timestamp REAL,
+                            symbol TEXT,
+                            action TEXT,
+                            quantity INTEGER,
+                            price REAL,
+                            order_type TEXT,
+                            product TEXT,
+                            status TEXT,
+                            raw_payload TEXT
+                        );
+                    """)
+                    conn.execute("""
+                        INSERT INTO order_audit_journal (
+                            timestamp, symbol, action, quantity, price, order_type, product, status, raw_payload
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """, (
+                        record.get("timestamp", time.time()),
+                        record.get("symbol", ""),
+                        record.get("action", ""),
+                        int(record.get("quantity", 0)),
+                        float(record.get("price", 0.0)),
+                        record.get("order_type", ""),
+                        record.get("product", ""),
+                        record.get("status", record.get("stat", "Ok")),
+                        json.dumps(record)
+                    ))
+            else:
+                os.makedirs(os.path.dirname(self.audit_file) or ".", exist_ok=True)
+                line = json.dumps(record) + "\n"
+                with open(self.audit_file, "a", encoding="utf-8") as f:
+                    f.write(line)
         except Exception as err:
             logger.warning(f"Failed to record audit journal: {err}")

@@ -19,19 +19,19 @@
 
 | Task ID | Task Scope | Status | Verification Gate | Commit |
 | :--- | :--- | :---: | :--- | :---: |
-| **TASK 0** | **Latent Gateway Remediation & SQLite WAL Migration Baseline** | `[►] IN PROGRESS` | `pytest tests/test_gateway_hardening.py` | *Active* |
-| ↳ Subtask 0.1 | Fix `place_order` keyword mismatch (`symbol=sym`) in lines 408 & 420 | `[ ]` | Unit test | - |
-| ↳ Subtask 0.2 | Fix undefined variable `sym` (`NameError`) in lines 420 & 421 | `[ ]` | Unit test | - |
-| ↳ Subtask 0.3 | Fix `price <= 0.0` check in line 232 to allow market order liquidation | `[ ]` | Unit test | - |
-| ↳ Subtask 0.4 | Fix line 418 to cover short positions (`netqty < 0`) with `action="BUY"` | `[ ]` | Unit test | - |
-| ↳ Subtask 0.5 | Pass product type `prd = p.get("prd", "C")` in line 420 | `[ ]` | Unit test | - |
-| ↳ Subtask 0.6 | Fix `cancel_order` parameter name (`orderno=...`) in line 391 | `[ ]` | Unit test | - |
-| ↳ Subtask 0.7 | Fix `_send_live_order` to prevent masking broker rejections as Ok | `[ ]` | Unit test | - |
-| ↳ Subtask 0.8 | Normalize symbols without corrupting futures or special series | `[ ]` | Unit test | - |
-| ↳ Subtask 0.9 | Migrate `_record_audit` from $O(N^2)$ JSON rewrite to SQLite WAL | `[ ]` | Concurrent load test | - |
-| ↳ Subtask 0.10 | Build `ArchiveMigrator` to migrate legacy `audit/archive_*.json` | `[ ]` | Parity verification | - |
-| **TASK 1** | **Windows Job Guard & Zero-Copy SharedMemory IPC** | `[ ] QUEUED` | `pytest tests/test_shm_worker_isolation.py` | - |
-| ↳ Subtask 1.1 | Windows Job Manager (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000`) | `[ ]` | Process termination test | - |
+| **TASK 0** | **Latent Gateway Remediation & SQLite WAL Migration Baseline** | `[x] COMPLETED` | `unittest tests/test_gateway_hardening.py` | *Pending Commit* |
+| ↳ Subtask 0.1 | Fix `place_order` keyword mismatch (`symbol=sym`) in lines 408 & 420 | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.2 | Fix undefined variable `sym` (`NameError`) in lines 420 & 421 | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.3 | Fix `price <= 0.0` check in line 232 to allow market order liquidation | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.4 | Fix line 418 to cover short positions (`netqty < 0`) with `action="BUY"` | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.5 | Pass product type `prd = p.get("prd", "C")` in line 420 | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.6 | Fix `cancel_order` parameter name (`orderno=...`) in line 391 | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.7 | Fix `_send_live_order` to prevent masking broker rejections as Ok | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.8 | Normalize symbols without corrupting futures or special series | `[x]` | Unit test passed | *Verified* |
+| ↳ Subtask 0.9 | Migrate `_record_audit` from $O(N^2)$ JSON rewrite to SQLite WAL | `[x]` | 10 paper orders logged to WAL | *Verified* |
+| ↳ Subtask 0.10 | Build `ArchiveMigrator` to migrate legacy `audit/archive_*.json` | `[x]` | 2,039 champions in SQLite WAL | *Verified* |
+| **TASK 1** | **Windows Job Guard & Zero-Copy SharedMemory IPC** | `[►] IN PROGRESS` | `unittest tests/test_shm_worker_isolation.py` | *Active* |
+| ↳ Subtask 1.1 | Windows Job Manager (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000`) | `[►]` | In progress | - |
 | ↳ Subtask 1.2 | CPU Affinity & Priority Governor (Cores 0-1 vs Cores 2-3) | `[ ]` | Affinity mask check | - |
 | ↳ Subtask 1.3 | SharedMemory IPC Bus (162 KB RAM, 256B Header + 400-Niche Array) | `[ ]` | Latency benchmark (<5µs) | - |
 | ↳ Subtask 1.4 | Spawned Evolution Worker (`evolution_worker.py`) with heartbeat | `[ ]` | Worker isolation test | - |
