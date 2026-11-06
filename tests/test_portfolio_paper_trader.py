@@ -50,6 +50,37 @@ def test_portfolio_paper_trader_exit_to_cash():
     print("[PASS] test_portfolio_paper_trader_exit_to_cash")
 
 
+def test_two_pass_rebalancing_and_liquidbees_sweep():
+    """Verify sells execute before buys and idle cash is swept into Liquid BeES earning yield."""
+    from src.execution.portfolio_paper_trader import PortfolioPaperTrader
+
+    trader = PortfolioPaperTrader(initial_capital=50000.0)
+    prices = {"NIFTYBEES": 250.0, "BANKBEES": 500.0, "LIQUIDBEES": 1000.0}
+
+    # Start with 100% NIFTYBEES
+    trader.rebalance({"NIFTYBEES": 1.0}, prices)
+    assert trader.positions["NIFTYBEES"]["quantity"] > 0
+    assert trader.cash < 250.0
+
+    # Rebalance 100% from NIFTYBEES to BANKBEES: Sells must precede buys
+    trades = trader.rebalance({"NIFTYBEES": 0.0, "BANKBEES": 1.0}, prices)
+    assert len(trades) >= 2
+    assert trades[0]["action"] == "SELL"
+    assert trades[0]["ticker"] == "NIFTYBEES"
+    assert trades[1]["action"] == "BUY"
+    assert trades[1]["ticker"] == "BANKBEES"
+    assert trader.positions["BANKBEES"]["quantity"] > 0
+
+    # Auto-sweep idle cash into LIQUIDBEES
+    trader.rebalance({"BANKBEES": 0.0}, prices)
+    sweep_res = trader.auto_sweep_liquid_bees(liquid_bees_price=1000.0, annual_yield=0.068)
+    assert "swept_units" in sweep_res
+    assert sweep_res["swept_units"] > 40
+    assert "LIQUIDBEES" in trader.positions
+    print("[PASS] test_two_pass_rebalancing_and_liquidbees_sweep")
+
+
 if __name__ == "__main__":
     test_portfolio_paper_trader_multi_asset_rebalance()
     test_portfolio_paper_trader_exit_to_cash()
+    test_two_pass_rebalancing_and_liquidbees_sweep()

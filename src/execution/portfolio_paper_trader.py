@@ -120,3 +120,40 @@ class PortfolioPaperTrader:
                     self.trade_history.append(trade_rec)
 
         return executed_trades
+
+    def auto_sweep_liquid_bees(
+        self,
+        liquid_bees_price: float = 1000.0,
+        annual_yield: float = 0.068,
+        reserve_ratio: float = 0.05
+    ) -> Dict[str, Any]:
+        """
+        Sweeps idle unallocated cash into LIQUIDBEES earning 6.8% annualized TREPS yield.
+        Leaves reserve_ratio (e.g. 5%) of cash as an immediate liquidity cushion.
+        """
+        if self.cash <= liquid_bees_price:
+            return {"status": "INSUFFICIENT_CASH", "swept_units": 0, "cash": self.cash}
+
+        available_to_sweep = max(0.0, self.cash * (1.0 - reserve_ratio))
+        swept_units = int(available_to_sweep / liquid_bees_price)
+        if swept_units <= 0:
+            return {"status": "ZERO_UNITS", "swept_units": 0, "cash": self.cash}
+
+        sweep_cost = swept_units * liquid_bees_price
+        self.cash -= sweep_cost
+
+        prev_pos = self.positions.get("LIQUIDBEES", {"quantity": 0, "avg_price": liquid_bees_price})
+        total_units = prev_pos["quantity"] + swept_units
+        self.positions["LIQUIDBEES"] = {"quantity": total_units, "avg_price": liquid_bees_price}
+
+        daily_yield_rate = annual_yield / 365.0
+        daily_interest = (total_units * liquid_bees_price) * daily_yield_rate
+
+        return {
+            "status": "SWEPT_OK",
+            "swept_units": swept_units,
+            "total_liquid_bees_units": total_units,
+            "cost": sweep_cost,
+            "daily_yield_inr": round(daily_interest, 2),
+            "remaining_cash": round(self.cash, 2)
+        }
