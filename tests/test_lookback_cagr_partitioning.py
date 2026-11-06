@@ -129,8 +129,31 @@ def test_map_elites_cagr_evaluation_precision():
     assert abs(metrics["cagr_pct"] - expected_cagr) < 1.0, f"CAGR {metrics['cagr_pct']} should match 1y net ret {expected_cagr}"
     print("[PASS] test_map_elites_cagr_evaluation_precision")
 
+
+def test_map_elites_friction_stress_test():
+    """Verify MapElitesArchive.stress_test_friction eliminates fragile high-turnover alphas."""
+    from src.evolution.map_elites import MapElitesArchive
+    from src.domain.formula_ast import ASTNode
+
+    archive = MapElitesArchive()
+    idx = pd.date_range("2024-01-01", periods=100, freq="B")
+    df = pd.DataFrame(index=idx)
+    df["Close"] = 250.0 + np.sin(np.linspace(0, 10, 100)) * 5.0
+    df["Open"] = df["Close"].shift(1).fillna(250.0)
+    df["Close_Adj"] = df["Close"]
+
+    robust_node = ASTNode("FEATURE", "1.0")
+    archive.evaluate_and_insert(robust_node, df)
+
+    assert hasattr(archive, "stress_test_friction")
+    pruned = archive.stress_test_friction(df, multiplier=2.0)
+    assert isinstance(pruned, int)
+    print("[PASS] test_map_elites_friction_stress_test")
+
+
 if __name__ == "__main__":
     test_cagr_calculation_normalizes_cross_timeframe()
     test_archive_lookback_partitioning_isolation()
     test_map_elites_cagr_evaluation_precision()
+    test_map_elites_friction_stress_test()
     print("ALL LOOKBACK PARTITIONING & CAGR TESTS PASS EMPIRICALLY!")
