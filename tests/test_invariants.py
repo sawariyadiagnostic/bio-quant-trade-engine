@@ -53,7 +53,7 @@ def test_estimate_return_moments():
 
     # Fat-tailed series with negative shock (crashes)
     fat_rets = normal_rets.copy()
-    fat_rets[10:15] = -0.08  # 8% gap crash down
+    fat_rets[10:25] = -0.08  # 8% gap crash down cluster
     _, _, fat_skew, fat_kurt = estimate_return_moments(fat_rets)
     assert fat_skew < -0.50  # Left skewed
     assert fat_kurt > 5.0    # Leptokurtic / fat-tailed
@@ -146,6 +146,7 @@ def test_sanitize_finite_array():
 
 if __name__ == "__main__":
     test_deflated_sharpe_ratio()
+    test_estimate_return_moments()
     test_point_in_time_causality()
     test_covariance_conditioning()
     test_circuit_headroom()
