@@ -377,6 +377,53 @@ class ShoonyaGateway:
         except Exception as e:
             return {"stat": "Not_Ok", "emsg": str(e)}
 
+    def cancel_all_orders(self) -> dict[str, Any]:
+        """Emergency order cancellation for all pending orders."""
+        if self.paper_trading:
+            return {"stat": "Ok", "cancelled_orders": 0, "message": "All pending paper orders cancelled."}
+        if self.api and self.susertoken:
+            try:
+                orders = self.api.get_order_book()
+                cancelled = 0
+                if isinstance(orders, list):
+                    for o in orders:
+                        if o.get("status") in ["OPEN", "TRIGGER_PENDING"]:
+                            self.api.cancel_order(norenordno=o["norenordno"])
+                            cancelled += 1
+                return {"stat": "Ok", "cancelled_orders": cancelled}
+            except Exception as e:
+                return {"stat": "Not_Ok", "emsg": str(e)}
+        return {"stat": "Ok", "cancelled_orders": 0, "message": "Gateway offline or paper mode."}
+
+    def liquidate_positions(self) -> dict[str, Any]:
+        """Emergency panic liquidation of all active positions to 100% cash."""
+        if self.paper_trading:
+            liquidated = []
+            symbols = list(self.paper_positions.keys())
+            for sym in symbols:
+                pos = self.paper_positions.get(sym)
+                if pos and pos.get("quantity", 0) > 0:
+                    qty = pos["quantity"]
+                    price = pos.get("avg_price", 100.0)
+                    res = self.place_order(trading_symbol=sym, quantity=qty, price=price, action="SELL", is_etf="BEES" in sym)
+                    liquidated.append({"symbol": sym, "quantity": qty, "result": res})
+            return {"stat": "Ok", "liquidated_count": len(liquidated), "liquidated": liquidated, "balance": self.balance}
+        if self.api and self.susertoken:
+            try:
+                positions = self.api.get_positions()
+                liquidated = []
+                if isinstance(positions, list):
+                    for p in positions:
+                        netqty = int(p.get("netqty", 0))
+                        if netqty > 0:
+                            tsym = p.get("tsym", "")
+                            res = self.place_order(trading_symbol=tsym, quantity=netqty, price=0.0, action="SELL", order_type="MKT", is_etf="BEES" in sym)
+                            liquidated.append({"symbol": sym, "quantity": netqty, "result": res})
+                return {"stat": "Ok", "liquidated_count": len(liquidated), "liquidated": liquidated}
+            except Exception as e:
+                return {"stat": "Not_Ok", "emsg": str(e)}
+        return {"stat": "Ok", "liquidated_count": 0, "message": "Gateway offline or paper mode."}
+
     def _record_audit(self, record: dict[str, Any]) -> None:
         """Appends order execution to persistent audit log."""
         try:

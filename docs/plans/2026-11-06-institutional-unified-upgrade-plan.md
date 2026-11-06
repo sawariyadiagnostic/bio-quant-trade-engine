@@ -32,8 +32,8 @@
 | **P2** | **Task 11**| Pre-Open Auction Limit Router & Micro-Trailing Stop | `src/execution/overnight_engine.py`, `tests/test_overnight_engine.py` | `[x]` Complete | `feat(execution)` |
 | **P2** | **Task 12**| Shoonya Gateway Hardening (`clordid`, Retries, Sell Fix)| `src/execution/shoonya_gateway.py`, `src/execution/execution_dispatcher.py` | `[x]` Complete | `feat(gateway)` |
 | **P2** | **Task 13**| Two-Pass Atomic Rebalancing & Liquid BeES Auto-Sweep | `src/execution/portfolio_paper_trader.py`, `tests/test_portfolio_paper_trader.py` | `[x]` Complete | `feat(execution)` |
-| **P3** | **Task 14**| Thread-Safe State & Interactive I/O DAG in Master Cockpit| `src/ui/evolution_dashboard.py`, `src/ui/visualizations.py` | `[x]` Completed | Commit: Pending |
-| **P3** | **Task 15**| One-Click "First Pot of Gold" Launcher & Panic Switch | `src/ui/evolution_dashboard.py`, `src/ui/shoonya_ui.py` | `[ ]` Not Started | - |
+| **P3** | **Task 14**| Thread-Safe State & Interactive I/O DAG in Master Cockpit| `src/ui/evolution_dashboard.py`, `src/ui/visualizations.py` | `[x]` Completed | Commit: `4977457` |
+| **P3** | **Task 15**| One-Click "First Pot of Gold" Launcher & Panic Switch | `src/ui/evolution_dashboard.py`, `src/ui/shoonya_ui.py` | `[x]` Completed | Commit: Pending |
 
 ---
 
@@ -394,19 +394,19 @@
 - Modify: `src/ui/shoonya_ui.py:100-160`
 - Test: `tests/test_archive_wipe.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_archive_wipe.py`, verify that clicking the "Emergency Panic Kill-Switch" in `evolution_dashboard.py` cancels all open broker orders, halts background streams, and sets status to `EMERGENCY_HALTED`.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_archive_wipe.py`  
   Expected: FAIL.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/ui/evolution_dashboard.py`:
   - Add the `Emergency Kill-Switch` button wired to `ShoonyaGateway.cancel_all_orders()` and `PortfolioPaperTrader.rebalance(all_zero_weights)`.
   - Add the "First Pot of Gold" one-click launcher pre-configured for `NIFTYBEES` overnight arbitrage.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_archive_wipe.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "feat(ui): add one-click overnight arbitrage launcher and emergency kill-switch"`
 
 ---

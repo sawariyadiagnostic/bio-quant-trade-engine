@@ -100,6 +100,18 @@ ROW_COUNT_MAP = {
     "All Resident Champions": 400
 }
 
+def get_first_pot_of_gold_preset() -> Tuple[str, str, str, str, float, int, int]:
+    """Returns preset parameters for First Pot of Gold overnight ETF arbitrage."""
+    return (
+        "Single-Asset Continual Evolution",
+        "NIFTYBEES",
+        "5 Years (~1,260 bars)",
+        "overnight",
+        50000.0,
+        25,
+        50
+    )
+
 # Auto-load initial archive on module load
 def _load_initial_archive(ticker: str = "NIFTYBEES", lookback_code: str = "5y") -> List[Dict[str, Any]]:
     clean_t = ticker.replace(".NS", "").replace(".BO", "")
@@ -1002,6 +1014,7 @@ def create_ui():
 
                 render_shoonya_accordion()
 
+                pot_of_gold_btn = gr.Button("⚡ FIRST POT OF GOLD (NIFTYBEES ARBITRAGE)", variant="secondary", size="md")
                 master_launch_btn = gr.Button("🚀 ENGAGE MASTER ENGINE", variant="primary", size="lg")
                 with gr.Row():
                     load_archive_btn = gr.Button("📂 Load Archive", variant="secondary")
@@ -1075,6 +1088,10 @@ def create_ui():
         )
 
         # Wire Presets
+        pot_of_gold_btn.click(
+            lambda: get_first_pot_of_gold_preset(),
+            outputs=[mode_radio, ticker_single, lookback_dropdown, target_mode_radio, initial_cash_input, gen_slider, pop_slider]
+        )
         btn_preset_quick.click(lambda: (5, 25), outputs=[gen_slider, pop_slider])
         btn_preset_deep.click(lambda: (50, 100), outputs=[gen_slider, pop_slider])
         btn_preset_inst.click(lambda: (100, 200), outputs=[gen_slider, pop_slider])

@@ -82,7 +82,32 @@ def test_on_reset_checkbox_toggle():
     assert "Ready to launch" in status2 or "CONTINUAL MODE" in status2
     print("[PASS] test_on_reset_checkbox_toggle")
 
+def test_emergency_panic_kill_switch():
+    from src.execution.shoonya_gateway import ShoonyaGateway, ShoonyaCredentials
+    from src.ui.shoonya_ui import emergency_panic_kill_switch
+    
+    gw = ShoonyaGateway(credentials=ShoonyaCredentials(), paper_trading=True)
+    gw.balance = 50000.0
+    # Buy a test position
+    gw.place_order("NIFTYBEES", 100, 250.0, "BUY", is_etf=True)
+    assert len(gw.paper_positions) == 1
+    
+    # Trigger emergency panic kill-switch
+    status_md, orders_df = emergency_panic_kill_switch("Paper Trading (0% Risk)")
+    assert "EMERGENCY PANIC KILL-SWITCH" in status_md
+    print("[PASS] test_emergency_panic_kill_switch")
+
+def test_first_pot_of_gold_preset():
+    from src.ui.evolution_dashboard import get_first_pot_of_gold_preset
+    mode, ticker, lookback, horizon, cash, gens, pop = get_first_pot_of_gold_preset()
+    assert ticker == "NIFTYBEES"
+    assert horizon == "overnight"
+    assert cash >= 50000.0
+    print("[PASS] test_first_pot_of_gold_preset")
+
 if __name__ == "__main__":
     test_wipe_and_reset_archive()
     test_on_reset_checkbox_toggle()
+    test_emergency_panic_kill_switch()
+    test_first_pot_of_gold_preset()
     print("All archive wipe tests passed successfully!")

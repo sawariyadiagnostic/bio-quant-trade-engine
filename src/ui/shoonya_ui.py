@@ -114,6 +114,22 @@ def submit_auth_code(raw_code: str, mode: str) -> Tuple[str, pd.DataFrame]:
     gw.exchange_auth_code(clean_code)
     return get_shoonya_status_md("Live Exchange (Shoonya Noren)"), get_shoonya_orders_table()
 
+def emergency_panic_kill_switch(mode: str = "Paper Trading (0% Risk)") -> Tuple[str, pd.DataFrame]:
+    """Cancels all active orders and liquidates all open positions to 100% cash."""
+    paper = "Paper" in mode
+    creds = ShoonyaCredentials.from_env()
+    gw = ShoonyaGateway(credentials=creds, paper_trading=paper)
+    cancel_res = gw.cancel_all_orders()
+    liq_res = gw.liquidate_positions()
+    msg = (
+        f"### 🛑 EMERGENCY PANIC KILL-SWITCH TRIGGERED\n"
+        f"- **Orders Cancelled:** {cancel_res.get('cancelled_orders', 0)}\n"
+        f"- **Positions Liquidated:** {liq_res.get('liquidated_count', 0)}\n"
+        f"- **Cash Balance Restored:** ₹{gw.balance:,.2f}\n"
+        f"- **All active streams halted & capital secured.**"
+    )
+    return msg, get_shoonya_orders_table()
+
 def render_shoonya_accordion() -> None:
     """Renders the Shoonya gateway controls and status accordion inside Gradio UI."""
     with gr.Accordion("🏦 Shoonya (Finvasia) Gateway & Order Execution", open=False):
@@ -136,9 +152,16 @@ def render_shoonya_accordion() -> None:
             )
             submit_code_btn = gr.Button("⚡ Connect Live Session", variant="primary", scale=1)
 
+        panic_kill_btn = gr.Button("🛑 EMERGENCY PANIC KILL-SWITCH", variant="stop", size="lg")
+
         gr.Markdown("#### 📜 Recent Order Audit Journal")
         orders_df = gr.DataFrame(value=get_shoonya_orders_table(), label="Executed Orders", wrap=True)
         
+        panic_kill_btn.click(
+            fn=emergency_panic_kill_switch,
+            inputs=[shoonya_mode],
+            outputs=[shoonya_status_display, orders_df]
+        )
         check_shoonya_btn.click(
             fn=refresh_shoonya,
             inputs=[shoonya_mode],
