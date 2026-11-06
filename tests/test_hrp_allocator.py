@@ -53,6 +53,28 @@ def test_hrp_allocation_edge_cases():
     print("[PASS] test_hrp_allocation_edge_cases")
 
 
+def test_hrp_ward_linkage_and_ledoit_wolf():
+    """Verify HRPAllocator supports Ward/Average linkage and Ledoit-Wolf shrinkage."""
+    from src.execution.hrp_allocator import HRPAllocator
+
+    np.random.seed(42)
+    T, N = 100, 4
+    rets = np.random.normal(0.0005, 0.015, (T, N))
+
+    # Test linkage_method and use_shrinkage
+    w_ward = HRPAllocator.compute_weights(rets, linkage_method="ward", use_shrinkage=True)
+    assert isinstance(w_ward, np.ndarray)
+    assert len(w_ward) == N
+    assert np.isclose(np.sum(w_ward), 1.0)
+    assert np.all(w_ward >= 0.0)
+
+    w_avg = HRPAllocator.compute_weights(rets, linkage_method="average", use_shrinkage=True)
+    assert np.isclose(np.sum(w_avg), 1.0)
+    assert np.all(w_avg >= 0.0)
+    print("[PASS] test_hrp_ward_linkage_and_ledoit_wolf")
+
+
 if __name__ == "__main__":
     test_hrp_allocation_weights()
     test_hrp_allocation_edge_cases()
+    test_hrp_ward_linkage_and_ledoit_wolf()

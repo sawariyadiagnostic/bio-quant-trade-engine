@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import squareform
+try:
+    from sklearn.covariance import ledoit_wolf
+except ImportError:
+    ledoit_wolf = None
 
 
 class HRPAllocator:
@@ -11,14 +15,21 @@ class HRPAllocator:
     Implements Marcos López de Prado's Hierarchical Risk Parity (HRP).
     Allocates risk budgets across strategy/asset clusters using graph hierarchy
     and recursive bisection, eliminating matrix inversion blowups.
+    Upgraded with Ward/Average linkage and analytical Ledoit-Wolf shrinkage.
     """
     @staticmethod
-    def compute_weights(returns_matrix: np.ndarray) -> np.ndarray:
+    def compute_weights(
+        returns_matrix: np.ndarray,
+        linkage_method: str = "ward",
+        use_shrinkage: bool = True
+    ) -> np.ndarray:
         """
         Computes risk-parity weights for N return series.
 
         Args:
             returns_matrix: 2D array of shape [T, N].
+            linkage_method: Hierarchical clustering linkage ('ward', 'average', 'single').
+            use_shrinkage: Whether to apply Ledoit-Wolf analytical covariance shrinkage.
 
         Returns:
             1D array of portfolio weights summing to 1.0.
@@ -30,13 +41,21 @@ class HRPAllocator:
         if N <= 1:
             return np.ones(N, dtype=np.float64)
 
-        # 1. Covariance & Correlation Matrix
-        cov = np.cov(returns_matrix, rowvar=False)
-        std = np.sqrt(np.diag(cov))
+        # 1. Covariance & Correlation Matrix with Optional Ledoit-Wolf Shrinkage
+        if use_shrinkage and T >= 4 and ledoit_wolf is not None:
+            try:
+                cov, _ = ledoit_wolf(returns_matrix)
+            except Exception:
+                cov = np.cov(returns_matrix, rowvar=False)
+        else:
+            cov = np.cov(returns_matrix, rowvar=False)
+
+        std = np.sqrt(np.maximum(1e-12, np.diag(cov)))
         if np.any(std < 1e-8) or not np.all(np.isfinite(cov)):
             return np.full(N, 1.0 / N, dtype=np.float64)
 
-        corr = np.corrcoef(returns_matrix, rowvar=False)
+        inv_std = 1.0 / std
+        corr = cov * np.outer(inv_std, inv_std)
         corr = np.nan_to_num(corr, nan=0.0)
         np.fill_diagonal(corr, 1.0)
 
@@ -47,12 +66,17 @@ class HRPAllocator:
         # Condensed distance matrix for hierarchical clustering
         try:
             condensed = squareform(dist, checks=False)
-            link = linkage(condensed, method="single")
+            link = linkage(condensed, method=linkage_method)
             sort_ix = HRPAllocator._get_quasi_diag(link)
         except Exception:
-            # Fallback to inverse variance weighting if clustering fails
-            inv_var = 1.0 / np.maximum(1e-8, np.diag(cov))
-            return (inv_var / np.sum(inv_var)).astype(np.float64)
+            # Fallback to single linkage or inverse variance weighting
+            try:
+                condensed = squareform(dist, checks=False)
+                link = linkage(condensed, method="single")
+                sort_ix = HRPAllocator._get_quasi_diag(link)
+            except Exception:
+                inv_var = 1.0 / np.maximum(1e-8, np.diag(cov))
+                return (inv_var / np.sum(inv_var)).astype(np.float64)
 
         # 3. Recursive Bisection
         sorted_cov = cov[np.ix_(sort_ix, sort_ix)]

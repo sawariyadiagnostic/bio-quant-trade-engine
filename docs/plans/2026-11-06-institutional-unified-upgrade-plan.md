@@ -25,7 +25,7 @@
 | **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[x]` Complete | `fix(pipeline)` |
 | **P1** | **Task 5** | Multi-Asset 3D Tensor Simulation `(B, N, T)` | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[x]` Complete | `feat(backtest)` |
 | **P1** | **Task 6** | Cross-Sectional Alpha Operators (`CS_Rank`, `CS_Demean`) | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[x]` Complete | `feat(ast)` |
-| **P1** | **Task 7** | Ward/Average Linkage HRP & Ledoit-Wolf Shrinkage | `src/execution/hrp_allocator.py`, `tests/test_hrp_allocator.py`| `[ ]` Not Started | - |
+| **P1** | **Task 7** | Ward/Average Linkage HRP & Ledoit-Wolf Shrinkage | `src/execution/hrp_allocator.py`, `tests/test_hrp_allocator.py`| `[x]` Complete | `feat(risk)` |
 | **P1** | **Task 8** | Purged & Embargoed Walk-Forward Validation | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[ ]` Not Started | - |
 | **P1** | **Task 9** | MAP-Elites 2-Objective Pareto & 2x Friction Stress Test | `src/evolution/map_elites.py`, `tests/test_lookback_cagr_partitioning.py` | `[ ]` Not Started | - |
 | **P2** | **Task 10**| GIFT NIFTY Overnight Lead-Lag Ingestion (06:30–08:30 IST)| `src/data/gift_nifty_loader.py`, `src/execution/overnight_engine.py` | `[ ]` Not Started | - |
@@ -194,19 +194,19 @@
 - Modify: `src/execution/hrp_allocator.py:25-70`
 - Test: `tests/test_hrp_allocator.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_hrp_allocator.py`, test collinear/ill-conditioned covariance matrices and assert linkage is `"ward"` or `"average"`, producing non-chaining balanced risk allocations.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_hrp_allocator.py`  
   Expected: FAIL if single linkage causes degenerate chaining.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/execution/hrp_allocator.py`:
   - When condition number $\kappa > 1000$, apply `sklearn.covariance.ledoit_wolf`.
   - Update `linkage(condensed, method="average")` or `"ward"`.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_hrp_allocator.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "fix(risk): upgrade HRP to Ward/Average linkage with Ledoit-Wolf shrinkage"`
 
 ---
