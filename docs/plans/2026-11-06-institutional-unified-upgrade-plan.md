@@ -21,7 +21,7 @@
 | :---: | :---: | :--- | :--- | :---: | :---: |
 | **P0** | **Task 1** | Fix Causality Check & Empirical Fat-Tailed DSR | `src/domain/invariants.py`, `tests/test_invariants.py` | `[x]` Complete | `fix(invariants)` |
 | **P0** | **Task 2** | Daily-Resetting VWAP & Auction Jump Decomposition | `src/data/vector_lake.py`, `tests/test_vector_lake.py` | `[x]` Complete | `feat(data)` |
-| **P0** | **Task 3** | AST Math Clamping (`EXP/LOG/POW_SAFE`) & MurmurHash | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[ ]` Not Started | - |
+| **P0** | **Task 3** | AST Math Clamping (`EXP/LOG/POW_SAFE`) & MurmurHash | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[x]` Complete | `feat(ast)` |
 | **P0** | **Task 4** | Statutory Tax Schedule & Real Data Enforcing | `src/domain/models.py`, `src/pipeline/alpha_engine.py` | `[ ]` Not Started | - |
 | **P1** | **Task 5** | Multi-Asset 3D Tensor Simulation `(B, N, T)` | `src/backtest/matrix_engine.py`, `tests/test_matrix_engine.py` | `[ ]` Not Started | - |
 | **P1** | **Task 6** | Cross-Sectional Alpha Operators (`CS_Rank`, `CS_Demean`) | `src/domain/formula_ast.py`, `tests/test_mega_evolution_ast.py`| `[ ]` Not Started | - |
@@ -97,19 +97,19 @@
 - Modify: `src/domain/formula_ast.py:100-140`
 - Test: `tests/test_mega_evolution_ast.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_mega_evolution_ast.py`, verify that `ASTNode.canonical_hash()` generates identical hashes for commutative operations (`ADD(A, B) == ADD(B, A)`), and `EXP_SAFE` bounds inputs to $[-20.0, 20.0]$.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_mega_evolution_ast.py`  
   Expected: FAIL (`AttributeError: 'ASTNode' object has no attribute 'canonical_hash'`).
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/domain/formula_ast.py`:
   - Implement `canonical_hash()` sorting commutative children.
   - Implement bounded math operators: `EXP_SAFE = np.exp(np.clip(child, -20.0, 20.0))`, `LOG_SAFE = np.log(np.maximum(1e-8, np.abs(child)))`.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_mega_evolution_ast.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
   Commit: `git commit -m "feat(ast): add canonical formula hashing and bounded mathematical operators"`
 
 ---

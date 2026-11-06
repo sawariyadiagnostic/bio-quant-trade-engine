@@ -60,6 +60,34 @@ def test_mega_evolution_formula_string_and_parsing():
     print("[PASS] test_mega_evolution_formula_string_and_parsing")
 
 
+def test_ast_canonical_hash_and_bounded_math():
+    """Verify ASTNode canonical hash is invariant to commutative symmetry and math is clamped."""
+    from src.domain.formula_ast import ASTNode, ASTEvaluator
+
+    # Commutative test: ADD(A, B) vs ADD(B, A)
+    node1 = ASTNode("ADD", children=[ASTNode("FEATURE", "A"), ASTNode("FEATURE", "B")])
+    node2 = ASTNode("ADD", children=[ASTNode("FEATURE", "B"), ASTNode("FEATURE", "A")])
+    assert node1.canonical_hash() == node2.canonical_hash()
+
+    # Non-commutative test: SUB(A, B) vs SUB(B, A)
+    sub1 = ASTNode("SUB", children=[ASTNode("FEATURE", "A"), ASTNode("FEATURE", "B")])
+    sub2 = ASTNode("SUB", children=[ASTNode("FEATURE", "B"), ASTNode("FEATURE", "A")])
+    assert sub1.canonical_hash() != sub2.canonical_hash()
+
+    # Math clamping: EXP_SAFE and LOG_SAFE prevent overflow/underflow
+    df = pd.DataFrame({"X": [100.0, -100.0, 0.0]})
+    exp_node = ASTNode("EXP_SAFE", children=[ASTNode("FEATURE", "X")])
+    exp_res = ASTEvaluator.eval_node(exp_node, df)
+    assert np.all(np.isfinite(exp_res))
+    assert exp_res[0] <= np.exp(20.0) + 1.0
+
+    log_node = ASTNode("LOG_SAFE", children=[ASTNode("FEATURE", "X")])
+    log_res = ASTEvaluator.eval_node(log_node, df)
+    assert np.all(np.isfinite(log_res))
+    print("[PASS] test_ast_canonical_hash_and_bounded_math")
+
+
 if __name__ == "__main__":
     test_mega_evolution_ast_evaluation()
     test_mega_evolution_formula_string_and_parsing()
+    test_ast_canonical_hash_and_bounded_math()

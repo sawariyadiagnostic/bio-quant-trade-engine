@@ -1,12 +1,13 @@
 """64-Byte Cache-Aligned Epigenetic AST Evaluator & Genetic Operators (Ponytail MVC)."""
 from dataclasses import dataclass, field
+import hashlib
 import random
 import numpy as np
 import pandas as pd
 from numpy.lib.stride_tricks import sliding_window_view
 
 OPERATORS_BINARY = ("ADD", "SUB", "MUL", "DIV_SAFE")
-OPERATORS_UNARY = ("SIGN", "ABS", "LOG_ABS", "SIGMOID", "RELU")
+OPERATORS_UNARY = ("SIGN", "ABS", "LOG_ABS", "SIGMOID", "RELU", "EXP_SAFE", "LOG_SAFE")
 OPERATORS_ROLLING = ("DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20")
 
 STANDARD_FEATURES = [
@@ -37,6 +38,20 @@ class ASTNode:
 
     def get_all_subnodes(self) -> list['ASTNode']:
         return [self] + [sub for c in self.children for sub in c.get_all_subnodes()]
+
+    def canonical_hash(self) -> str:
+        """Returns deterministic 16-character hex hash invariant to commutative child ordering."""
+        if self.op == "FEATURE":
+            raw = f"F:{self.val}"
+        elif self.op in ("ADD", "MUL") and len(self.children) == 2:
+            h0 = self.children[0].canonical_hash()
+            h1 = self.children[1].canonical_hash()
+            ordered = sorted([h0, h1])
+            raw = f"{self.op}({ordered[0]},{ordered[1]})"
+        else:
+            child_hashes = [c.canonical_hash() for c in self.children]
+            raw = f"{self.op}(" + ",".join(child_hashes) + ")"
+        return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def to_formula_str(self) -> str:
         if self.op == "FEATURE":
@@ -120,6 +135,8 @@ class ASTEvaluator:
             elif node.op == "LOG_ABS": res = np.log(np.abs(child) + 1.0)
             elif node.op == "SIGMOID": res = 1.0 / (1.0 + np.exp(-np.clip(child, -10.0, 10.0)))
             elif node.op == "RELU": res = np.maximum(0.0, child)
+            elif node.op == "EXP_SAFE": res = np.exp(np.clip(child, -20.0, 20.0))
+            elif node.op == "LOG_SAFE": res = np.log(np.maximum(1e-8, np.abs(child)))
             else: res = np.zeros(n)
             return np.nan_to_num(res, nan=0.0)
 
