@@ -44,6 +44,7 @@ from src.ui.visualizations import (
     build_cosine_similarity_heatmap,
     build_avionics_hud_markdown,
     build_combat_telemetry_markdown,
+    build_pipeline_dag_html,
     EMPTY_LEADERBOARD,
     EMPTY_PORTFOLIO
 )
@@ -920,6 +921,7 @@ def run_evolution_stream(
 def create_ui():
     init_m_plot, init_hrp_plot, init_port_table, init_sim_heatmap = _update_v2_visuals("NIFTYBEES", 50000.0)
     with gr.Blocks(title="Bio-Quant Alpha-OS v2.0: Master Cockpit", theme=gr.themes.Soft()) as demo:
+        session_records = gr.State(value=CURRENT_ARCHIVE_RECORDS)
         hud_box = gr.Markdown(
             build_avionics_hud_markdown(
                 equity=50000.0,
@@ -1052,6 +1054,9 @@ def create_ui():
                             label="Resident Alpha Genomes Archive",
                             wrap=True
                         )
+
+                    with gr.TabItem("🔄 System I/O Architecture & Pipeline DAG"):
+                        dag_html_view = gr.HTML(value=build_pipeline_dag_html(), label="System Data Flow & Contracts")
 
         # Wire Mode Toggle
         def on_mode_change(m: str):

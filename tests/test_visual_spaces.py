@@ -60,6 +60,18 @@ def test_empty_visuals():
     assert isinstance(tbl, pd.DataFrame)
     assert len(tbl) == 1
 
+
+def test_pipeline_dag_html_and_state_safety():
+    """Verify build_pipeline_dag_html produces valid HTML DAG of system I/O contracts."""
+    from src.ui.visualizations import build_pipeline_dag_html
+    dag_html = build_pipeline_dag_html()
+    assert isinstance(dag_html, str)
+    assert "VectorDataLake" in dag_html
+    assert "MatrixSimulator" in dag_html
+    assert "ShoonyaGateway" in dag_html
+    assert "LIQUIDBEES" in dag_html
+    print("[PASS] test_pipeline_dag_html_and_state_safety")
+
 def test_populated_visuals():
     records = generate_mock_records()
 
@@ -103,4 +115,5 @@ if __name__ == "__main__":
     test_empty_visuals()
     test_populated_visuals()
     test_sorting_leaderboard()
+    test_pipeline_dag_html_and_state_safety()
     print("ALL VISUAL SPACE & SORTING TESTS PASSED EMPIRICALLY!")

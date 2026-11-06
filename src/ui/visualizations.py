@@ -523,4 +523,45 @@ def build_combat_telemetry_markdown(title: str, lines: List[str]) -> str:
 """
 
 
+def build_pipeline_dag_html() -> str:
+    """Renders high-contrast interactive HTML DAG of system architecture and I/O contracts."""
+    return """
+<div style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #c9d1d9;">
+  <div style="font-weight: 700; font-size: 1.1rem; color: #58a6ff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+    <span>⚡</span> SYSTEM PIPELINE WORKFLOW & DYNAMIC I/O CONTRACT DAG
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+    <div style="background: #161b22; border: 1px solid #388bfd33; border-top: 3px solid #58a6ff; border-radius: 6px; padding: 10px;">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #58a6ff;">1. DATA LAYER</div>
+      <div style="font-size: 0.75rem; color: #8b949e; margin: 4px 0;"><b>VectorDataLake & GiftNiftyLoader</b></div>
+      <div style="font-size: 0.75rem; color: #7ee787;">IN: NSE Parquet / GIFT Quote</div>
+      <div style="font-size: 0.75rem; color: #d2a8ff;">PROC: Session VWAP + Circuit Limits</div>
+      <div style="font-size: 0.75rem; color: #f0883e;">OUT: 20+ Normalized Tensors</div>
+    </div>
+    <div style="background: #161b22; border: 1px solid #388bfd33; border-top: 3px solid #3fb950; border-radius: 6px; padding: 10px;">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #3fb950;">2. QUANT ALPHA CORE</div>
+      <div style="font-size: 0.75rem; color: #8b949e; margin: 4px 0;"><b>ASTEvaluator & MatrixSimulator</b></div>
+      <div style="font-size: 0.75rem; color: #7ee787;">IN: Tensors + Epigenetic Trees</div>
+      <div style="font-size: 0.75rem; color: #d2a8ff;">PROC: 3D Tensor (B,N,T) + Purged CV</div>
+      <div style="font-size: 0.75rem; color: #f0883e;">OUT: Sortino Floor + DSR Stats</div>
+    </div>
+    <div style="background: #161b22; border: 1px solid #388bfd33; border-top: 3px solid #bc8cff; border-radius: 6px; padding: 10px;">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #bc8cff;">3. RISK & MAP-ELITES</div>
+      <div style="font-size: 0.75rem; color: #8b949e; margin: 4px 0;"><b>HRPAllocator & CircuitDamper</b></div>
+      <div style="font-size: 0.75rem; color: #7ee787;">IN: Strategy Returns & Covariance</div>
+      <div style="font-size: 0.75rem; color: #d2a8ff;">PROC: Ledoit-Wolf + Ward Linkage</div>
+      <div style="font-size: 0.75rem; color: #f0883e;">OUT: Risk-Budgeted Weights</div>
+    </div>
+    <div style="background: #161b22; border: 1px solid #388bfd33; border-top: 3px solid #f0883e; border-radius: 6px; padding: 10px;">
+      <div style="font-size: 0.8rem; font-weight: 700; color: #f0883e;">4. EXECUTION TOWER</div>
+      <div style="font-size: 0.75rem; color: #8b949e; margin: 4px 0;"><b>ShoonyaGateway & PortfolioPaperTrader</b></div>
+      <div style="font-size: 0.75rem; color: #7ee787;">IN: Weights + Pre-Open Auction</div>
+      <div style="font-size: 0.75rem; color: #d2a8ff;">PROC: Pass 1 Sells -> Pass 2 Buys</div>
+      <div style="font-size: 0.75rem; color: #f0883e;">OUT: Fills + LIQUIDBEES (6.8%) Sweep</div>
+    </div>
+  </div>
+</div>
+"""
+
+
 
