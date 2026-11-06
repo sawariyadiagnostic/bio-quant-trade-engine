@@ -106,7 +106,7 @@
         "7.4_test_panic_button_spam_deduplication": "PASSED"
       },
       "verification_cmd": "python -m unittest tests/test_chaos_fault_injection.py",
-      "commit": null
+      "commit": "009bf41"
     }
   }
 }

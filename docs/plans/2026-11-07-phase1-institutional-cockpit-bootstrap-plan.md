@@ -30,42 +30,42 @@
 | ↳ Subtask 0.8 | Normalize symbols without corrupting futures or special series | `[x]` | Unit test passed | *Verified* |
 | ↳ Subtask 0.9 | Migrate `_record_audit` from $O(N^2)$ JSON rewrite to SQLite WAL | `[x]` | 10 paper orders logged to WAL | *Verified* |
 | ↳ Subtask 0.10 | Build `ArchiveMigrator` to migrate legacy `audit/archive_*.json` | `[x]` | 2,039 champions in SQLite WAL | *Verified* |
-| **TASK 1** | **Windows Job Guard & Zero-Copy SharedMemory IPC** | `[►] IN PROGRESS` | `unittest tests/test_shm_worker_isolation.py` | *Active* |
-| ↳ Subtask 1.1 | Windows Job Manager (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000`) | `[►]` | In progress | - |
-| ↳ Subtask 1.2 | CPU Affinity & Priority Governor (Cores 0-1 vs Cores 2-3) | `[ ]` | Affinity mask check | - |
-| ↳ Subtask 1.3 | SharedMemory IPC Bus (162 KB RAM, 256B Header + 400-Niche Array) | `[ ]` | Latency benchmark (<5µs) | - |
-| ↳ Subtask 1.4 | Spawned Evolution Worker (`evolution_worker.py`) with heartbeat | `[ ]` | Worker isolation test | - |
-| **TASK 2** | **Two-Stage Risk Sentry & Market Microstructure Protection** | `[ ] QUEUED` | `pytest tests/test_risk_sentry_isolation.py` | - |
-| ↳ Subtask 2.1 | Stage 1 In-Process Atomic Freeze (<0.5ms) | `[ ]` | Nanosecond timing test | - |
-| ↳ Subtask 2.2 | Stage 2 Parallel Async Socket Dispatch (aiohttp connection pool) | `[ ]` | Concurrent mock dispatch | - |
-| ↳ Subtask 2.3 | Lower-Circuit Evaporation Trap & Synthetic Delta Hedge (`NIFTYBEES`) | `[ ]` | Circuit-lock test | - |
-| ↳ Subtask 2.4 | Statutory DP Charge Floor (₹15,930 notional / MIS routing) | `[ ]` | Friction calculation test | - |
-| ↳ Subtask 2.5 | Headless Session Watchdog (`QuickAuth` 08:45 IST TOTP daemon) | `[ ]` | Auth cycle test | - |
-| **TASK 3** | **FastAPI REST Server & Differential Delta SSE Protocol** | `[ ] QUEUED` | `pytest tests/test_cockpit_server_api.py` | - |
-| ↳ Subtask 3.1 | SQLite WAL Archive Store (`src/evolution/archive_store.py`) | `[ ]` | Read/write benchmark | - |
-| ↳ Subtask 3.2 | FastAPI ASGI Server & Discrete Node Endpoints on Port 7860 | `[ ]` | TestClient HTTP 200 | - |
-| ↳ Subtask 3.3 | Differential SSE Stream (`ping`, `tick`, `elite_added`, `complete`) | `[ ]` | SSE chunk wire test | - |
-| ↳ Subtask 3.4 | Worker Process Supervisor & Watchdog Loop | `[ ]` | Crash recovery test | - |
-| **TASK 4** | **Decoupled Institutional n8n-Style Node Cockpit Web UI** | `[ ] QUEUED` | `pytest tests/test_web_cockpit_ui.py` | - |
-| ↳ Subtask 4.1 | Offline Dependency Vendoring (`vendor_ui_dependencies.py`) | `[ ]` | Asset 200 verification | - |
-| ↳ Subtask 4.2 | Zero-Dependency Web Audio API Synthesizer (`audio_synth.js`) | `[ ]` | Synth trigger test | - |
-| ↳ Subtask 4.3 | AG Grid Virtualization & Incremental Transactions (`applyTransactionAsync`) | `[ ]` | Grid rendering test | - |
-| ↳ Subtask 4.4 | Plotly WebGL (`scattergl`) & 250ms RAF Redraw Throttler | `[ ]` | Compositor FPS test | - |
-| ↳ Subtask 4.5 | 5-Second Dead-Man Switch HUD Watchdog Banner | `[ ]` | Stream cutoff test | - |
-| ↳ Subtask 4.6 | Full Dark-Mode Avionics Layout & n8n Node Pipeline Deck | `[ ]` | Visual layout inspection | - |
-| **TASK 5** | **Companion Headless Terminal Rescue TUI** | `[ ] QUEUED` | `pytest tests/test_rescue_tui.py` | - |
-| ↳ Subtask 5.1 | Rich Terminal Dashboard (`src/ui/rescue_tui.py`) | `[ ]` | Console output test | - |
-| ↳ Subtask 5.2 | Single-Keystroke `Key: K` Panic Liquidation Trigger | `[ ]` | Key event mock test | - |
-| **TASK 6** | **Gradio Elimination & Codebase Hardening** | `[ ] QUEUED` | `python scripts/red_team_harness.py` | - |
-| ↳ Subtask 6.1 | Deprecate `src/ui/evolution_dashboard.py` with redirect stub | `[ ]` | Import check | - |
-| ↳ Subtask 6.2 | Remove `gradio` from runtime dependencies | `[ ]` | Dependency audit | - |
-| ↳ Subtask 6.3 | Full Red Team Invariants Gate (12/12 passing in <100ms) | `[ ]` | Harness test | - |
-| ↳ Subtask 6.4 | Architecture and ledger documentation updates | `[ ]` | File review | - |
-| **TASK 7** | **Adversarial Chaos Fault-Injection Testing Suite** | `[ ] QUEUED` | `pytest tests/test_chaos_fault_injection.py` | - |
-| ↳ Subtask 7.1 | Test A: Worker SIGKILL crash recovery | `[ ]` | Chaos test | - |
-| ↳ Subtask 7.2 | Test B: Broker network hang timeout | `[ ]` | Chaos test | - |
-| ↳ Subtask 7.3 | Test C: Corrupted archive ingestion recovery | `[ ]` | Chaos test | - |
-| ↳ Subtask 7.4 | Test D: 50-clicks/sec panic button spam deduplication | `[ ]` | Chaos test | - |
+| **TASK 1** | **Windows Job Guard & Zero-Copy SharedMemory IPC** | `[x] COMPLETED` | `unittest tests/test_shm_worker_isolation.py` | `0e5c78d` |
+| ↳ Subtask 1.1 | Windows Job Manager (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000`) | `[x]` | Process kill test | `0e5c78d` |
+| ↳ Subtask 1.2 | CPU Affinity & Priority Governor (Cores 0-1 vs Cores 2-3) | `[x]` | Affinity mask check | `0e5c78d` |
+| ↳ Subtask 1.3 | SharedMemory IPC Bus (162 KB RAM, 256B Header + 400-Niche Array) | `[x]` | Latency benchmark (<5µs) | `0e5c78d` |
+| ↳ Subtask 1.4 | Spawned Evolution Worker (`evolution_worker.py`) with heartbeat | `[x]` | Worker isolation test | `0e5c78d` |
+| **TASK 2** | **Two-Stage Risk Sentry & Market Microstructure Protection** | `[x] COMPLETED` | `unittest tests/test_risk_sentry_isolation.py` | `dfd130c` |
+| ↳ Subtask 2.1 | Stage 1 In-Process Atomic Freeze (<0.5ms) | `[x]` | 3.6us nanosecond timing test | `dfd130c` |
+| ↳ Subtask 2.2 | Stage 2 Parallel Async Socket Dispatch (asyncio gather pool) | `[x]` | 2.64ms concurrent mock dispatch | `dfd130c` |
+| ↳ Subtask 2.3 | Lower-Circuit Evaporation Trap & Synthetic Delta Hedge (`NIFTYBEES`) | `[x]` | Circuit-lock & beta-weighted test | `dfd130c` |
+| ↳ Subtask 2.4 | Statutory DP Charge Floor (₹15,930 notional / MIS routing) | `[x]` | Friction elimination test | `dfd130c` |
+| ↳ Subtask 2.5 | Headless Session Watchdog (`QuickAuth` 08:45 IST TOTP daemon) | `[x]` | TOTP & session heal test | `dfd130c` |
+| **TASK 3** | **FastAPI REST Server & Differential Delta SSE Protocol** | `[x] COMPLETED` | `unittest tests/test_cockpit_server_api.py` | `8377c45` |
+| ↳ Subtask 3.1 | SQLite WAL Archive Store (`src/evolution/archive_store.py`) | `[x]` | Read/write benchmark | `0e5c78d` |
+| ↳ Subtask 3.2 | FastAPI ASGI Server & Discrete Node Endpoints on Port 7860 | `[x]` | TestClient HTTP 200 | `8377c45` |
+| ↳ Subtask 3.3 | Differential SSE Stream (`ping`, `tick`, `elite_added`, `complete`) | `[x]` | SSE chunk wire test | `8377c45` |
+| ↳ Subtask 3.4 | Worker Process Supervisor & Watchdog Loop | `[x]` | Crash recovery test | `8377c45` |
+| **TASK 4** | **Decoupled Institutional n8n-Style Node Cockpit Web UI** | `[x] COMPLETED` | `unittest tests/test_web_cockpit_ui.py` | `49f7111` |
+| ↳ Subtask 4.1 | Offline Dependency Vendoring (`vendor_ui_dependencies.py`) | `[x]` | 6 assets locally vendored | `49f7111` |
+| ↳ Subtask 4.2 | Zero-Dependency Web Audio API Synthesizer (`audio_synth.js`) | `[x]` | Audio oscillator test | `49f7111` |
+| ↳ Subtask 4.3 | AG Grid Virtualization & Incremental Transactions (`applyTransactionAsync`) | `[x]` | Grid rendering test | `49f7111` |
+| ↳ Subtask 4.4 | Plotly WebGL (`scattergl`) & 250ms RAF Redraw Throttler | `[x]` | Compositor RAF test | `49f7111` |
+| ↳ Subtask 4.5 | 5-Second Dead-Man Switch HUD Watchdog Banner | `[x]` | Stream cutoff test | `49f7111` |
+| ↳ Subtask 4.6 | Full Dark-Mode Avionics Layout & n8n Node Pipeline Deck | `[x]` | Visual layout inspection | `49f7111` |
+| **TASK 5** | **Companion Headless Terminal Rescue TUI** | `[x] COMPLETED` | `unittest tests/test_rescue_tui.py` | `90fe659` |
+| ↳ Subtask 5.1 | Rich Terminal Dashboard (`src/ui/rescue_tui.py`) | `[x]` | Console ASCII layout test | `90fe659` |
+| ↳ Subtask 5.2 | Single-Keystroke `Key: K` Panic Liquidation Trigger | `[x]` | Key event mock test | `90fe659` |
+| **TASK 6** | **Gradio Elimination & Codebase Hardening** | `[x] COMPLETED` | `python scripts/red_team_harness.py` | `4746c87` |
+| ↳ Subtask 6.1 | Deprecate `src/ui/evolution_dashboard.py` with redirect stub | `[x]` | Backward compatible stub | `4746c87` |
+| ↳ Subtask 6.2 | Remove `gradio` from runtime dependencies | `[x]` | 1,267 lines eliminated | `4746c87` |
+| ↳ Subtask 6.3 | Full Red Team Invariants Gate (12/12 passing in <100ms) | `[x]` | 12/12 in 17.5ms | `4746c87` |
+| ↳ Subtask 6.4 | Architecture and ledger documentation updates | `[x]` | ARCHITECTURE.md updated | `4746c87` |
+| **TASK 7** | **Adversarial Chaos Fault-Injection Testing Suite** | `[x] COMPLETED` | `unittest tests/test_chaos_fault_injection.py` | `009bf41` |
+| ↳ Subtask 7.1 | Test A: Worker SIGKILL crash recovery | `[x]` | Chaos test passed | `009bf41` |
+| ↳ Subtask 7.2 | Test B: Broker network hang timeout | `[x]` | 0.2s timeout guard passed | `009bf41` |
+| ↳ Subtask 7.3 | Test C: Corrupted archive ingestion recovery | `[x]` | Safe containment passed | `009bf41` |
+| ↳ Subtask 7.4 | Test D: 50-clicks/sec panic button spam deduplication | `[x]` | 50/50 HTTP 200 passed | `009bf41` |
 
 ---
 

@@ -71,9 +71,13 @@ class SharedMemoryBus:
                 old = shared_memory.SharedMemory(name=name)
                 old.close()
                 old.unlink()
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError, OSError):
                 pass
-            self.shm = shared_memory.SharedMemory(name=name, create=True, size=TOTAL_SHM_SIZE)
+            try:
+                self.shm = shared_memory.SharedMemory(name=name, create=True, size=TOTAL_SHM_SIZE)
+            except FileExistsError:
+                self.shm = shared_memory.SharedMemory(name=name, create=False)
+
             # Initialize header
             hdr = HeaderStruct.from_buffer(self.shm.buf[:HEADER_SIZE])
             hdr.magic = MAGIC_BIOQUANT
