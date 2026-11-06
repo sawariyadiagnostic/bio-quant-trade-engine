@@ -48,9 +48,21 @@ class ExecutionDispatcher:
         sig = float(signals[-1]) if len(signals) > 0 else 0.0
 
         action = "BUY" if sig > self.signal_threshold else ("SELL" if sig < -self.signal_threshold else "HOLD")
-        if action != "BUY":
-            reason = "SIGNAL_BELOW_THRESHOLD" if action == "HOLD" else "SELL_SIGNAL"
-            return DispatchDecision(ticker, action, round(sig, 4), round(p, 2), 0, regime_id, bands, reason)
+        if action == "HOLD":
+            return DispatchDecision(ticker, "HOLD", round(sig, 4), round(p, 2), 0, regime_id, bands, "SIGNAL_BELOW_THRESHOLD")
+
+        if action == "SELL":
+            tsym = self.gateway.format_trading_symbol(ticker)
+            held = self.gateway.paper_positions.get(tsym, {}).get("quantity", 0)
+            if held > 0:
+                res = self.gateway.place_order(ticker, held, p, action="SELL", is_etf=is_etf)
+                ok = res.get("stat") == "Ok" or res.get("status") in ("COMPLETE", "PLACED", "OPEN")
+                return DispatchDecision(
+                    ticker, "SELL", round(sig, 4), round(p, 2), held, regime_id, bands,
+                    order_id=res.get("norenordno") or res.get("order_id"), executed=ok,
+                    rejection_reason="" if ok else str(res.get("emsg") or "SELL_FAILED")
+                )
+            return DispatchDecision(ticker, "SELL", round(sig, 4), round(p, 2), 0, regime_id, bands, "NO_POSITION_HELD")
 
         units, reason = self.risk_controller.allocate(p, is_etf, regime_id, bands)
         if units <= 0:

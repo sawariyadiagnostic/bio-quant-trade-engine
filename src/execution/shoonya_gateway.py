@@ -75,6 +75,7 @@ class ShoonyaGateway:
         self.susertoken: Optional[str] = None
         self.actid: Optional[str] = self.creds.user_id
         self.paper_positions: dict[str, dict[str, Any]] = {}
+        self.clordid_ledger: dict[str, dict[str, Any]] = {}
         self.paper_order_counter = 1000
         self.api: Optional[Any] = None
 
@@ -213,12 +214,18 @@ class ShoonyaGateway:
         action: str = "BUY",
         product: str = "C",
         order_type: str = "MKT",
-        is_etf: bool = True
+        is_etf: bool = True,
+        client_order_id: Optional[str] = None
     ) -> dict[str, Any]:
         """
         Places order in either Paper Trading or Live Exchange mode.
         Guarded against NaN, Inf, non-integer quantity, and negative prices.
+        Supports client_order_id idempotency to prevent duplicate broker executions.
         """
+        if client_order_id and client_order_id in self.clordid_ledger:
+            logger.info(f"ShoonyaGateway: Idempotent replay for client_order_id={client_order_id}")
+            return self.clordid_ledger[client_order_id]
+
         if not isinstance(quantity, (int, np.integer)) or quantity <= 0:
             return {"stat": "Not_Ok", "emsg": "Quantity must be a positive integer"}
 
@@ -231,8 +238,13 @@ class ShoonyaGateway:
 
         trading_symbol = self.format_trading_symbol(symbol)
         if self.paper_trading:
-            return self._execute_paper_order(trading_symbol, int(quantity), float(price), clean_action, is_etf)
-        return self._send_live_order(trading_symbol, int(quantity), float(price), clean_action, product, order_type)
+            res = self._execute_paper_order(trading_symbol, int(quantity), float(price), clean_action, is_etf)
+        else:
+            res = self._send_live_order(trading_symbol, int(quantity), float(price), clean_action, product, order_type)
+
+        if client_order_id and res.get("stat") == "Ok":
+            self.clordid_ledger[client_order_id] = res
+        return res
 
     def _execute_paper_order(
         self,

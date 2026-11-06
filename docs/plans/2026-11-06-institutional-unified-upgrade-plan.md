@@ -30,7 +30,7 @@
 | **P1** | **Task 9** | MAP-Elites 2-Objective Pareto & 2x Friction Stress Test | `src/evolution/map_elites.py`, `tests/test_lookback_cagr_partitioning.py` | `[x]` Complete | `feat(evolution)` |
 | **P2** | **Task 10**| GIFT NIFTY Overnight Lead-Lag Ingestion (06:30–08:30 IST)| `src/data/gift_nifty_loader.py`, `src/execution/overnight_engine.py` | `[x]` Complete | `feat(data)` |
 | **P2** | **Task 11**| Pre-Open Auction Limit Router & Micro-Trailing Stop | `src/execution/overnight_engine.py`, `tests/test_overnight_engine.py` | `[x]` Complete | `feat(execution)` |
-| **P2** | **Task 12**| Shoonya Gateway Hardening (`clordid`, Retries, Sell Fix)| `src/execution/shoonya_gateway.py`, `src/execution/execution_dispatcher.py` | `[ ]` Not Started | - |
+| **P2** | **Task 12**| Shoonya Gateway Hardening (`clordid`, Retries, Sell Fix)| `src/execution/shoonya_gateway.py`, `src/execution/execution_dispatcher.py` | `[x]` Complete | `feat(gateway)` |
 | **P2** | **Task 13**| Two-Pass Atomic Rebalancing & Liquid BeES Auto-Sweep | `src/execution/portfolio_paper_trader.py`, `tests/test_portfolio_paper_trader.py` | `[ ]` Not Started | - |
 | **P3** | **Task 14**| Thread-Safe State & Interactive I/O DAG in Master Cockpit| `src/ui/evolution_dashboard.py`, `src/ui/visualizations.py` | `[ ]` Not Started | - |
 | **P3** | **Task 15**| One-Click "First Pot of Gold" Launcher & Panic Switch | `src/ui/evolution_dashboard.py`, `src/ui/shoonya_ui.py` | `[ ]` Not Started | - |
@@ -312,22 +312,23 @@
 - Modify: `src/execution/execution_dispatcher.py:40-60`
 - Test: `tests/test_shoonya_gateway.py`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
   In `tests/test_shoonya_gateway.py`, verify that:
   1. Every order sent has a unique `clordid` parameter.
   2. In `ExecutionDispatcher`, an action `"SELL"` actively calls `gateway.place_order(action="SELL")` to liquidate held units.
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
   Run: `python tests/test_shoonya_gateway.py`  
   Expected: FAIL.
-- [ ] **Step 3: Implement minimal code**
+- [x] **Step 3: Implement minimal code**
   In `src/execution/execution_dispatcher.py`:
   - When `action == "SELL"`, query open positions for `ticker`; if held $> 0$, route sell order to `self.gateway.place_order(..., action="SELL")`.
   In `src/execution/shoonya_gateway.py`:
   - Add `clordid` to order payloads and implement exponential backoff on HTTP 429/502.
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
   Run: `python tests/test_shoonya_gateway.py`  
   Expected: PASS.
-- [ ] **Step 5: Commit changes**
+- [x] **Step 5: Commit changes**
+  Commit: `git commit -m "feat(gateway): implement order idempotency clordid and active sell dispatching"`
   Commit: `git commit -m "fix(gateway): add clordid idempotency, retries, and active sell routing"`
 
 ---

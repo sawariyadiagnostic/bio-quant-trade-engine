@@ -6,8 +6,13 @@ Empirically verifies:
 3. Micro-Capital Controller: 0% leverage, ETF vs Single Stock caps, and crash regime gating.
 """
 import os
+import sys
 import tempfile
 import pyotp
+import pandas as pd
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from src.domain.models import CircuitBands
 from src.execution.shoonya_gateway import ShoonyaGateway, ShoonyaCredentials
 from src.execution.risk_controller import MicroCapitalController
@@ -145,6 +150,37 @@ def test_micro_capital_circuit_band_lockout():
     assert units == 0
     assert reason == "CIRCUIT_LOCKED"
 
+
+def test_gateway_idempotency_and_sell_routing():
+    """Verify client_order_id idempotency and dispatcher active sell liquidation."""
+    from src.execution.execution_dispatcher import ExecutionDispatcher
+    from src.execution.risk_controller import MicroCapitalController
+
+    gw = ShoonyaGateway(paper_trading=True, initial_balance=50000.0)
+
+    # 1. Idempotency test: duplicate client_order_id must return cached confirmation
+    clordid = "CLORD_TEST_12345"
+    res1 = gw.place_order("NIFTYBEES", quantity=10, price=250.0, action="BUY", client_order_id=clordid)
+    assert res1["stat"] == "Ok"
+    bal_after_1 = gw.balance
+
+    # Duplicate call with same clordid
+    res2 = gw.place_order("NIFTYBEES", quantity=10, price=250.0, action="BUY", client_order_id=clordid)
+    assert res2["stat"] == "Ok"
+    assert res2["norenordno"] == res1["norenordno"]
+    assert gw.balance == bal_after_1  # Balance must NOT be deducted twice!
+
+    # 2. Dispatcher sell routing: liquidation executes through gateway
+    rc = MicroCapitalController(total_capital=50000.0)
+    dispatcher = ExecutionDispatcher(gateway=gw, risk_controller=rc)
+
+    df = pd.DataFrame({"Close": [250.0, 252.0]})
+    dec = dispatcher.evaluate_and_dispatch("NIFTYBEES", df, formula="-0.50", is_etf=True)
+    assert dec.action == "SELL"
+    assert dec.quantity == 10
+    assert dec.executed is True
+
+
 if __name__ == "__main__":
     print("Running Shoonya Gateway and Micro-Capital Controller Test Suite...")
     test_totp_generation()
@@ -163,5 +199,7 @@ if __name__ == "__main__":
     print("  [PASS] test_micro_capital_drawdown_circuit_breaker")
     test_micro_capital_circuit_band_lockout()
     print("  [PASS] test_micro_capital_circuit_band_lockout")
-    print("ALL 8 EMPIRICAL TESTS PASSED SUCCESSFULLY!")
+    test_gateway_idempotency_and_sell_routing()
+    print("  [PASS] test_gateway_idempotency_and_sell_routing")
+    print("ALL 9 EMPIRICAL TESTS PASSED SUCCESSFULLY!")
 
