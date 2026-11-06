@@ -190,5 +190,31 @@ def run_evolution_process(
         bus.close()
 
 
+def spawn_evolution_worker(
+    instrument: str = "NIFTYBEES",
+    lookback_years: float = 1.0,
+    generations: int = 10,
+    population_size: int = 50,
+    archive_db_path: str = "audit/alpha_elites.db",
+    shm_name: str = ""
+) -> multiprocessing.Process:
+    """Spawns an isolated evolution worker process via multiprocessing 'spawn' context."""
+    lookback_str = f"{int(lookback_years)}y" if lookback_years >= 1.0 else "1y"
+    ctx = multiprocessing.get_context("spawn")
+    proc = ctx.Process(
+        target=run_evolution_process,
+        kwargs={
+            "shm_name": shm_name,
+            "ticker": instrument,
+            "lookback": lookback_str,
+            "generations": generations,
+            "population": population_size,
+        },
+        daemon=True
+    )
+    proc.start()
+    return proc
+
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()

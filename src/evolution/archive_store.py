@@ -107,6 +107,42 @@ class ArchiveStore:
             cursor = conn.execute(sql, (ticker, lookback, limit))
             return [dict(row) for row in cursor.fetchall()]
 
+    def get_top_elites(
+        self,
+        limit: int = 50,
+        metric: str = "fitness",
+        ticker: Optional[str] = None,
+        lookback: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Returns top resident elites, optionally filtering by ticker and lookback."""
+        allowed_metrics = {"fitness", "net_return_pct", "cagr_pct", "max_drawdown", "win_rate", "trades_count"}
+        # Map 'sharpe' to 'fitness' if requested
+        safe_metric = "fitness" if metric in {"sharpe", "fitness"} else metric
+        if safe_metric not in allowed_metrics:
+            safe_metric = "fitness"
+        order_dir = "ASC" if safe_metric == "max_drawdown" else "DESC"
+
+        where_clauses = []
+        params = []
+        if ticker:
+            where_clauses.append("ticker = ?")
+            params.append(ticker)
+        if lookback:
+            where_clauses.append("lookback = ?")
+            params.append(lookback)
+
+        where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        sql = f"""
+            SELECT * FROM resident_elites
+            {where_sql}
+            ORDER BY {safe_metric} {order_dir}
+            LIMIT ?;
+        """
+        params.append(limit)
+        with self._get_connection() as conn:
+            cursor = conn.execute(sql, tuple(params))
+            return [dict(row) for row in cursor.fetchall()]
+
     def count_champions(self, ticker: Optional[str] = None, lookback: Optional[str] = None) -> int:
         """Returns total champion count."""
         with self._get_connection() as conn:
