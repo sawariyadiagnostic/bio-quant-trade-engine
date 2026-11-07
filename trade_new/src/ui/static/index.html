@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bio-Quant Institutional Alpha Cockpit</title>
+    <!-- Vendored Offline Air-Gapped Dependencies -->
+    <link rel="stylesheet" href="/vendor/ag-grid.min.css">
+    <link rel="stylesheet" href="/vendor/ag-theme-alpine.min.css">
+    <script src="/vendor/tailwind.min.js"></script>
+    <script src="/vendor/plotly-full.min.js?v=3.7.2"></script>
+    <script src="/vendor/ag-grid-community.min.js"></script>
+    <script src="/audio_synth.js?v=2.0.4"></script>
+    <script src="/app.js?v=2.0.5"></script>
+    <script defer src="/vendor/alpine.min.js"></script>
+    <style>
+        body { background-color: #0b0f19; color: #f1f5f9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+        .hud-border { border: 1px solid rgba(59, 130, 246, 0.2); }
+        .node-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(51, 65, 85, 0.8); backdrop-filter: blur(8px); }
+        .ag-theme-alpine-dark {
+            --ag-background-color: #0f172a;
+            --ag-header-background-color: #1e293b;
+            --ag-odd-row-background-color: #0b0f19;
+            --ag-border-color: #334155;
+            --ag-header-foreground-color: #94a3b8;
+            --ag-foreground-color: #e2e8f0;
+        }
+    </style>
+</head>
+<body x-data="cockpitApp()" class="min-h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Avionics HUD Ribbon -->
+    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between text-xs tracking-wider z-50">
+        <div class="flex items-center space-x-3">
+            <span class="text-blue-400 font-bold flex items-center gap-1.5 text-sm">
+                <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                BIO-QUANT ALPHA COCKPIT
+            </span>
+            <span class="text-slate-500">|</span>
+            <span class="px-2 py-0.5 rounded text-[11px] font-semibold"
+                  :class="{
+                      'bg-emerald-950 text-emerald-400 border border-emerald-800': status === 'STANDBY',
+                      'bg-blue-950 text-blue-400 border border-blue-800 animate-pulse': status === 'EVOLVING',
+                      'bg-amber-950 text-amber-400 border border-amber-800': status === 'FROZEN',
+                      'bg-red-950 text-red-400 border border-red-800 animate-bounce': status === 'PANICKED',
+                      'bg-purple-950 text-purple-400 border border-purple-800': status === 'COMPLETE'
+                  }"
+                  x-text="'STATUS: ' + status">
+            </span>
+        </div>
+
+        <!-- Microsecond Telemetry Counters -->
+        <div class="flex items-center space-x-6 text-slate-300">
+            <div>
+                <span class="text-slate-500">ASSET:</span>
+                <span class="font-bold text-blue-400" x-text="instrument">NIFTYBEES</span>
+            </div>
+            <div>
+                <span class="text-slate-500">GEN:</span>
+                <span class="font-bold text-white" x-text="telemetry.current_gen + '/' + telemetry.total_gens">0/10</span>
+            </div>
+            <div>
+                <span class="text-slate-500">CHAMPIONS:</span>
+                <span class="font-bold text-emerald-400" x-text="gridOccupiedCount">0</span>
+            </div>
+            <div>
+                <span class="text-slate-500">OCCUPANCY:</span>
+                <span class="font-bold text-cyan-400" x-text="gridOccupancy + '%'">0.0%</span>
+            </div>
+            <div>
+                <span class="text-slate-500">MAX SHARPE:</span>
+                <span class="font-bold text-amber-400" x-text="telemetry.top_sharpe.toFixed(2)">0.00</span>
+            </div>
+        </div>
+
+        <!-- Controls: Sound & Emergency Action Buttons -->
+        <div class="flex items-center space-x-2">
+            <button @click="toggleMute()"
+                    class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+                    :title="isMuted ? 'Unmute Sound' : 'Mute Sound'">
+                <span x-text="isMuted ? '🔇 MUTED' : '🔊 AUDIO ON'"></span>
+            </button>
+            <button @click="emergencyFreeze()"
+                    class="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-black font-bold border border-amber-400 transition"
+                    title="Stage 1: In-process atomic freeze (<0.5ms)">
+                ❄ FREEZE
+            </button>
+            <button @click="emergencyPanic()"
+                    class="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold border border-red-400 transition animate-pulse"
+                    title="Stage 2: Parallel async socket dispatch to 100% cash">
+                🚨 PANIC (100% CASH)
+            </button>
+        </div>
+    </header>
+
+    <!-- Dead-Man Switch Heartbeat Watchdog Banner -->
+    <div x-show="deadManDisconnected" x-transition
+         class="bg-red-600 text-white px-4 py-1.5 text-xs font-bold flex items-center justify-between tracking-wide shadow-lg">
+        <div class="flex items-center space-x-2">
+            <span>⚠️ DEAD-MAN SWITCH ALERT:</span>
+            <span>SharedMemory heartbeat expired (>5.0s silence). Worker process may be stalled.</span>
+        </div>
+        <div class="space-x-2">
+            <button @click="connectSSE()" class="bg-black/30 hover:bg-black/50 px-2 py-0.5 rounded underline">RECONNECT</button>
+            <button @click="emergencyPanic()" class="bg-black text-red-300 hover:bg-neutral-900 px-2.5 py-0.5 rounded">EXECUTE PANIC</button>
+        </div>
+    </div>
+
+    <!-- Main Workspace Split: Left (n8n Node Pipeline Deck) & Right (Tactical Deck) -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- Left Column: n8n Node Pipeline Deck -->
+        <aside class="w-84 bg-slate-950 border-r border-slate-800 p-3.5 flex flex-col space-y-3.5 overflow-y-auto">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                <span>PIPELINE NODES</span>
+                <span class="text-[10px] text-blue-400">n8n DAG</span>
+            </div>
+
+            <!-- Node 1: Ingest Data Lake (Dynamic 100+ Asset Universe Selector) -->
+            <div class="node-card p-3 rounded-lg space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-blue-300 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                        Node 1: Data Ingest (Multi-Asset Lake)
+                    </span>
+                    <span class="text-[10px] text-slate-400" x-text="universeCount + ' Assets'">100+ Lake</span>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">TARGET ASSET (UNIVERSE)</label>
+                    <select x-model="instrument" @change="onAssetChange()" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500 font-mono">
+                        <template x-for="(assets, category) in universeCategories" :key="category">
+                            <optgroup :label="category">
+                                <template x-for="ast in assets" :key="ast">
+                                    <option :value="ast" x-text="ast + (residentTickers.includes(ast) ? ' ⭐' : '')"></option>
+                                </template>
+                            </optgroup>
+                        </template>
+                        <!-- Fallback list while universe assets fetch -->
+                        <option value="NIFTYBEES">NIFTYBEES (Nifty 50) ⭐</option>
+                        <option value="BANKBEES">BANKBEES (Banking) ⭐</option>
+                        <option value="HAL">HAL (Defense) ⭐</option>
+                        <option value="BEL">BEL (Defense) ⭐</option>
+                        <option value="RELIANCE">RELIANCE (Energy) ⭐</option>
+                        <option value="TCS">TCS (Tech) ⭐</option>
+                        <option value="INFY">INFY (Tech) ⭐</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-slate-400 mb-1">LOOKBACK HORIZON</label>
+                    <select x-model="lookbackYears" @change="onAssetChange()" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <option value="1.0">1 Year (~252 bars)</option>
+                        <option value="2.0">2 Years (~504 bars)</option>
+                        <option value="5.0">5 Years (~1,260 bars)</option>
+                    </select>
+                </div>
+                <button @click="ingestData()"
+                        class="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition">
+                    ▶ INGEST LAKE DATA
+                </button>
+            </div>
+
+            <!-- Node 2: Genetic Evolution Compute Worker & Random Seed Governor -->
+            <div class="node-card p-3 rounded-lg space-y-2.5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        Node 2: MAP-Elites Engine
+                    </span>
+                    <span class="text-[10px] text-slate-500" x-text="computeTarget === 'remote' ? 'Kaggle GPU ⚡' : 'Cores 2-3'">Cores 2-3</span>
+                </div>
+
+                <!-- Compute Target Selector (Local CPU vs Kaggle Cloud GPU) -->
+                <div class="flex space-x-1 bg-slate-900 p-0.5 rounded border border-slate-800 text-[10px]">
+                    <button type="button" @click="computeTarget = 'local'"
+                            :class="computeTarget === 'local' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                            class="flex-1 py-0.5 rounded text-center transition">
+                        Local CPU
+                    </button>
+                    <button type="button" @click="computeTarget = 'remote'"
+                            :class="computeTarget === 'remote' ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                            class="flex-1 py-0.5 rounded text-center transition">
+                        Kaggle GPU ⚡
+                    </button>
+                </div>
+
+                <!-- Remote Kaggle GPU Connection Panel -->
+                <div x-show="computeTarget === 'remote'" x-transition class="space-y-1.5 bg-purple-950/40 p-2 rounded border border-purple-800/50">
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-purple-300 font-semibold">CLOUDFLARE TUNNEL URL</span>
+                        <button type="button" @click="testRemoteGpu()" class="text-purple-400 hover:text-purple-200 underline">
+                            Test Ping
+                        </button>
+                    </div>
+                    <input type="text" x-model="remoteUrl" placeholder="https://xxx.trycloudflare.com"
+                           class="w-full bg-slate-900 border border-purple-700/60 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-purple-400 font-mono">
+                    <div x-show="remoteGpuStatus" class="text-[10px]" :class="remoteGpuStatus && remoteGpuStatus.online ? 'text-emerald-400' : 'text-rose-400'" x-text="remoteGpuStatus ? remoteGpuStatus.message : ''"></div>
+                </div>
+
+                <!-- Generations Control (Open Bounds & Presets) -->
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400">
+                        <span class="font-semibold text-slate-300">GENERATIONS (100-GEN CHARGE)</span>
+                        <div class="flex items-center space-x-1">
+                            <span class="text-slate-500">Gens:</span>
+                            <input type="number" min="1" max="100000" x-model.number="generations"
+                                   class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white text-right font-mono font-bold focus:border-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <input type="range" min="5" max="500" step="5" x-model.number="generations" class="w-full accent-emerald-500 cursor-pointer">
+                    <!-- Generation Presets -->
+                    <div class="flex items-center justify-between gap-1 pt-0.5">
+                        <button type="button" @click="setGenerations(25)" :class="generations == 25 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">25</button>
+                        <button type="button" @click="setGenerations(50)" :class="generations == 50 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">50</button>
+                        <button type="button" @click="setGenerations(100)" :class="generations == 100 ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400 font-bold' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-2 py-0.5 rounded text-[9px] border hover:border-emerald-500 transition">100 ⚡ Charge</button>
+                        <button type="button" @click="setGenerations(250)" :class="generations == 250 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">250</button>
+                        <button type="button" @click="setGenerations(500)" :class="generations == 500 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">500 🔥</button>
+                    </div>
+                </div>
+
+                <!-- Population / Formula Count Control (Open Bounds & Presets) -->
+                <div class="space-y-1">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400">
+                        <span class="font-semibold text-slate-300">FORMULAS / GEN (POPULATION)</span>
+                        <div class="flex items-center space-x-1">
+                            <span class="text-slate-500">Pop:</span>
+                            <input type="number" min="10" max="100000" x-model.number="populationSize"
+                                   class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white text-right font-mono font-bold focus:border-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+                    <input type="range" min="20" max="1000" step="10" x-model.number="populationSize" class="w-full accent-emerald-500 cursor-pointer">
+                    <!-- Population Presets -->
+                    <div class="flex items-center justify-between gap-1 pt-0.5">
+                        <button type="button" @click="setPopulation(50)" :class="populationSize == 50 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">50</button>
+                        <button type="button" @click="setPopulation(100)" :class="populationSize == 100 ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400 font-bold' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-2 py-0.5 rounded text-[9px] border hover:border-emerald-500 transition">100 ⚡ Standard</button>
+                        <button type="button" @click="setPopulation(250)" :class="populationSize == 250 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">250 📦 Chunk</button>
+                        <button type="button" @click="setPopulation(500)" :class="populationSize == 500 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">500</button>
+                        <button type="button" @click="setPopulation(1000)" :class="populationSize == 1000 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">1,000 🚀</button>
+                    </div>
+                </div>
+
+                <!-- Compute Evaluation Meter -->
+                <div class="bg-slate-950/70 border border-slate-800/80 rounded px-2.5 py-1.5 text-[10px] flex items-center justify-between">
+                    <span class="text-slate-400">Total Compute Budget:</span>
+                    <span class="font-mono text-emerald-400 font-bold" x-text="((generations || 0) * (populationSize || 0)).toLocaleString() + ' Candidate Formulas'">10,000 Candidate Formulas</span>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[10px] text-slate-400 mb-1">
+                        <span>SEED GOVERNOR</span>
+                        <button @click="randomizeSeed()" class="text-emerald-400 hover:text-emerald-300 text-[10px]">🎲 Randomize</button>
+                    </div>
+                    <input type="number" x-model.number="randomSeed" placeholder="Seed (e.g. 42 or leave blank)"
+                           class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
+                </div>
+                <div class="flex space-x-2 pt-1">
+                    <button @click="startEvolution()"
+                            class="flex-1 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition">
+                        ⚡ EVOLVE
+                    </button>
+                    <button @click="abortEvolution()"
+                            class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
+                        ABORT
+                    </button>
+                </div>
+            </div>
+
+            <!-- Node 3: Risk Sentry & Microstructure Safeguard -->
+            <div class="node-card p-3 rounded-lg space-y-2 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        Node 3: Risk Sentry
+                    </span>
+                    <span class="text-[10px] text-emerald-400 font-bold">ARMED</span>
+                </div>
+                <div class="text-[11px] text-slate-400 space-y-1">
+                    <div class="flex justify-between">
+                        <span>Statutory DP Floor:</span>
+                        <span class="text-white font-bold">₹15,930 (MIS Route)</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Lower-Circuit Trap:</span>
+                        <span class="text-white font-bold">Synthetic NIFTYBEES</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Headless Watchdog:</span>
+                        <span class="text-emerald-400 font-bold">QuickAuth 2FA</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Column: Tactical Deck & Visualizers -->
+        <main class="flex-1 flex flex-col bg-slate-900 overflow-hidden">
+            <!-- Tactical Tabs -->
+            <div class="bg-slate-950 border-b border-slate-800 px-4 flex items-center justify-between text-xs">
+                <div class="flex space-x-1 py-1.5">
+                    <button @click="setTab('tactical')"
+                            :class="activeTab === 'tactical' ? 'bg-slate-800 text-white border-b-2 border-blue-400' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3.5 py-1.5 font-medium rounded-t transition">
+                        🗺 MAP-Elites Grid (20x20 Heatmap)
+                    </button>
+                    <button @click="setTab('manifold')"
+                            :class="activeTab === 'manifold' ? 'bg-slate-800 text-white border-b-2 border-purple-400' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3.5 py-1.5 font-medium rounded-t transition">
+                        🌌 3D Phenotype Manifold
+                    </button>
+                    <button @click="setTab('cosine')"
+                            :class="activeTab === 'cosine' ? 'bg-slate-800 text-white border-b-2 border-emerald-400' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3.5 py-1.5 font-medium rounded-t transition">
+                        🧬 1024D Protein Latent Space
+                    </button>
+                    <button @click="setTab('leaderboard')"
+                            :class="activeTab === 'leaderboard' ? 'bg-slate-800 text-white border-b-2 border-amber-400' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3.5 py-1.5 font-medium rounded-t transition">
+                        🏆 Resident Champions (AG Grid)
+                    </button>
+                    <button @click="setTab('telemetry')"
+                            :class="activeTab === 'telemetry' ? 'bg-slate-800 text-white border-b-2 border-slate-400' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3.5 py-1.5 font-medium rounded-t transition">
+                        📟 Streaming Audit Log
+                    </button>
+                </div>
+                <div class="text-slate-500 text-[11px] flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Differential SSE Bus: Port 7860
+                </div>
+            </div>
+
+            <!-- Tab Content 1: 20x20 MAP-Elites WebGL Behavioral Heatmap -->
+            <div x-show="activeTab === 'tactical'" class="flex-1 p-3 flex flex-col space-y-2">
+                <!-- Heatmap Sub-Controls Ribbon -->
+                <div class="flex items-center justify-between bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded text-xs">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-slate-400 font-semibold">COLOR METRIC:</span>
+                        <select x-model="gridMetric" @change="fetchGridMatrix()" class="bg-slate-900 border border-slate-700 text-white text-xs rounded px-2 py-0.5">
+                            <option value="fitness">Sharpe / Fitness</option>
+                            <option value="net_return_pct">Net Return %</option>
+                            <option value="cagr_pct">CAGR %</option>
+                            <option value="max_drawdown">Max Drawdown %</option>
+                            <option value="win_rate">Win Rate %</option>
+                            <option value="trades_count">Trades Count</option>
+                        </select>
+                        <button @click="fetchGridMatrix()" class="text-xs text-blue-400 hover:text-blue-300 underline">
+                            🔄 Reload Grid
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-slate-400">Illuminated Niches: <span class="text-emerald-400 font-bold" x-text="gridOccupiedCount + '/400'">0/400</span></span>
+                        <span class="text-slate-400">Occupancy: <span class="text-cyan-400 font-bold" x-text="gridOccupancy + '%'">0.0%</span></span>
+                    </div>
+                </div>
+                <div id="mapElitesChart" class="flex-1 w-full rounded border border-slate-800"></div>
+            </div>
+
+            <!-- Tab Content 2: 3D Phenotype Manifold (UMAP & HDBSCAN Clones Pruner) -->
+            <div x-show="activeTab === 'manifold'" class="flex-1 p-3 flex flex-col space-y-2">
+                <div class="flex items-center justify-between bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded text-xs">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-slate-400 font-semibold">PROJECTION:</span>
+                        <select x-model="manifoldMethod" @change="fetchManifold()" class="bg-slate-900 border border-slate-700 text-white text-xs rounded px-2 py-0.5">
+                            <option value="auto">Auto (UMAP &le;30 / SVD >30)</option>
+                            <option value="fast">Fast SVD (Instant &lt;2ms)</option>
+                            <option value="umap">UMAP Non-Linear</option>
+                        </select>
+                        <button @click="fetchManifold()" class="text-xs text-purple-400 hover:text-purple-300 underline">
+                            🔄 Recompute Manifold
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-slate-400">Clusters: <span class="text-purple-400 font-bold" x-text="manifoldClusters">0</span></span>
+                        <span class="text-slate-400">Occam Compression: <span class="text-emerald-400 font-bold" x-text="manifoldCompression + '%'">0.0%</span></span>
+                    </div>
+                </div>
+                <div id="manifoldChart3d" class="flex-1 w-full rounded border border-slate-800"></div>
+            </div>
+
+            <!-- Tab Content 3: 1024D Protein Latent Space Cosine Similarity Heatmap -->
+            <div x-show="activeTab === 'cosine'" class="flex-1 p-3 flex flex-col space-y-2">
+                <div class="flex items-center justify-between bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded text-xs">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-slate-400 font-semibold">1024D EMBEDDINGS DIVERSITY:</span>
+                        <span class="text-emerald-400">Unit-Norm Decision & Return Trajectory Cosine Matrix</span>
+                    </div>
+                    <button @click="fetchCosine()" class="text-xs text-emerald-400 hover:text-emerald-300 underline">
+                        🔄 Refresh Cosine Matrix
+                    </button>
+                </div>
+                <div id="cosineHeatmapChart" class="flex-1 w-full rounded border border-slate-800"></div>
+            </div>
+
+            <!-- Tab Content 4: AG Grid Virtualized Champions Table -->
+            <div x-show="activeTab === 'leaderboard'" class="flex-1 p-3 flex flex-col">
+                <div id="leaderboardGrid" class="ag-theme-alpine-dark flex-1 w-full rounded border border-slate-800"></div>
+            </div>
+
+            <!-- Tab Content 5: Real-Time Event Audit Log -->
+            <div x-show="activeTab === 'telemetry'" class="flex-1 p-3 flex flex-col">
+                <div class="flex-1 bg-black/60 rounded border border-slate-800 p-3 overflow-y-auto font-mono text-xs space-y-1">
+                    <template x-for="(l, idx) in logs" :key="idx">
+                        <div class="flex items-start space-x-2">
+                            <span class="text-slate-500" x-text="l.time"></span>
+                            <span :class="{
+                                'text-emerald-400': l.type === 'success',
+                                'text-red-400': l.type === 'error',
+                                'text-amber-400': l.type === 'warning',
+                                'text-slate-300': l.type === 'info'
+                            }" x-text="l.msg"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
