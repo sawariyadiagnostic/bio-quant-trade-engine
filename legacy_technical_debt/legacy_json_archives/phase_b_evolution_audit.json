@@ -1,0 +1,205 @@
+{
+  "dataset_rows": 1233,
+  "generations_run": 10,
+  "population_size": 40,
+  "archive_resident_count": 17,
+  "archive_occupancy_pct": 4.25,
+  "generational_history": [
+    {
+      "generation": 1,
+      "offspring_count": 40,
+      "thymic_survivors": 9,
+      "archive_inserted": 5,
+      "total_elites": 4,
+      "archive_occupancy_pct": 1.0
+    },
+    {
+      "generation": 2,
+      "offspring_count": 40,
+      "thymic_survivors": 10,
+      "archive_inserted": 6,
+      "total_elites": 7,
+      "archive_occupancy_pct": 1.75
+    },
+    {
+      "generation": 3,
+      "offspring_count": 40,
+      "thymic_survivors": 11,
+      "archive_inserted": 4,
+      "total_elites": 8,
+      "archive_occupancy_pct": 2.0
+    },
+    {
+      "generation": 4,
+      "offspring_count": 40,
+      "thymic_survivors": 11,
+      "archive_inserted": 3,
+      "total_elites": 9,
+      "archive_occupancy_pct": 2.25
+    },
+    {
+      "generation": 5,
+      "offspring_count": 40,
+      "thymic_survivors": 12,
+      "archive_inserted": 4,
+      "total_elites": 9,
+      "archive_occupancy_pct": 2.25
+    },
+    {
+      "generation": 6,
+      "offspring_count": 40,
+      "thymic_survivors": 14,
+      "archive_inserted": 4,
+      "total_elites": 10,
+      "archive_occupancy_pct": 2.5
+    },
+    {
+      "generation": 7,
+      "offspring_count": 40,
+      "thymic_survivors": 16,
+      "archive_inserted": 3,
+      "total_elites": 12,
+      "archive_occupancy_pct": 3.0
+    },
+    {
+      "generation": 8,
+      "offspring_count": 40,
+      "thymic_survivors": 15,
+      "archive_inserted": 4,
+      "total_elites": 13,
+      "archive_occupancy_pct": 3.25
+    },
+    {
+      "generation": 9,
+      "offspring_count": 40,
+      "thymic_survivors": 27,
+      "archive_inserted": 12,
+      "total_elites": 16,
+      "archive_occupancy_pct": 4.0
+    },
+    {
+      "generation": 10,
+      "offspring_count": 40,
+      "thymic_survivors": 21,
+      "archive_inserted": 3,
+      "total_elites": 17,
+      "archive_occupancy_pct": 4.25
+    }
+  ],
+  "top_elites": [
+    {
+      "rank": 1,
+      "net_calmar": 19712.698,
+      "win_rate_pct": 77.63,
+      "net_return_pct": 259807.07,
+      "annualized_volatility": 0.2323,
+      "annualized_turnover": 0.61,
+      "tree_depth": 3,
+      "tree_size": 3,
+      "formula_str": "TS_MAX_10(DELTA_5(TR_Expansion))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 2,
+      "net_calmar": 17860.101,
+      "win_rate_pct": 77.67,
+      "net_return_pct": 235390.44,
+      "annualized_volatility": 0.232,
+      "annualized_turnover": 2.66,
+      "tree_depth": 5,
+      "tree_size": 6,
+      "formula_str": "SIGN(TS_MAX_10(DELTA_5((True_Range - EMA_Slope))))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 3,
+      "net_calmar": 8788.275,
+      "win_rate_pct": 78.37,
+      "net_return_pct": 115272.97,
+      "annualized_volatility": 0.2109,
+      "annualized_turnover": 7.98,
+      "tree_depth": 8,
+      "tree_size": 17,
+      "formula_str": "(TS_MAX_10((Dist_VWAP + SP500_Ret)) * LOG_ABS(SIGMOID(TS_RANK_20(((SP500_Ret + TS_MIN_10(Vol_Price_Flow)) / SIGN((Dist_VWAP * ADR_Ret)))))))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 4,
+      "net_calmar": 2074.541,
+      "win_rate_pct": 77.58,
+      "net_return_pct": 27329.78,
+      "annualized_volatility": 0.1902,
+      "annualized_turnover": 19.84,
+      "tree_depth": 3,
+      "tree_size": 3,
+      "formula_str": "TS_RANK_20(EMA_10(Dist_VWAP))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 5,
+      "net_calmar": 1123.44,
+      "win_rate_pct": 78.37,
+      "net_return_pct": 5899.16,
+      "annualized_volatility": 0.1493,
+      "annualized_turnover": 34.77,
+      "tree_depth": 5,
+      "tree_size": 6,
+      "formula_str": "DELTA_5(EMA_10(DELTA_5((Dist_VWAP + SP500_Ret))))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    }
+  ]
+}

@@ -1,0 +1,672 @@
+{
+  "S&P 500 -> NIFTYBEES": {
+    "statistics": {
+      "pair": "S&P 500 -> NIFTYBEES",
+      "total_sessions": 475,
+      "pearson_corr": 0.132,
+      "directional_match_pct": 59.79,
+      "us_green_stats": {
+        "sessions": 259,
+        "india_gap_up_pct": 76.06,
+        "avg_gap_bps": 43.0
+      },
+      "us_red_stats": {
+        "sessions": 216,
+        "india_gap_down_pct": 40.28,
+        "avg_gap_bps": 22.3
+      },
+      "strong_us_green_stats": {
+        "sessions": 140,
+        "india_gap_up_pct": 77.14,
+        "avg_gap_bps": 46.3
+      },
+      "strong_us_red_stats": {
+        "sessions": 98,
+        "india_gap_down_pct": 45.92,
+        "avg_gap_bps": 10.7
+      }
+    },
+    "simulations": {
+      "1x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 45894.33,
+          "net_profit": 35894.33,
+          "return_pct": 358.94,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -3.89
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 29283.33,
+          "net_profit": 19283.33,
+          "return_pct": 192.83,
+          "total_trades": 259,
+          "winning_trades": 197,
+          "win_rate_pct": 76.06,
+          "max_drawdown_pct": -3.54
+        }
+      },
+      "2x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 182028.17,
+          "net_profit": 172028.17,
+          "return_pct": 1720.28,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -7.91
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 79006.47,
+          "net_profit": 69006.47,
+          "return_pct": 690.06,
+          "total_trades": 259,
+          "winning_trades": 197,
+          "win_rate_pct": 76.06,
+          "max_drawdown_pct": -7.11
+        }
+      },
+      "3x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 701923.35,
+          "net_profit": 691923.35,
+          "return_pct": 6919.23,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -11.93
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 209429.72,
+          "net_profit": 199429.72,
+          "return_pct": 1994.3,
+          "total_trades": 259,
+          "winning_trades": 197,
+          "win_rate_pct": 76.06,
+          "max_drawdown_pct": -10.64
+        }
+      },
+      "5x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 9614044.55,
+          "net_profit": 9604044.55,
+          "return_pct": 96040.45,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -19.77
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 1397648.34,
+          "net_profit": 1387648.34,
+          "return_pct": 13876.48,
+          "total_trades": 259,
+          "winning_trades": 197,
+          "win_rate_pct": 76.06,
+          "max_drawdown_pct": -17.6
+        }
+      }
+    }
+  },
+  "NASDAQ -> NIFTYBEES": {
+    "statistics": {
+      "pair": "NASDAQ -> NIFTYBEES",
+      "total_sessions": 475,
+      "pearson_corr": 0.139,
+      "directional_match_pct": 57.68,
+      "us_green_stats": {
+        "sessions": 263,
+        "india_gap_up_pct": 73.76,
+        "avg_gap_bps": 42.8
+      },
+      "us_red_stats": {
+        "sessions": 212,
+        "india_gap_down_pct": 37.74,
+        "avg_gap_bps": 22.2
+      },
+      "strong_us_green_stats": {
+        "sessions": 165,
+        "india_gap_up_pct": 76.97,
+        "avg_gap_bps": 42.6
+      },
+      "strong_us_red_stats": {
+        "sessions": 130,
+        "india_gap_down_pct": 42.31,
+        "avg_gap_bps": 17.7
+      }
+    },
+    "simulations": {
+      "1x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 45894.33,
+          "net_profit": 35894.33,
+          "return_pct": 358.94,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -3.89
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 29555.41,
+          "net_profit": 19555.41,
+          "return_pct": 195.55,
+          "total_trades": 263,
+          "winning_trades": 194,
+          "win_rate_pct": 73.76,
+          "max_drawdown_pct": -3.54
+        }
+      },
+      "2x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 182028.17,
+          "net_profit": 172028.17,
+          "return_pct": 1720.28,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -7.91
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 80214.95,
+          "net_profit": 70214.95,
+          "return_pct": 702.15,
+          "total_trades": 263,
+          "winning_trades": 194,
+          "win_rate_pct": 73.76,
+          "max_drawdown_pct": -7.11
+        }
+      },
+      "3x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 701923.35,
+          "net_profit": 691923.35,
+          "return_pct": 6919.23,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -11.93
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 213420.66,
+          "net_profit": 203420.66,
+          "return_pct": 2034.21,
+          "total_trades": 263,
+          "winning_trades": 194,
+          "win_rate_pct": 73.76,
+          "max_drawdown_pct": -10.64
+        }
+      },
+      "5x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 9614044.55,
+          "net_profit": 9604044.55,
+          "return_pct": 96040.45,
+          "total_trades": 475,
+          "winning_trades": 326,
+          "win_rate_pct": 68.63,
+          "max_drawdown_pct": -19.77
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 1425741.84,
+          "net_profit": 1415741.84,
+          "return_pct": 14157.42,
+          "total_trades": 263,
+          "winning_trades": 194,
+          "win_rate_pct": 73.76,
+          "max_drawdown_pct": -17.6
+        }
+      }
+    }
+  },
+  "INFY ADR (NYSE) -> INFY.NS (NSE)": {
+    "statistics": {
+      "pair": "INFY ADR (NYSE) -> INFY.NS (NSE)",
+      "total_sessions": 475,
+      "pearson_corr": 0.639,
+      "directional_match_pct": 67.79,
+      "us_green_stats": {
+        "sessions": 215,
+        "india_gap_up_pct": 70.7,
+        "avg_gap_bps": 52.9
+      },
+      "us_red_stats": {
+        "sessions": 260,
+        "india_gap_down_pct": 65.38,
+        "avg_gap_bps": -46.1
+      },
+      "strong_us_green_stats": {
+        "sessions": 165,
+        "india_gap_up_pct": 73.33,
+        "avg_gap_bps": 64.0
+      },
+      "strong_us_red_stats": {
+        "sessions": 186,
+        "india_gap_down_pct": 72.58,
+        "avg_gap_bps": -67.1
+      }
+    },
+    "simulations": {
+      "1x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 8071.85,
+          "net_profit": -1928.15,
+          "return_pct": -19.28,
+          "total_trades": 475,
+          "winning_trades": 242,
+          "win_rate_pct": 50.95,
+          "max_drawdown_pct": -29.47
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 29194.32,
+          "net_profit": 19194.32,
+          "return_pct": 191.94,
+          "total_trades": 215,
+          "winning_trades": 152,
+          "win_rate_pct": 70.7,
+          "max_drawdown_pct": -2.06
+        }
+      },
+      "2x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 5394.48,
+          "net_profit": -4605.52,
+          "return_pct": -46.06,
+          "total_trades": 475,
+          "winning_trades": 242,
+          "win_rate_pct": 50.95,
+          "max_drawdown_pct": -56.91
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 78849.8,
+          "net_profit": 68849.8,
+          "return_pct": 688.5,
+          "total_trades": 215,
+          "winning_trades": 152,
+          "win_rate_pct": 70.7,
+          "max_drawdown_pct": -4.16
+        }
+      },
+      "3x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 3347.39,
+          "net_profit": -6652.61,
+          "return_pct": -66.53,
+          "total_trades": 475,
+          "winning_trades": 242,
+          "win_rate_pct": 50.95,
+          "max_drawdown_pct": -75.14
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 207972.81,
+          "net_profit": 197972.81,
+          "return_pct": 1979.73,
+          "total_trades": 215,
+          "winning_trades": 152,
+          "win_rate_pct": 70.7,
+          "max_drawdown_pct": -6.24
+        }
+      },
+      "5x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 1016.72,
+          "net_profit": -8983.28,
+          "return_pct": -89.83,
+          "total_trades": 475,
+          "winning_trades": 242,
+          "win_rate_pct": 50.95,
+          "max_drawdown_pct": -93.13
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 1352726.01,
+          "net_profit": 1342726.01,
+          "return_pct": 13427.26,
+          "total_trades": 215,
+          "winning_trades": 152,
+          "win_rate_pct": 70.7,
+          "max_drawdown_pct": -10.32
+        }
+      }
+    }
+  },
+  "HDFC ADR (NYSE) -> HDFCBANK.NS (NSE)": {
+    "statistics": {
+      "pair": "HDFC ADR (NYSE) -> HDFCBANK.NS (NSE)",
+      "total_sessions": 474,
+      "pearson_corr": 0.474,
+      "directional_match_pct": 64.14,
+      "us_green_stats": {
+        "sessions": 231,
+        "india_gap_up_pct": 61.9,
+        "avg_gap_bps": 19.0
+      },
+      "us_red_stats": {
+        "sessions": 243,
+        "india_gap_down_pct": 66.26,
+        "avg_gap_bps": -31.7
+      },
+      "strong_us_green_stats": {
+        "sessions": 152,
+        "india_gap_up_pct": 69.74,
+        "avg_gap_bps": 33.3
+      },
+      "strong_us_red_stats": {
+        "sessions": 171,
+        "india_gap_down_pct": 69.01,
+        "avg_gap_bps": -37.1
+      }
+    },
+    "simulations": {
+      "1x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 6262.16,
+          "net_profit": -3737.84,
+          "return_pct": -37.38,
+          "total_trades": 474,
+          "winning_trades": 225,
+          "win_rate_pct": 47.47,
+          "max_drawdown_pct": -42.49
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 14533.64,
+          "net_profit": 4533.64,
+          "return_pct": 45.34,
+          "total_trades": 231,
+          "winning_trades": 143,
+          "win_rate_pct": 61.9,
+          "max_drawdown_pct": -3.92
+        }
+      },
+      "2x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 3349.52,
+          "net_profit": -6650.48,
+          "return_pct": -66.5,
+          "total_trades": 474,
+          "winning_trades": 225,
+          "win_rate_pct": 47.47,
+          "max_drawdown_pct": -71.44
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 19658.61,
+          "net_profit": 9658.61,
+          "return_pct": 96.59,
+          "total_trades": 231,
+          "winning_trades": 143,
+          "win_rate_pct": 61.9,
+          "max_drawdown_pct": -8.05
+        }
+      },
+      "3x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 1716.28,
+          "net_profit": -8283.72,
+          "return_pct": -82.84,
+          "total_trades": 474,
+          "winning_trades": 225,
+          "win_rate_pct": 47.47,
+          "max_drawdown_pct": -86.39
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 26207.01,
+          "net_profit": 16207.01,
+          "return_pct": 162.07,
+          "total_trades": 231,
+          "winning_trades": 143,
+          "win_rate_pct": 61.9,
+          "max_drawdown_pct": -12.11
+        }
+      },
+      "5x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 390.76,
+          "net_profit": -9609.24,
+          "return_pct": -96.09,
+          "total_trades": 474,
+          "winning_trades": 225,
+          "win_rate_pct": 47.47,
+          "max_drawdown_pct": -97.31
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 44630.95,
+          "net_profit": 34630.95,
+          "return_pct": 346.31,
+          "total_trades": 231,
+          "winning_trades": 143,
+          "win_rate_pct": 61.9,
+          "max_drawdown_pct": -19.96
+        }
+      }
+    }
+  },
+  "ICICI ADR (NYSE) -> ICICIBANK.NS (NSE)": {
+    "statistics": {
+      "pair": "ICICI ADR (NYSE) -> ICICIBANK.NS (NSE)",
+      "total_sessions": 475,
+      "pearson_corr": 0.4,
+      "directional_match_pct": 61.89,
+      "us_green_stats": {
+        "sessions": 213,
+        "india_gap_up_pct": 61.5,
+        "avg_gap_bps": 15.3
+      },
+      "us_red_stats": {
+        "sessions": 262,
+        "india_gap_down_pct": 62.21,
+        "avg_gap_bps": -15.9
+      },
+      "strong_us_green_stats": {
+        "sessions": 145,
+        "india_gap_up_pct": 67.59,
+        "avg_gap_bps": 25.2
+      },
+      "strong_us_red_stats": {
+        "sessions": 157,
+        "india_gap_down_pct": 72.61,
+        "avg_gap_bps": -34.2
+      }
+    },
+    "simulations": {
+      "1x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 8014.3,
+          "net_profit": -1985.7,
+          "return_pct": -19.86,
+          "total_trades": 475,
+          "winning_trades": 230,
+          "win_rate_pct": 48.42,
+          "max_drawdown_pct": -26.25
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 1.0,
+          "initial_capital": 10000.0,
+          "final_capital": 13081.86,
+          "net_profit": 3081.86,
+          "return_pct": 30.82,
+          "total_trades": 213,
+          "winning_trades": 131,
+          "win_rate_pct": 61.5,
+          "max_drawdown_pct": -4.33
+        }
+      },
+      "2x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 5575.8,
+          "net_profit": -4424.2,
+          "return_pct": -44.24,
+          "total_trades": 475,
+          "winning_trades": 230,
+          "win_rate_pct": 48.42,
+          "max_drawdown_pct": -49.84
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 2.0,
+          "initial_capital": 10000.0,
+          "final_capital": 16093.05,
+          "net_profit": 6093.05,
+          "return_pct": 60.93,
+          "total_trades": 213,
+          "winning_trades": 131,
+          "win_rate_pct": 61.5,
+          "max_drawdown_pct": -9.49
+        }
+      },
+      "3x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 3786.41,
+          "net_profit": -6213.59,
+          "return_pct": -62.14,
+          "total_trades": 475,
+          "winning_trades": 230,
+          "win_rate_pct": 48.42,
+          "max_drawdown_pct": -66.98
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 3.0,
+          "initial_capital": 10000.0,
+          "final_capital": 19625.27,
+          "net_profit": 9625.27,
+          "return_pct": 96.25,
+          "total_trades": 213,
+          "winning_trades": 131,
+          "win_rate_pct": 61.5,
+          "max_drawdown_pct": -14.84
+        }
+      },
+      "5x": {
+        "unfiltered": {
+          "filtered": false,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 1623.61,
+          "net_profit": -8376.39,
+          "return_pct": -83.76,
+          "total_trades": 475,
+          "winning_trades": 230,
+          "win_rate_pct": 48.42,
+          "max_drawdown_pct": -86.66
+        },
+        "us_lead_lag_filtered": {
+          "filtered": true,
+          "leverage": 5.0,
+          "initial_capital": 10000.0,
+          "final_capital": 28454.81,
+          "net_profit": 18454.81,
+          "return_pct": 184.55,
+          "total_trades": 213,
+          "winning_trades": 131,
+          "win_rate_pct": 61.5,
+          "max_drawdown_pct": -24.96
+        }
+      }
+    }
+  }
+}

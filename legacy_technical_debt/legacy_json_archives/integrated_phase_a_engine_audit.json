@@ -1,0 +1,44 @@
+{
+  "NIFTYBEES_1x": {
+    "tier": "TIER1_DAILY_ETF",
+    "leverage": 1.0,
+    "final_capital": 69446.08,
+    "net_profit": 59446.08,
+    "return_pct": 594.46,
+    "win_rate_pct": 76.42,
+    "max_drawdown_pct": -3.39,
+    "total_trades": 475
+  },
+  "NIFTYBEES_5x": {
+    "tier": "TIER1_DAILY_ETF",
+    "leverage": 5.0,
+    "final_capital": 74083742.43,
+    "net_profit": 74073742.43,
+    "return_pct": 740737.42,
+    "win_rate_pct": 76.0,
+    "max_drawdown_pct": -16.89,
+    "total_trades": 475
+  },
+  "INFY_ADR_FILTERED_1x": {
+    "tier": "TIER2_ADR_LEAD_EQUITY",
+    "leverage": 1.0,
+    "final_capital": 93598.21,
+    "net_profit": 83598.21,
+    "return_pct": 835.98,
+    "active_trades": 206,
+    "idle_sessions": 269,
+    "active_win_rate_pct": 79.13,
+    "max_drawdown_pct": -2.4
+  },
+  "INFY_ADR_FILTERED_5x": {
+    "tier": "TIER2_ADR_LEAD_EQUITY",
+    "leverage": 5.0,
+    "final_capital": 2599194450.15,
+    "net_profit": 2599184450.15,
+    "return_pct": 25991844.5,
+    "active_trades": 206,
+    "idle_sessions": 269,
+    "active_win_rate_pct": 79.13,
+    "max_drawdown_pct": -9.27
+  }
+}

@@ -1,0 +1,298 @@
+{
+  "timestamp": "2026-10-31 11:45:09",
+  "colab_url": "https://proxy-defence-cliff-strikes.trycloudflare.com",
+  "device": "Tesla T4",
+  "total_time_seconds": 121.0,
+  "total_formulas_evaluated": 18300,
+  "total_elites_harvested": 399,
+  "assets": {
+    "NIFTYBEES": {
+      "ticker": "NIFTYBEES.NS",
+      "description": "Benchmark Nifty 50 ETF (5Y Horizon - Low Friction 1.2 bps)",
+      "lookback": "5y",
+      "resident_count": 54,
+      "archive_file": "audit\\archive_NIFTYBEES.json",
+      "duration_sec": 14.8,
+      "top_earner": {
+        "net_return_pct": 342330.92,
+        "max_drawdown": 13.18,
+        "win_rate": 77.87,
+        "calmar_cias": 12.24,
+        "formula": "TS_MAX_10(TS_MIN_10(Spread))"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 22.7,
+        "max_drawdown": 0.14,
+        "win_rate": 80.0,
+        "calmar_cias": 568072.9,
+        "formula": "((Spread - RSI_14) / EMA_10(Open))"
+      },
+      "top_win_rate": {
+        "net_return_pct": 298.58,
+        "max_drawdown": 13.18,
+        "win_rate": 87.32,
+        "calmar_cias": 16.49,
+        "formula": "(Garman_Klass_Vol - (RSI_14 + Spread))"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 17.0,
+        "max_drawdown": 0.12,
+        "win_rate": 85.0,
+        "calmar_cias": 467.57,
+        "formula": "(Dist_VWAP - RSI_14)"
+      }
+    },
+    "NIFTYBEES_10Y": {
+      "ticker": "NIFTYBEES.NS",
+      "description": "Benchmark Nifty 50 ETF (10Y Full Cycle Macro Horizon)",
+      "lookback": "10y",
+      "resident_count": 96,
+      "archive_file": "audit\\archive_NIFTYBEES_10Y.json",
+      "duration_sec": 13.7,
+      "top_earner": {
+        "net_return_pct": 130641390140.25,
+        "max_drawdown": 20.58,
+        "win_rate": 74.85,
+        "calmar_cias": 18.32,
+        "formula": "TS_MAX_10(Vol_ZScore)"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 22.7,
+        "max_drawdown": 0.14,
+        "win_rate": 80.0,
+        "calmar_cias": 568072.9,
+        "formula": "((Spread - RSI_14) / EMA_10(Open))"
+      },
+      "top_win_rate": {
+        "net_return_pct": 298.58,
+        "max_drawdown": 13.18,
+        "win_rate": 87.32,
+        "calmar_cias": 16.49,
+        "formula": "(Garman_Klass_Vol - (RSI_14 + Spread))"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 17.0,
+        "max_drawdown": 0.12,
+        "win_rate": 85.0,
+        "calmar_cias": 467.57,
+        "formula": "(Dist_VWAP - RSI_14)"
+      }
+    },
+    "BANKBEES": {
+      "ticker": "BANKBEES.NS",
+      "description": "High-Beta Banking Sector ETF (5Y Horizon)",
+      "lookback": "5y",
+      "resident_count": 41,
+      "archive_file": "audit\\archive_BANKBEES.json",
+      "duration_sec": 14.9,
+      "top_earner": {
+        "net_return_pct": 6486.21,
+        "max_drawdown": 5.57,
+        "win_rate": 71.02,
+        "calmar_cias": 27.72,
+        "formula": "Downside_Vol_Ratio"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 13.72,
+        "max_drawdown": 0.11,
+        "win_rate": 86.67,
+        "calmar_cias": 142438.36,
+        "formula": "TS_MAX_10((SP500_Ret - TR_Expansion))"
+      },
+      "top_win_rate": {
+        "net_return_pct": 13.72,
+        "max_drawdown": 0.11,
+        "win_rate": 86.67,
+        "calmar_cias": 142438.36,
+        "formula": "TS_MAX_10((SP500_Ret - TR_Expansion))"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 2.29,
+        "max_drawdown": 0.1,
+        "win_rate": 73.33,
+        "calmar_cias": 99.19,
+        "formula": "(EMA_10(Vol_Price_Flow) - (True_Range - SP500_Ret))"
+      }
+    },
+    "HAL": {
+      "ticker": "HAL.NS",
+      "description": "Hindustan Aeronautics (Sovereign Capex Momentum Leader)",
+      "lookback": "5y",
+      "resident_count": 59,
+      "archive_file": "audit\\archive_HAL.json",
+      "duration_sec": 14.6,
+      "top_earner": {
+        "net_return_pct": 2.0343335299966031e+18,
+        "max_drawdown": 8.62,
+        "win_rate": 94.63,
+        "calmar_cias": 97.28,
+        "formula": "TS_MAX_10(TS_RANK_20(EMA_Slope))"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 2079.95,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 2829.91,
+        "formula": "(ADR_Ret - Dist_VWAP)"
+      },
+      "top_win_rate": {
+        "net_return_pct": 11.55,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 302.12,
+        "formula": "TS_MIN_10(Vol_ZScore)"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 11.55,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 302.12,
+        "formula": "TS_MIN_10(Vol_ZScore)"
+      }
+    },
+    "BEL": {
+      "ticker": "BEL.NS",
+      "description": "Bharat Electronics (Defense Systems Leader)",
+      "lookback": "5y",
+      "resident_count": 55,
+      "archive_file": "audit\\archive_BEL.json",
+      "duration_sec": 11.9,
+      "top_earner": {
+        "net_return_pct": 1694940885746930.0,
+        "max_drawdown": 7.48,
+        "win_rate": 92.59,
+        "calmar_cias": 97.14,
+        "formula": "LOG_ABS((Vol_Price_Flow - Garman_Klass_Vol))"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 169847215108.1,
+        "max_drawdown": 0.42,
+        "win_rate": 99.8,
+        "calmar_cias": 1680846.59,
+        "formula": "SIGN((Spread - Garman_Klass_Vol))"
+      },
+      "top_win_rate": {
+        "net_return_pct": 62.86,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 773.21,
+        "formula": "DELTA_5(SIGN(Garman_Klass_Vol))"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 62.86,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 773.21,
+        "formula": "DELTA_5(SIGN(Garman_Klass_Vol))"
+      }
+    },
+    "INFY": {
+      "ticker": "INFY.NS",
+      "description": "Infosys (IT Clade High-Beta Overnight Leader)",
+      "lookback": "5y",
+      "resident_count": 31,
+      "archive_file": "audit\\archive_INFY.json",
+      "duration_sec": 12.2,
+      "top_earner": {
+        "net_return_pct": 1.8669830354742586e+40,
+        "max_drawdown": 7.68,
+        "win_rate": 95.78,
+        "calmar_cias": 249.1,
+        "formula": "(Parkinson_Vol + Vol_Price_Flow)"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 2283962885307.39,
+        "max_drawdown": 2.89,
+        "win_rate": 99.75,
+        "calmar_cias": 2338450.01,
+        "formula": "TS_MIN_10((Open / Dist_VWAP))"
+      },
+      "top_win_rate": {
+        "net_return_pct": 42.99,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 586.88,
+        "formula": "((Spread / Garman_Klass_Vol) - RSI_14)"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 42.99,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 586.88,
+        "formula": "((Spread / Garman_Klass_Vol) - RSI_14)"
+      }
+    },
+    "RELIANCE": {
+      "ticker": "RELIANCE.NS",
+      "description": "Reliance Industries (Heavyweight Mega-Cap)",
+      "lookback": "5y",
+      "resident_count": 31,
+      "archive_file": "audit\\archive_RELIANCE.json",
+      "duration_sec": 11.4,
+      "top_earner": {
+        "net_return_pct": 113478491.31,
+        "max_drawdown": 5.54,
+        "win_rate": 91.63,
+        "calmar_cias": 64.76,
+        "formula": "((Vol_ZScore + Downside_Vol_Ratio) + SIGMOID(Low))"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 231.57,
+        "max_drawdown": 0.13,
+        "win_rate": 98.7,
+        "calmar_cias": 606144.35,
+        "formula": "((Vol_Price_Flow / Downside_Vol_Ratio) - (ADR_Ret + Garman_Klass_Vol))"
+      },
+      "top_win_rate": {
+        "net_return_pct": 390.01,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 616.51,
+        "formula": "EMA_10((Spread - Garman_Klass_Vol))"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 390.01,
+        "max_drawdown": 0.03,
+        "win_rate": 100.0,
+        "calmar_cias": 616.51,
+        "formula": "EMA_10((Spread - Garman_Klass_Vol))"
+      }
+    },
+    "NIFTY_50": {
+      "ticker": "^NSEI",
+      "description": "Nifty 50 Pure Continuous Spot Index",
+      "lookback": "5y",
+      "resident_count": 32,
+      "archive_file": "audit\\archive_NIFTY_50.json",
+      "duration_sec": 11.4,
+      "top_earner": {
+        "net_return_pct": 112.42,
+        "max_drawdown": 9.39,
+        "win_rate": 61.42,
+        "calmar_cias": 2.04,
+        "formula": "TS_RANK_20(TS_RANK_20(EMA_Slope))"
+      },
+      "top_institutional_calmar": {
+        "net_return_pct": 16.46,
+        "max_drawdown": 3.07,
+        "win_rate": 63.48,
+        "calmar_cias": 5.35,
+        "formula": "DELTA_5(SIGN(Dist_EMA20))"
+      },
+      "top_win_rate": {
+        "net_return_pct": 5.9,
+        "max_drawdown": 3.01,
+        "win_rate": 64.76,
+        "calmar_cias": 3.45,
+        "formula": "TS_MIN_10(DELTA_5(Low))"
+      },
+      "lowest_drawdown": {
+        "net_return_pct": 0.27,
+        "max_drawdown": 1.82,
+        "win_rate": 63.16,
+        "calmar_cias": 0.3,
+        "formula": "DELTA_5(TS_RANK_20(Global_Confluence))"
+      }
+    }
+  }
+}

@@ -1,0 +1,525 @@
+{
+  "analysis_period": "2025-10-29 to 2026-10-29 (1 Year / 250 Sessions)",
+  "results": {
+    "sp500_to_niftybees": {
+      "asset_pair": "S&P 500 (US) -> NIFTYBEES (India)",
+      "aligned_sessions": 475,
+      "pearson_correlation": 0.132,
+      "overall_directional_hit_rate_pct": 59.79,
+      "when_us_is_green": {
+        "sessions": 259,
+        "india_gap_up_probability_pct": 76.06,
+        "avg_india_gap_bps": 43.0
+      },
+      "when_us_is_red": {
+        "sessions": 216,
+        "india_gap_down_probability_pct": 40.28,
+        "avg_india_gap_bps": 22.3
+      },
+      "strong_us_signal_filter": {
+        "us_surge_above_50bps": {
+          "sessions": 140,
+          "india_gap_up_win_rate_pct": 77.14,
+          "avg_india_gap_bps": 46.2
+        },
+        "us_drop_below_minus_50bps": {
+          "sessions": 99,
+          "india_gap_down_rate_pct": 45.45,
+          "avg_india_gap_bps": 10.6
+        }
+      },
+      "recent_aligned_sessions": [
+        {
+          "date_t": "2026-10-14",
+          "date_next": "2026-10-15",
+          "us_day_t_return_pct": -1.11,
+          "india_day_next_gap_pct": 0.39,
+          "india_day_next_close_pct": 1.45,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-15",
+          "date_next": "2026-10-16",
+          "us_day_t_return_pct": 0.33,
+          "india_day_next_gap_pct": 0.0,
+          "india_day_next_close_pct": 0.91,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-16",
+          "date_next": "2026-10-19",
+          "us_day_t_return_pct": -1.09,
+          "india_day_next_gap_pct": 0.3,
+          "india_day_next_close_pct": -1.02,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-19",
+          "date_next": "2026-10-21",
+          "us_day_t_return_pct": 0.41,
+          "india_day_next_gap_pct": 2.0,
+          "india_day_next_close_pct": -0.62,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-21",
+          "date_next": "2026-10-22",
+          "us_day_t_return_pct": 0.58,
+          "india_day_next_gap_pct": 2.0,
+          "india_day_next_close_pct": -0.24,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-22",
+          "date_next": "2026-10-23",
+          "us_day_t_return_pct": -1.21,
+          "india_day_next_gap_pct": 0.77,
+          "india_day_next_close_pct": -0.66,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-23",
+          "date_next": "2026-10-26",
+          "us_day_t_return_pct": -0.52,
+          "india_day_next_gap_pct": 0.26,
+          "india_day_next_close_pct": 0.85,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-26",
+          "date_next": "2026-10-27",
+          "us_day_t_return_pct": 0.7,
+          "india_day_next_gap_pct": 0.0,
+          "india_day_next_close_pct": 0.03,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-27",
+          "date_next": "2026-10-28",
+          "us_day_t_return_pct": 0.6,
+          "india_day_next_gap_pct": -0.08,
+          "india_day_next_close_pct": 0.04,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-28",
+          "date_next": "2026-10-29",
+          "us_day_t_return_pct": 0.28,
+          "india_day_next_gap_pct": 0.54,
+          "india_day_next_close_pct": 0.88,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        }
+      ]
+    },
+    "nasdaq_to_niftybees": {
+      "asset_pair": "NASDAQ (US) -> NIFTYBEES (India)",
+      "aligned_sessions": 475,
+      "pearson_correlation": 0.139,
+      "overall_directional_hit_rate_pct": 57.68,
+      "when_us_is_green": {
+        "sessions": 263,
+        "india_gap_up_probability_pct": 73.76,
+        "avg_india_gap_bps": 42.8
+      },
+      "when_us_is_red": {
+        "sessions": 212,
+        "india_gap_down_probability_pct": 37.74,
+        "avg_india_gap_bps": 22.2
+      },
+      "strong_us_signal_filter": {
+        "us_surge_above_50bps": {
+          "sessions": 165,
+          "india_gap_up_win_rate_pct": 76.97,
+          "avg_india_gap_bps": 42.6
+        },
+        "us_drop_below_minus_50bps": {
+          "sessions": 131,
+          "india_gap_down_rate_pct": 42.75,
+          "avg_india_gap_bps": 17.3
+        }
+      },
+      "recent_aligned_sessions": [
+        {
+          "date_t": "2026-10-14",
+          "date_next": "2026-10-15",
+          "us_day_t_return_pct": -1.88,
+          "india_day_next_gap_pct": 0.39,
+          "india_day_next_close_pct": 1.45,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-15",
+          "date_next": "2026-10-16",
+          "us_day_t_return_pct": 0.08,
+          "india_day_next_gap_pct": 0.0,
+          "india_day_next_close_pct": 0.91,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-16",
+          "date_next": "2026-10-19",
+          "us_day_t_return_pct": -2.15,
+          "india_day_next_gap_pct": 0.3,
+          "india_day_next_close_pct": -1.02,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-19",
+          "date_next": "2026-10-21",
+          "us_day_t_return_pct": 1.11,
+          "india_day_next_gap_pct": 2.0,
+          "india_day_next_close_pct": -0.62,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-21",
+          "date_next": "2026-10-22",
+          "us_day_t_return_pct": 1.05,
+          "india_day_next_gap_pct": 2.0,
+          "india_day_next_close_pct": -0.24,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-22",
+          "date_next": "2026-10-23",
+          "us_day_t_return_pct": -2.6,
+          "india_day_next_gap_pct": 0.77,
+          "india_day_next_close_pct": -0.66,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-23",
+          "date_next": "2026-10-26",
+          "us_day_t_return_pct": -0.21,
+          "india_day_next_gap_pct": 0.26,
+          "india_day_next_close_pct": 0.85,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-26",
+          "date_next": "2026-10-27",
+          "us_day_t_return_pct": 0.82,
+          "india_day_next_gap_pct": 0.0,
+          "india_day_next_close_pct": 0.03,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-27",
+          "date_next": "2026-10-28",
+          "us_day_t_return_pct": 1.18,
+          "india_day_next_gap_pct": -0.08,
+          "india_day_next_close_pct": 0.04,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-28",
+          "date_next": "2026-10-29",
+          "us_day_t_return_pct": 0.27,
+          "india_day_next_gap_pct": 0.54,
+          "india_day_next_close_pct": 0.88,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        }
+      ]
+    },
+    "infy_adr_to_infy_nse": {
+      "asset_pair": "INFY ADR (NYSE) -> INFY.NS (NSE)",
+      "aligned_sessions": 475,
+      "pearson_correlation": 0.639,
+      "overall_directional_hit_rate_pct": 67.79,
+      "when_us_is_green": {
+        "sessions": 215,
+        "india_gap_up_probability_pct": 70.7,
+        "avg_india_gap_bps": 53.0
+      },
+      "when_us_is_red": {
+        "sessions": 260,
+        "india_gap_down_probability_pct": 65.38,
+        "avg_india_gap_bps": -46.1
+      },
+      "strong_us_signal_filter": {
+        "us_surge_above_50bps": {
+          "sessions": 167,
+          "india_gap_up_win_rate_pct": 72.46,
+          "avg_india_gap_bps": 63.1
+        },
+        "us_drop_below_minus_50bps": {
+          "sessions": 187,
+          "india_gap_down_rate_pct": 72.73,
+          "avg_india_gap_bps": -67.5
+        }
+      },
+      "recent_aligned_sessions": [
+        {
+          "date_t": "2026-10-13",
+          "date_next": "2026-10-14",
+          "us_day_t_return_pct": 5.26,
+          "india_day_next_gap_pct": 1.09,
+          "india_day_next_close_pct": 2.44,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-14",
+          "date_next": "2026-10-15",
+          "us_day_t_return_pct": 0.7,
+          "india_day_next_gap_pct": 1.01,
+          "india_day_next_close_pct": 2.02,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-15",
+          "date_next": "2026-10-16",
+          "us_day_t_return_pct": 5.66,
+          "india_day_next_gap_pct": 1.58,
+          "india_day_next_close_pct": 4.61,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-16",
+          "date_next": "2026-10-19",
+          "us_day_t_return_pct": 0.91,
+          "india_day_next_gap_pct": -0.37,
+          "india_day_next_close_pct": -2.63,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-19",
+          "date_next": "2026-10-21",
+          "us_day_t_return_pct": -0.33,
+          "india_day_next_gap_pct": 2.14,
+          "india_day_next_close_pct": 3.3,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-21",
+          "date_next": "2026-10-22",
+          "us_day_t_return_pct": 0.71,
+          "india_day_next_gap_pct": -0.09,
+          "india_day_next_close_pct": -1.25,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-22",
+          "date_next": "2026-10-23",
+          "us_day_t_return_pct": 3.69,
+          "india_day_next_gap_pct": 2.92,
+          "india_day_next_close_pct": 0.04,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-23",
+          "date_next": "2026-10-26",
+          "us_day_t_return_pct": -6.58,
+          "india_day_next_gap_pct": -3.36,
+          "india_day_next_close_pct": 1.06,
+          "us_green": false,
+          "india_gap_green": false,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-26",
+          "date_next": "2026-10-27",
+          "us_day_t_return_pct": 0.65,
+          "india_day_next_gap_pct": -1.2,
+          "india_day_next_close_pct": -0.26,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-27",
+          "date_next": "2026-10-28",
+          "us_day_t_return_pct": -2.57,
+          "india_day_next_gap_pct": -2.84,
+          "india_day_next_close_pct": -3.43,
+          "us_green": false,
+          "india_gap_green": false,
+          "directional_match": true
+        }
+      ]
+    },
+    "icici_adr_to_icicibank_nse": {
+      "asset_pair": "ICICI ADR (NYSE) -> ICICIBANK.NS (NSE)",
+      "aligned_sessions": 475,
+      "pearson_correlation": 0.399,
+      "overall_directional_hit_rate_pct": 61.89,
+      "when_us_is_green": {
+        "sessions": 213,
+        "india_gap_up_probability_pct": 61.5,
+        "avg_india_gap_bps": 15.3
+      },
+      "when_us_is_red": {
+        "sessions": 262,
+        "india_gap_down_probability_pct": 62.21,
+        "avg_india_gap_bps": -15.9
+      },
+      "strong_us_signal_filter": {
+        "us_surge_above_50bps": {
+          "sessions": 145,
+          "india_gap_up_win_rate_pct": 67.59,
+          "avg_india_gap_bps": 25.2
+        },
+        "us_drop_below_minus_50bps": {
+          "sessions": 158,
+          "india_gap_down_rate_pct": 72.78,
+          "avg_india_gap_bps": -34.5
+        }
+      },
+      "recent_aligned_sessions": [
+        {
+          "date_t": "2026-10-13",
+          "date_next": "2026-10-14",
+          "us_day_t_return_pct": 1.75,
+          "india_day_next_gap_pct": -0.29,
+          "india_day_next_close_pct": -1.59,
+          "us_green": true,
+          "india_gap_green": false,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-14",
+          "date_next": "2026-10-15",
+          "us_day_t_return_pct": -0.95,
+          "india_day_next_gap_pct": 0.26,
+          "india_day_next_close_pct": 3.8,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-15",
+          "date_next": "2026-10-16",
+          "us_day_t_return_pct": 4.14,
+          "india_day_next_gap_pct": 0.4,
+          "india_day_next_close_pct": 0.55,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-16",
+          "date_next": "2026-10-19",
+          "us_day_t_return_pct": 1.87,
+          "india_day_next_gap_pct": 0.57,
+          "india_day_next_close_pct": -1.15,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-19",
+          "date_next": "2026-10-21",
+          "us_day_t_return_pct": -1.7,
+          "india_day_next_gap_pct": 1.81,
+          "india_day_next_close_pct": 0.29,
+          "us_green": false,
+          "india_gap_green": true,
+          "directional_match": false
+        },
+        {
+          "date_t": "2026-10-21",
+          "date_next": "2026-10-22",
+          "us_day_t_return_pct": -1.14,
+          "india_day_next_gap_pct": -0.43,
+          "india_day_next_close_pct": 0.97,
+          "us_green": false,
+          "india_gap_green": false,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-22",
+          "date_next": "2026-10-23",
+          "us_day_t_return_pct": 1.35,
+          "india_day_next_gap_pct": 0.43,
+          "india_day_next_close_pct": -0.31,
+          "us_green": true,
+          "india_gap_green": true,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-23",
+          "date_next": "2026-10-26",
+          "us_day_t_return_pct": -1.6,
+          "india_day_next_gap_pct": 0.0,
+          "india_day_next_close_pct": 0.63,
+          "us_green": false,
+          "india_gap_green": false,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-26",
+          "date_next": "2026-10-27",
+          "us_day_t_return_pct": -0.61,
+          "india_day_next_gap_pct": -0.15,
+          "india_day_next_close_pct": -1.15,
+          "us_green": false,
+          "india_gap_green": false,
+          "directional_match": true
+        },
+        {
+          "date_t": "2026-10-27",
+          "date_next": "2026-10-28",
+          "us_day_t_return_pct": -1.23,
+          "india_day_next_gap_pct": -0.53,
+          "india_day_next_close_pct": -0.67,
+          "us_green": false,
+          "india_gap_green": false,
+          "directional_match": true
+        }
+      ]
+    }
+  }
+}

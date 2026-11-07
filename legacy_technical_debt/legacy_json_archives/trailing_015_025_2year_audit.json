@@ -1,0 +1,206 @@
+{
+  "NIFTYBEES": {
+    "daily_unfiltered": {
+      "1x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 1.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 72.21,
+        "final_capital": 65319.56,
+        "net_profit": 55319.56,
+        "return_pct": 553.2,
+        "max_drawdown_pct": -3.42,
+        "worst_single_day_loss_pct": -3.01
+      },
+      "2x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 2.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 72.21,
+        "final_capital": 365727.71,
+        "net_profit": 355727.71,
+        "return_pct": 3557.28,
+        "max_drawdown_pct": -6.95,
+        "worst_single_day_loss_pct": -6.05
+      },
+      "3x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 3.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 72.21,
+        "final_capital": 1975510.61,
+        "net_profit": 1965510.61,
+        "return_pct": 19655.11,
+        "max_drawdown_pct": -10.44,
+        "worst_single_day_loss_pct": -9.08
+      },
+      "5x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 5.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 72.21,
+        "final_capital": 51950803.81,
+        "net_profit": 51940803.81,
+        "return_pct": 519408.04,
+        "max_drawdown_pct": -17.34,
+        "worst_single_day_loss_pct": -15.15
+      }
+    },
+    "lead_filtered": {
+      "1x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 1.0,
+        "total_trades": 259,
+        "skipped_sessions": 216,
+        "win_rate_pct": 79.54,
+        "final_capital": 35742.7,
+        "net_profit": 25742.7,
+        "return_pct": 257.43,
+        "max_drawdown_pct": -3.65,
+        "worst_single_day_loss_pct": -3.01
+      },
+      "2x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 2.0,
+        "total_trades": 259,
+        "skipped_sessions": 216,
+        "win_rate_pct": 79.54,
+        "final_capital": 117166.79,
+        "net_profit": 107166.79,
+        "return_pct": 1071.67,
+        "max_drawdown_pct": -7.32,
+        "worst_single_day_loss_pct": -6.05
+      },
+      "3x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 3.0,
+        "total_trades": 259,
+        "skipped_sessions": 216,
+        "win_rate_pct": 79.54,
+        "final_capital": 375729.41,
+        "net_profit": 365729.41,
+        "return_pct": 3657.29,
+        "max_drawdown_pct": -10.95,
+        "worst_single_day_loss_pct": -9.08
+      },
+      "5x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 5.0,
+        "total_trades": 259,
+        "skipped_sessions": 216,
+        "win_rate_pct": 79.54,
+        "final_capital": 3625539.47,
+        "net_profit": 3615539.47,
+        "return_pct": 36155.39,
+        "max_drawdown_pct": -18.08,
+        "worst_single_day_loss_pct": -15.15
+      }
+    }
+  },
+  "INFY.NS": {
+    "daily_unfiltered": {
+      "1x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 1.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 52.0,
+        "final_capital": 78365.08,
+        "net_profit": 68365.08,
+        "return_pct": 683.65,
+        "max_drawdown_pct": -12.84,
+        "worst_single_day_loss_pct": -6.89
+      },
+      "2x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 2.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 52.0,
+        "final_capital": 468791.08,
+        "net_profit": 458791.08,
+        "return_pct": 4587.91,
+        "max_drawdown_pct": -25.05,
+        "worst_single_day_loss_pct": -13.8
+      },
+      "3x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 3.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 52.0,
+        "final_capital": 2415267.6,
+        "net_profit": 2405267.6,
+        "return_pct": 24052.68,
+        "max_drawdown_pct": -36.27,
+        "worst_single_day_loss_pct": -20.72
+      },
+      "5x": {
+        "mode": "DAILY_UNFILTERED",
+        "leverage": 5.0,
+        "total_trades": 475,
+        "skipped_sessions": 0,
+        "win_rate_pct": 52.0,
+        "final_capital": 41202543.55,
+        "net_profit": 41192543.55,
+        "return_pct": 411925.44,
+        "max_drawdown_pct": -55.73,
+        "worst_single_day_loss_pct": -34.55
+      }
+    },
+    "lead_filtered": {
+      "1x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 1.0,
+        "total_trades": 215,
+        "skipped_sessions": 260,
+        "win_rate_pct": 72.09,
+        "final_capital": 131510.67,
+        "net_profit": 121510.67,
+        "return_pct": 1215.11,
+        "max_drawdown_pct": -2.16,
+        "worst_single_day_loss_pct": -1.43
+      },
+      "2x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 2.0,
+        "total_trades": 215,
+        "skipped_sessions": 260,
+        "win_rate_pct": 72.09,
+        "final_capital": 1514478.48,
+        "net_profit": 1504478.48,
+        "return_pct": 15044.78,
+        "max_drawdown_pct": -4.36,
+        "worst_single_day_loss_pct": -2.89
+      },
+      "3x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 3.0,
+        "total_trades": 215,
+        "skipped_sessions": 260,
+        "win_rate_pct": 72.09,
+        "final_capital": 16185655.96,
+        "net_profit": 16175655.96,
+        "return_pct": 161756.56,
+        "max_drawdown_pct": -6.52,
+        "worst_single_day_loss_pct": -4.35
+      },
+      "5x": {
+        "mode": "LEAD_FILTERED",
+        "leverage": 5.0,
+        "total_trades": 215,
+        "skipped_sessions": 260,
+        "win_rate_pct": 72.09,
+        "final_capital": 1503821705.25,
+        "net_profit": 1503811705.25,
+        "return_pct": 15038117.05,
+        "max_drawdown_pct": -10.77,
+        "worst_single_day_loss_pct": -7.27
+      }
+    }
+  }
+}

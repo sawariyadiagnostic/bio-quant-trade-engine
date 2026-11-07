@@ -1,0 +1,236 @@
+{
+  "device": "Vectorized CPU",
+  "total_wall_time_sec": 13.05,
+  "evaluation_rate_per_sec": 68.95,
+  "generations": 15,
+  "population_size": 60,
+  "resident_elites_count": 56,
+  "occupancy_rate_pct": 14.0,
+  "top_elites": [
+    {
+      "rank": 1,
+      "net_calmar": 24512.869,
+      "win_rate": 77.76,
+      "net_return_pct": 323071.79,
+      "turnover": 0.2,
+      "volatility": 0.2356,
+      "formula": "EMA_10(RELU(EMA_Slope))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 2,
+      "net_calmar": 19106.165,
+      "win_rate": 77.8,
+      "net_return_pct": 251813.17,
+      "turnover": 1.84,
+      "volatility": 0.2326,
+      "formula": "LOG_ABS(DELTA_5(ABS(((SIGMOID(TS_MIN_10(SIGN(Vol_ZScore))) / EMA_Slope) * TS_MIN_10(True_Range)))))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 3,
+      "net_calmar": 14743.465,
+      "win_rate": 79.59,
+      "net_return_pct": 194314.17,
+      "turnover": 5.93,
+      "volatility": 0.2339,
+      "formula": "TS_MIN_10((ADR_Ret + (LOG_ABS((Dist_EMA20 * TS_MIN_10((Vol_Price_Flow / Downside_Vol_Ratio)))) / Parkinson_Vol)))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 4,
+      "net_calmar": 12311.968,
+      "win_rate": 77.57,
+      "net_return_pct": 162037.39,
+      "turnover": 24.75,
+      "volatility": 0.2308,
+      "formula": "TS_RANK_20((TS_MIN_10(Volume) - Volume))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    },
+    {
+      "rank": 5,
+      "net_calmar": 11948.478,
+      "win_rate": 81.85,
+      "net_return_pct": 157477.13,
+      "turnover": 11.05,
+      "volatility": 0.2328,
+      "formula": "EMA_10(((ABS(EMA_10(LOG_ABS(Dist_VWAP))) / SP500_Ret) + LOG_ABS(RSI_14)))",
+      "active_regimes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    }
+  ],
+  "generation_history": [
+    {
+      "generation": 1,
+      "offspring_count": 60,
+      "thymic_survivors": 23,
+      "archive_inserted": 13,
+      "total_elites": 8,
+      "archive_occupancy_pct": 2.0
+    },
+    {
+      "generation": 2,
+      "offspring_count": 60,
+      "thymic_survivors": 27,
+      "archive_inserted": 5,
+      "total_elites": 9,
+      "archive_occupancy_pct": 2.25
+    },
+    {
+      "generation": 3,
+      "offspring_count": 60,
+      "thymic_survivors": 29,
+      "archive_inserted": 9,
+      "total_elites": 14,
+      "archive_occupancy_pct": 3.5
+    },
+    {
+      "generation": 4,
+      "offspring_count": 60,
+      "thymic_survivors": 27,
+      "archive_inserted": 13,
+      "total_elites": 19,
+      "archive_occupancy_pct": 4.75
+    },
+    {
+      "generation": 5,
+      "offspring_count": 60,
+      "thymic_survivors": 31,
+      "archive_inserted": 8,
+      "total_elites": 23,
+      "archive_occupancy_pct": 5.75
+    },
+    {
+      "generation": 6,
+      "offspring_count": 60,
+      "thymic_survivors": 33,
+      "archive_inserted": 7,
+      "total_elites": 26,
+      "archive_occupancy_pct": 6.5
+    },
+    {
+      "generation": 7,
+      "offspring_count": 60,
+      "thymic_survivors": 31,
+      "archive_inserted": 4,
+      "total_elites": 29,
+      "archive_occupancy_pct": 7.25
+    },
+    {
+      "generation": 8,
+      "offspring_count": 60,
+      "thymic_survivors": 37,
+      "archive_inserted": 8,
+      "total_elites": 32,
+      "archive_occupancy_pct": 8.0
+    },
+    {
+      "generation": 9,
+      "offspring_count": 60,
+      "thymic_survivors": 36,
+      "archive_inserted": 15,
+      "total_elites": 38,
+      "archive_occupancy_pct": 9.5
+    },
+    {
+      "generation": 10,
+      "offspring_count": 60,
+      "thymic_survivors": 32,
+      "archive_inserted": 9,
+      "total_elites": 41,
+      "archive_occupancy_pct": 10.25
+    },
+    {
+      "generation": 11,
+      "offspring_count": 60,
+      "thymic_survivors": 21,
+      "archive_inserted": 5,
+      "total_elites": 45,
+      "archive_occupancy_pct": 11.25
+    },
+    {
+      "generation": 12,
+      "offspring_count": 60,
+      "thymic_survivors": 26,
+      "archive_inserted": 6,
+      "total_elites": 50,
+      "archive_occupancy_pct": 12.5
+    },
+    {
+      "generation": 13,
+      "offspring_count": 60,
+      "thymic_survivors": 35,
+      "archive_inserted": 6,
+      "total_elites": 54,
+      "archive_occupancy_pct": 13.5
+    },
+    {
+      "generation": 14,
+      "offspring_count": 60,
+      "thymic_survivors": 34,
+      "archive_inserted": 9,
+      "total_elites": 55,
+      "archive_occupancy_pct": 13.75
+    },
+    {
+      "generation": 15,
+      "offspring_count": 60,
+      "thymic_survivors": 28,
+      "archive_inserted": 1,
+      "total_elites": 56,
+      "archive_occupancy_pct": 14.0
+    }
+  ]
+}

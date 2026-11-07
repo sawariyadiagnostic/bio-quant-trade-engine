@@ -1,0 +1,65 @@
+# ==============================================================================
+# 🛡️ INSTITUTIONAL TRADING SECURITY & ENVIRONMENT ISOLATION
+# ==============================================================================
+
+# Private Credentials & Keys (CRITICAL: NEVER COMMIT)
+.env
+*.env
+!.env.example
+*.key
+*.pem
+*.pfx
+*.p12
+*.cer
+*.crt
+id_rsa*
+id_ed25519*
+
+# Account Logs & Financial Audit Records
+audit/
+*.audit
+logs/
+*.log
+*.sqlite
+*.db
+
+# Python Bytecode & Runtime Caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Quant Market Data, Models & Artifacts
+*.parquet
+*.snappy
+*.feather
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.weights
+*.pt
+*.pth
+*.onnx
+data/cache/
+data/raw/
+
+# IDE & OS Metadata
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Scratch & Temporary Testing Files
+scratch/
+tmp/
+temp/

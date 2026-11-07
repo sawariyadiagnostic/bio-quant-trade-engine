@@ -1,0 +1,485 @@
+"""
+20x20 MAP-Elites Behavioral Archive (Phase B).
+Illuminates 400 behavioral niches indexed by Volatility and Turnover.
+Enforces:
+- Statutory Tax Deductions (1.2 bps ETF / 3 bps Futures / 25 bps Equity Cash).
+- Calmar / Sortino multi-objective fitness.
+- Minimum Tax Hurdle (rejects high churn with sub-friction alpha).
+- Bloat Deduplication via behavioral correlation (>0.95 threshold).
+"""
+import os
+import json
+from dataclasses import dataclass
+from typing import Optional
+import numpy as np
+import pandas as pd
+from loguru import logger
+from ..domain.formula_ast import ASTNode, ASTEvaluator
+from ..domain.formula_parser import FormulaParser
+from ..domain.models import InstrumentType, TaxSchedule
+
+@dataclass
+class EliteIndividual:
+    formula: ASTNode
+    fitness: float          # Composite Institutional Alpha Score (Sortino x ln(1+PF) x Confidence)
+    volatility: float       # Annualized volatility
+    turnover: float         # Annualized turnover
+    win_rate: float         # Win rate %
+    net_return_pct: float   # Net cumulative return %
+    behavior_signature: np.ndarray # Trailing signal vector
+    sortino: float = 0.0
+    profit_factor: float = 0.0
+    trades_count: int = 0
+    max_drawdown: float = 0.0
+    cagr_pct: float = 0.0   # Compound Annual Growth Rate % (normalized across lookbacks)
+    lookback: str = "5y"
+
+class MapElitesArchive:
+    def __init__(self, grid_size: tuple[int, int] = (20, 20), tax_schedule: Optional[TaxSchedule] = None):
+        self.rows, self.cols = grid_size
+        self.grid = np.empty(grid_size, dtype=object)
+        self.tax_schedule = tax_schedule or TaxSchedule()
+
+        # Behavioral boundary bins
+        self.vol_bins = np.linspace(0.05, 0.60, self.rows)
+        self.turnover_bins = np.linspace(2.0, 150.0, self.cols)
+
+    def _get_bin_indices(self, vol: float, turnover: float) -> tuple[int, int]:
+        r = int(np.clip(np.digitize(vol, self.vol_bins) - 1, 0, self.rows - 1))
+        c = int(np.clip(np.digitize(turnover, self.turnover_bins) - 1, 0, self.cols - 1))
+        return r, c
+
+    def _get_statutory_friction(self, instrument: InstrumentType) -> float:
+        if self.tax_schedule:
+            return self.tax_schedule.get_friction_rate(instrument)
+        if instrument == InstrumentType.ETF_CASH:
+            return 0.00012
+        if instrument == InstrumentType.FUTURES:
+            return 0.00030
+        return 0.00250
+
+    def _calculate_metrics(
+        self,
+        positions: np.ndarray,
+        open_p: np.ndarray,
+        close_p: np.ndarray,
+        instrument: InstrumentType,
+        target_mode: str
+    ) -> Optional[dict]:
+        """Calculates institutional metrics, Sortino, Profit Factor, and Composite Alpha Score."""
+        if target_mode == "overnight":
+            gross_returns = (open_p[1:] - close_p[:-1]) / (close_p[:-1] + 1e-8)
+            trade_positions = positions[:-1]
+        else:
+            gross_returns = (close_p - open_p) / (open_p + 1e-8)
+            trade_positions = positions
+
+        # Statutory NSE Circuit Band Winsorization (Filters spurious ETF pre-open bad ticks)
+        gross_returns = np.clip(gross_returns, -0.10, 0.10)
+
+        pos_flips = np.abs(np.diff(trade_positions, prepend=0))
+        friction = self._get_statutory_friction(instrument)
+        net_returns = (trade_positions * gross_returns) - (pos_flips * friction)
+
+        active_trades = net_returns[trade_positions > 0]
+        n_trades = len(active_trades)
+        if n_trades < 5:
+            return None
+
+        annual_vol = float(np.std(net_returns) * np.sqrt(252))
+        turnover = float(np.mean(pos_flips) * 252)
+
+        cum_equity = np.cumprod(1.0 + net_returns)
+        total_net_ret = float(cum_equity[-1] - 1.0) if len(cum_equity) > 0 else 0.0
+        n_bars = len(net_returns)
+        years = max(0.08, n_bars / 252.0)
+        cagr = float(((1.0 + total_net_ret) ** (1.0 / years)) - 1.0) * 100.0 if total_net_ret > -0.999 else -100.0
+        peak = np.maximum.accumulate(cum_equity)
+        drawdowns = (peak - cum_equity) / (peak + 1e-8)
+        max_drawdown = float(np.max(drawdowns) * 100.0) if len(drawdowns) > 0 else 0.0
+        win_rate = float(np.mean(active_trades > 0) * 100.0) if n_trades > 0 else 0.0
+
+        mean_ret = float(np.mean(active_trades))
+        # True Institutional Semi-Deviation across all active trades (floored at 20 bps daily vol)
+        downside_sq = np.minimum(0.0, active_trades) ** 2
+        downside_dev = max(0.002, float(np.sqrt(np.mean(downside_sq))))
+        sortino = float((mean_ret / downside_dev) * np.sqrt(252))
+
+        gross_gains = float(np.sum(active_trades[active_trades > 0])) if np.any(active_trades > 0) else 0.0
+        gross_losses = max(0.001, abs(float(np.sum(active_trades[active_trades < 0]))))
+        profit_factor = float(gross_gains / gross_losses)
+
+        # 2x Friction Stress Hurdle: Reject fragile formulas that collapse when friction doubles
+        stressed_net = (trade_positions * gross_returns) - (pos_flips * (friction * 2.0))
+        stressed_active = stressed_net[trade_positions > 0]
+        if len(stressed_active) > 0 and sortino > 0.80:
+            s_mean = float(np.mean(stressed_active))
+            s_down_sq = np.minimum(0.0, stressed_active) ** 2
+            s_down_dev = max(0.002, float(np.sqrt(np.mean(s_down_sq))))
+            s_sortino = float((s_mean / s_down_dev) * np.sqrt(252))
+            if s_sortino < 0.20:
+                return None
+
+        calmar_ratio = max(0.0, cagr) / max(4.0, max_drawdown)
+        expected_trades = max(15.0, 5.0 * years)
+        trade_conf = min(1.2, max(0.2, float(np.sqrt(n_trades / expected_trades))))
+        quality_mult = min(3.0, max(0.5, float(np.sqrt(max(0.25, min(sortino, 16.0))))))
+
+        if turnover < 1.0:
+            turnover_penalty = max(0.2, float(turnover / 1.0))
+        elif turnover > 180.0:
+            turnover_penalty = max(0.3, float(180.0 / turnover))
+        else:
+            turnover_penalty = 1.0
+
+        institutional_fitness = float(max(0.0, calmar_ratio * quality_mult * trade_conf * turnover_penalty))
+
+        sig = trade_positions[-60:] if len(trade_positions) >= 60 else np.pad(trade_positions, (60 - len(trade_positions), 0))
+
+        return {
+            "annual_vol": annual_vol,
+            "turnover": turnover,
+            "total_net_ret": total_net_ret,
+            "cagr_pct": cagr,
+            "max_drawdown": max_drawdown,
+            "win_rate": win_rate,
+            "mean_ret": mean_ret,
+            "sortino": sortino,
+            "profit_factor": profit_factor,
+            "n_trades": n_trades,
+            "institutional_fitness": institutional_fitness,
+            "sig": sig,
+        }
+
+    def evaluate_and_insert(
+        self,
+        formula: ASTNode,
+        df: pd.DataFrame,
+        current_regime: int = 0,
+        instrument: InstrumentType = InstrumentType.ETF_CASH,
+        target_mode: str = "overnight" # "overnight" or "intraday"
+    ) -> bool:
+        """
+        Evaluates candidate formula with exact statutory friction and inserts into archive if elite.
+        """
+        raw_signals = ASTEvaluator.eval_node(formula, df, current_regime=current_regime)
+        if np.all(raw_signals == 0.0):
+            return False
+
+        # Long positions generated when signal > 0
+        positions = np.where(raw_signals > 0, 1.0, 0.0)
+        if np.sum(positions) == 0:
+            return False
+
+        c = df.get("Close_Adj", df.get("Close", df.get("Close_Raw"))).to_numpy(dtype=np.float64)
+        o = df["Open"].to_numpy(dtype=np.float64)
+
+        metrics = self._calculate_metrics(positions, o, c, instrument, target_mode)
+        if metrics is None:
+            return False
+
+        institutional_fitness = metrics["institutional_fitness"]
+        if institutional_fitness <= 0.0 or metrics["mean_ret"] <= 0.0:
+            return False
+
+        # Bloat Deduplication check
+        sig = metrics["sig"]
+        annual_vol = metrics["annual_vol"]
+        turnover = metrics["turnover"]
+        if not np.isfinite(annual_vol) or not np.isfinite(turnover):
+            return False
+
+        r, c_idx = self._get_bin_indices(annual_vol, turnover)
+        incumbent = self.grid[r, c_idx]
+
+        if incumbent is not None:
+            std1 = float(np.std(sig))
+            std2 = float(np.std(incumbent.behavior_signature))
+            if std1 > 1e-6 and std2 > 1e-6:
+                corr = np.corrcoef(sig, incumbent.behavior_signature)[0, 1]
+                if not np.isnan(corr) and corr > 0.95 and institutional_fitness <= incumbent.fitness:
+                    return False
+            elif np.array_equal(sig, incumbent.behavior_signature) and institutional_fitness <= incumbent.fitness:
+                return False
+
+        # Elite Insertion
+        if incumbent is None or institutional_fitness > incumbent.fitness:
+            self.grid[r, c_idx] = EliteIndividual(
+                formula=formula,
+                fitness=round(institutional_fitness, 2),
+                volatility=round(annual_vol, 4),
+                turnover=round(turnover, 2),
+                win_rate=round(metrics["win_rate"], 2),
+                net_return_pct=round(metrics["total_net_ret"] * 100.0, 2),
+                behavior_signature=sig,
+                sortino=round(metrics["sortino"], 2),
+                profit_factor=round(min(metrics["profit_factor"], 99.0), 2),
+                trades_count=metrics["n_trades"],
+                max_drawdown=round(metrics.get("max_drawdown", 0.0), 2),
+                cagr_pct=round(metrics.get("cagr_pct", 0.0), 2)
+            )
+            return True
+
+        return False
+
+    def insert(
+        self,
+        row: int,
+        col: int,
+        fitness: float,
+        formula: ASTNode,
+        metrics: Optional[dict] = None
+    ) -> bool:
+        """Directly inserts a resident elite into the archive grid for warm-start."""
+        m = metrics or {}
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            self.grid[row, col] = EliteIndividual(
+                formula=formula,
+                fitness=round(fitness, 2),
+                volatility=round(float(m.get("volatility", 0.0)), 4),
+                turnover=round(float(m.get("turnover", 0.0)), 2),
+                win_rate=round(float(m.get("win_rate", 0.0)), 2),
+                net_return_pct=round(float(m.get("net_return_pct", 0.0)), 2),
+                behavior_signature=np.zeros(60, dtype=np.float32),
+                sortino=round(float(m.get("sortino", 0.0)), 2),
+                profit_factor=round(min(float(m.get("profit_factor", 0.0)), 99.0), 2),
+                trades_count=int(m.get("trades_count", 0)),
+                max_drawdown=round(float(m.get("max_drawdown", 0.0)), 2),
+                cagr_pct=round(float(m.get("cagr_pct", 0.0)), 2)
+            )
+            return True
+        return False
+
+    def stress_test_friction(
+        self,
+        df: pd.DataFrame,
+        multiplier: float = 2.0,
+        max_sortino_drop: float = 0.50,
+        instrument: InstrumentType = InstrumentType.ETF_CASH,
+        target_mode: str = "overnight"
+    ) -> int:
+        """
+        Stress-tests all occupied elites in the archive under multiplied friction (e.g. 2.0x).
+        Eliminates fragile high-churn strategies whose stressed CAGR < 0 or Sortino drops > 50%.
+        Returns count of pruned individuals.
+        """
+        pruned_count = 0
+        base_friction = self._get_statutory_friction(instrument)
+        stressed_friction = base_friction * multiplier
+
+        open_p = df["Open"].to_numpy(dtype=np.float64)
+        close_p = df.get("Close_Adj", df.get("Close")).to_numpy(dtype=np.float64)
+
+        for r in range(self.rows):
+            for c in range(self.cols):
+                elite: Optional[EliteIndividual] = self.grid[r, c]
+                if elite is None:
+                    continue
+
+                raw_signals = ASTEvaluator.eval_node(elite.formula, df)
+                positions = np.where(raw_signals > 0, 1.0, 0.0)
+                if np.sum(positions) == 0:
+                    self.grid[r, c] = None
+                    pruned_count += 1
+                    continue
+
+                if target_mode == "overnight":
+                    gross_returns = (open_p[1:] - close_p[:-1]) / (close_p[:-1] + 1e-8)
+                    trade_positions = positions[:-1]
+                else:
+                    gross_returns = (close_p - open_p) / (open_p + 1e-8)
+                    trade_positions = positions
+
+                gross_returns = np.clip(gross_returns, -0.10, 0.10)
+                pos_flips = np.abs(np.diff(trade_positions, prepend=0))
+                net_returns = (trade_positions * gross_returns) - (pos_flips * stressed_friction)
+
+                active_trades = net_returns[trade_positions > 0]
+                if len(active_trades) < 5:
+                    self.grid[r, c] = None
+                    pruned_count += 1
+                    continue
+
+                cum_equity = np.cumprod(1.0 + net_returns)
+                total_net_ret = float(cum_equity[-1] - 1.0)
+                n_bars = len(net_returns)
+                years = max(0.08, n_bars / 252.0)
+                stressed_cagr = float(((1.0 + total_net_ret) ** (1.0 / years)) - 1.0) * 100.0 if total_net_ret > -0.999 else -100.0
+
+                mean_ret = float(np.mean(active_trades))
+                downside_sq = np.minimum(0.0, active_trades) ** 2
+                downside_dev = max(0.002, float(np.sqrt(np.mean(downside_sq))))
+                stressed_sortino = float((mean_ret / downside_dev) * np.sqrt(252))
+
+                min_acceptable_sortino = elite.sortino * (1.0 - max_sortino_drop)
+                if stressed_cagr < 0.0 or stressed_sortino < min_acceptable_sortino:
+                    self.grid[r, c] = None
+                    pruned_count += 1
+
+        return pruned_count
+
+    def get_resident_elites(self) -> list[EliteIndividual]:
+        return [cell for cell in self.grid.flatten() if cell is not None]
+
+    def get_top_elites(self, n: int = 10) -> list[EliteIndividual]:
+        elites = self.get_resident_elites()
+        return sorted(elites, key=lambda x: x.fitness, reverse=True)[:n]
+
+    def get_all_elite_records(self) -> list[dict]:
+        """Returns structured dictionary records for all resident champions in the archive."""
+        records = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                elite = self.grid[r, c]
+                if elite is not None:
+                    records.append({
+                        "row": r,
+                        "col": c,
+                        "fitness": elite.fitness,
+                        "net_return_pct": elite.net_return_pct,
+                        "cagr_pct": getattr(elite, "cagr_pct", elite.net_return_pct),
+                        "max_drawdown": elite.max_drawdown,
+                        "win_rate": elite.win_rate,
+                        "sortino": elite.sortino,
+                        "profit_factor": elite.profit_factor,
+                        "turnover": elite.turnover,
+                        "volatility": elite.volatility,
+                        "trades_count": elite.trades_count,
+                        "formula_str": elite.formula.to_formula_str(),
+                        "niche_name": f"Vol {self.vol_bins[r]*100:.0f}% / Turn {self.turnover_bins[c]:.1f}x"
+                    })
+        return records
+
+    def occupancy_rate(self) -> float:
+        occupied = len(self.get_resident_elites())
+        return float(occupied / (self.rows * self.cols))
+
+    def save_to_disk(self, file_path: str):
+        """Serializes the entire 20x20 MAP-Elites archive to disk for persistent continual evolution."""
+        os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+        records = []
+        for r in range(self.rows):
+            for c in range(self.cols):
+                elite = self.grid[r, c]
+                if elite is not None:
+                    records.append({
+                        "row": r,
+                        "col": c,
+                        "fitness": elite.fitness,
+                        "volatility": elite.volatility,
+                        "turnover": elite.turnover,
+                        "win_rate": elite.win_rate,
+                        "net_return_pct": elite.net_return_pct,
+                        "cagr_pct": getattr(elite, "cagr_pct", elite.net_return_pct),
+                        "max_drawdown": elite.max_drawdown,
+                        "sortino": elite.sortino,
+                        "profit_factor": elite.profit_factor,
+                        "trades_count": elite.trades_count,
+                        "formula_str": elite.formula.to_formula_str(),
+                        "active_regimes": sorted(list(elite.formula.active_regimes)),
+                        "behavior_signature": elite.behavior_signature.tolist()
+                    })
+
+        with open(file_path, "w") as f:
+            json.dump({
+                "rows": self.rows,
+                "cols": self.cols,
+                "resident_count": len(records),
+                "occupancy_pct": round(self.occupancy_rate() * 100.0, 2),
+                "elites": records
+            }, f, indent=2)
+        logger.info(f"Archive saved to {file_path}: {len(records)} resident elites persisted.")
+
+    def load_from_disk(self, file_path: str) -> int:
+        """Loads persistent archive from disk, restoring resident champions across runs."""
+        if not os.path.exists(file_path):
+            return 0
+
+        with open(file_path, "r") as f:
+            data = json.load(f)
+
+        loaded_count = 0
+        for item in data.get("elites", []):
+            try:
+                r, c = item["row"], item["col"]
+                formula_node = FormulaParser.parse(item["formula_str"], active_regimes=set(item.get("active_regimes", range(10))))
+                sig = np.array(item.get("behavior_signature", np.zeros(60)))
+                self.grid[r, c] = EliteIndividual(
+                    formula=formula_node,
+                    fitness=item["fitness"],
+                    volatility=item["volatility"],
+                    turnover=item["turnover"],
+                    win_rate=item["win_rate"],
+                    net_return_pct=item["net_return_pct"],
+                    behavior_signature=sig,
+                    sortino=item.get("sortino", 0.0),
+                    profit_factor=item.get("profit_factor", 0.0),
+                    trades_count=item.get("trades_count", 0),
+                    max_drawdown=item.get("max_drawdown", 0.0),
+                    cagr_pct=item.get("cagr_pct", round(item.get("net_return_pct", 0.0), 2))
+                )
+                loaded_count += 1
+            except Exception as e:
+                logger.warning(f"Skipped loading corrupted elite formula: {e}")
+
+        logger.info(f"Loaded {loaded_count} resident elites from {file_path}. Occupancy: {self.occupancy_rate() * 100.0:.2f}%")
+        return loaded_count
+
+    def prune_decayed_elites(
+        self,
+        df: pd.DataFrame,
+        current_regime: int = 0,
+        instrument: InstrumentType = InstrumentType.ETF_CASH,
+        target_mode: str = "overnight"
+    ) -> int:
+        """
+        Re-evaluates every stored champion on updated market data.
+        Evicts outdated or decayed elites that no longer beat statutory friction or Calmar threshold.
+        """
+        total_resident = len(self.get_resident_elites())
+        logger.info(f"Auditing {total_resident} resident elites for factor decay against {len(df)} market bars...")
+        pruned_count = 0
+        for r in range(self.rows):
+            for c in range(self.cols):
+                elite = self.grid[r, c]
+                if elite is None:
+                    continue
+
+                raw_signals = ASTEvaluator.eval_node(elite.formula, df, current_regime=current_regime)
+                if np.all(raw_signals == 0.0):
+                    self.grid[r, c] = None
+                    pruned_count += 1
+                    continue
+
+                positions = np.where(raw_signals > 0, 1.0, 0.0)
+                if np.sum(positions) == 0:
+                    self.grid[r, c] = None
+                    pruned_count += 1
+                    continue
+
+                close_p = df.get("Close_Adj", df.get("Close", df.get("Close_Raw"))).to_numpy(dtype=np.float64)
+                open_p = df["Open"].to_numpy(dtype=np.float64)
+
+                metrics = self._calculate_metrics(positions, open_p, close_p, instrument, target_mode)
+                if (
+                    metrics is None
+                    or metrics["institutional_fitness"] <= 0.0
+                    or metrics["total_net_ret"] <= 0.0
+                    or metrics["win_rate"] < 45.0
+                ):
+                    self.grid[r, c] = None # Outdated or decayed: evicted from niche
+                    pruned_count += 1
+                else:
+                    # Update metrics to fresh data
+                    elite.fitness = round(metrics["institutional_fitness"], 2)
+                    elite.win_rate = round(metrics["win_rate"], 2)
+                    elite.net_return_pct = round(metrics["total_net_ret"] * 100.0, 2)
+                    elite.cagr_pct = round(metrics.get("cagr_pct", 0.0), 2)
+                    elite.sortino = round(metrics["sortino"], 2)
+                    elite.profit_factor = round(min(metrics["profit_factor"], 99.0), 2)
+                    elite.trades_count = metrics["n_trades"]
+                    elite.volatility = round(metrics["annual_vol"], 4)
+                    elite.turnover = round(metrics["turnover"], 2)
+
+        logger.info(f"Temporal Decay Audit: {pruned_count} evicted, {total_resident - pruned_count} retained active.")
+        return pruned_count

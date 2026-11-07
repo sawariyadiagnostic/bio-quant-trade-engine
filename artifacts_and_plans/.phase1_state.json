@@ -1,0 +1,147 @@
+{
+  "phase": "Phase 1: Institutional Decoupled Cockpit & Engine - COMPLETED & AUDITED",
+  "updated_at": "2026-11-07T14:33:00+05:30",
+  "active_task": "COMPLETED",
+  "active_subtask": "ALL_PASSED",
+  "last_stable_commit": "1580c1d",
+  "tasks": {
+    "TASK_0": {
+      "title": "Latent Gateway Remediation & SQLite WAL Migration Baseline",
+      "status": "PASSED",
+      "subtasks": {
+        "0.1_fix_place_order_symbol_kwarg": "PASSED",
+        "0.2_fix_undefined_sym_name_error": "PASSED",
+        "0.3_fix_zero_price_market_order_guard": "PASSED",
+        "0.4_fix_short_position_square_off": "PASSED",
+        "0.5_pass_product_type_prd": "PASSED",
+        "0.6_fix_cancel_order_orderno_kwarg": "PASSED",
+        "0.7_fix_send_live_order_rejection_masking": "PASSED",
+        "0.8_normalize_symbols_cleanly": "PASSED",
+        "0.9_migrate_audit_to_sqlite_wal": "PASSED",
+        "0.10_build_archive_migrator": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_gateway_hardening.py && python scripts/red_team_harness.py --mode=full",
+      "commit": "39201a5"
+    },
+    "TASK_1": {
+      "title": "Windows Job Guard & Zero-Copy SharedMemory IPC",
+      "status": "PASSED",
+      "subtasks": {
+        "1.1_windows_job_manager": "PASSED",
+        "1.2_cpu_affinity_priority_governor": "PASSED",
+        "1.3_shared_memory_ipc_bus": "PASSED",
+        "1.4_spawned_evolution_worker": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_shm_worker_isolation.py",
+      "commit": "0e5c78d"
+    },
+    "TASK_2": {
+      "title": "Two-Stage Risk Sentry & Market Microstructure Protection",
+      "status": "PASSED",
+      "subtasks": {
+        "2.1_stage1_in_process_atomic_freeze": "PASSED",
+        "2.2_stage2_parallel_async_socket_dispatch": "PASSED",
+        "2.3_lower_circuit_synthetic_delta_hedge": "PASSED",
+        "2.4_statutory_dp_charge_floor": "PASSED",
+        "2.5_headless_quickauth_session_watchdog": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_risk_sentry_isolation.py",
+      "commit": "dfd130c"
+    },
+    "TASK_3": {
+      "title": "FastAPI REST Server & Differential Delta SSE Protocol",
+      "status": "PASSED",
+      "subtasks": {
+        "3.1_sqlite_wal_archive_store": "PASSED",
+        "3.2_fastapi_asgi_server_node_endpoints": "PASSED",
+        "3.3_differential_sse_streaming": "PASSED",
+        "3.4_worker_process_supervisor": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_cockpit_server_api.py",
+      "commit": "8377c45"
+    },
+    "TASK_4": {
+      "title": "Decoupled Institutional n8n-Style Node Cockpit Web UI",
+      "status": "PASSED",
+      "subtasks": {
+        "4.1_offline_dependency_vendoring": "PASSED",
+        "4.2_web_audio_api_synthesizer": "PASSED",
+        "4.3_ag_grid_virtualization_transactions": "PASSED",
+        "4.4_plotly_webgl_raf_throttler": "PASSED",
+        "4.5_dead_man_switch_hud_watchdog": "PASSED",
+        "4.6_avionics_layout_and_n8n_pipeline_deck": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_web_cockpit_ui.py",
+      "commit": "49f7111"
+    },
+    "TASK_5": {
+      "title": "Companion Headless Terminal Rescue TUI",
+      "status": "PASSED",
+      "subtasks": {
+        "5.1_rich_terminal_dashboard": "PASSED",
+        "5.2_single_keystroke_k_panic_trigger": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_rescue_tui.py",
+      "commit": "90fe659"
+    },
+    "TASK_6": {
+      "title": "Gradio Elimination & Codebase Hardening",
+      "status": "PASSED",
+      "subtasks": {
+        "6.1_deprecate_evolution_dashboard_redirect": "PASSED",
+        "6.2_remove_gradio_from_requirements": "PASSED",
+        "6.3_full_red_team_invariants_gate": "PASSED",
+        "6.4_documentation_and_ledger_update": "PASSED"
+      },
+      "verification_cmd": "python scripts/red_team_harness.py --mode=full",
+      "commit": "4746c87"
+    },
+    "TASK_7": {
+      "title": "Adversarial Chaos Fault-Injection Testing Suite",
+      "status": "PASSED",
+      "subtasks": {
+        "7.1_test_worker_sigkill_recovery": "PASSED",
+        "7.2_test_broker_network_hang_timeout": "PASSED",
+        "7.3_test_corrupted_archive_ingestion": "PASSED",
+        "7.4_test_panic_button_spam_deduplication": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_chaos_fault_injection.py",
+      "commit": "009bf41"
+    },
+    "TASK_8": {
+      "title": "20x20 MAP-Elites Heatmap, Dynamic Universe Selector, Seed Governor, and 3D Strategy Manifold",
+      "status": "PASSED",
+      "subtasks": {
+        "8.1_restore_20x20_map_elites_heatmap": "PASSED",
+        "8.2_dynamic_100_asset_universe_selector": "PASSED",
+        "8.3_random_seed_governor": "PASSED",
+        "8.4_3d_phenotype_manifold_and_latent_cosine_heatmap": "PASSED",
+        "8.5_empirical_verification_and_red_team_gate": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_cockpit_server_api.py tests/test_web_cockpit_ui.py tests/test_shm_worker_isolation.py && python scripts/red_team_harness.py --mode=full",
+      "commit": "fdaa2cd"
+    },
+    "TASK_9": {
+      "title": "Red Team Hostile Audit & Architectural Remediation",
+      "status": "PASSED",
+      "subtasks": {
+        "9.1_remediate_ag_grid_percentages_and_lookback_partitioning": "PASSED",
+        "9.2_remediate_genetic_engine_warmstart_insert": "PASSED",
+        "9.3_remediate_annualized_cagr_cumulative_overwrites": "PASSED",
+        "9.4_remediate_causal_lookahead_bias_in_global_leads": "PASSED",
+        "9.5_remediate_stock_split_price_basis_corruption": "PASSED",
+        "9.6_remediate_true_range_welles_wilder_formula": "PASSED",
+        "9.7_remediate_thymic_peak_to_trough_drawdown": "PASSED",
+        "9.8_remediate_live_broker_held_positions_check": "PASSED",
+        "9.9_remediate_synthetic_lower_circuit_delta_hedging": "PASSED",
+        "9.10_remediate_ast_depth_and_node_bloat_guards": "PASSED",
+        "9.11_remediate_shared_memory_seqlock_versioning": "PASSED",
+        "9.12_remediate_sse_timestamp_replacement_streaming": "PASSED",
+        "9.13_remediate_shoonya_session_expiry_rollover": "PASSED",
+        "9.14_remediate_browser_static_cache_invalidation": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_risk_sentry_isolation.py tests/test_cockpit_server_api.py tests/test_web_cockpit_ui.py tests/test_gateway_hardening.py tests/test_invariants.py && python scripts/red_team_harness.py --mode=full",
+      "commit": "1580c1d"
+    }
+  }
+}

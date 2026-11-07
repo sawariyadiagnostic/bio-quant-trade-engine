@@ -1,0 +1,74 @@
+{
+  "Banking_Financials": {
+    "leader": "HDFCBANK.NS",
+    "noise_pct": 100.0,
+    "active_clusters": 0,
+    "today_regime": -1
+  },
+  "Information_Technology": {
+    "leader": "TCS.NS",
+    "noise_pct": 71.78947368421052,
+    "active_clusters": 2,
+    "today_regime": -1
+  },
+  "Automotive": {
+    "leader": "MARUTI.NS",
+    "noise_pct": 100.0,
+    "active_clusters": 0,
+    "today_regime": -1
+  },
+  "Energy_Oil_Gas": {
+    "leader": "RELIANCE.NS",
+    "noise_pct": 47.368421052631575,
+    "active_clusters": 2,
+    "today_regime": 0
+  },
+  "Power_Utilities": {
+    "leader": "NTPC.NS",
+    "noise_pct": 45.89473684210526,
+    "active_clusters": 2,
+    "today_regime": -1
+  },
+  "Metals_Mining": {
+    "leader": "TATASTEEL.NS",
+    "noise_pct": 80.21052631578948,
+    "active_clusters": 2,
+    "today_regime": -1
+  },
+  "Pharma_Healthcare": {
+    "leader": "SUNPHARMA.NS",
+    "noise_pct": 72.21052631578947,
+    "active_clusters": 2,
+    "today_regime": 0
+  },
+  "FMCG_Consumption": {
+    "leader": "ITC.NS",
+    "noise_pct": 5.684210526315789,
+    "active_clusters": 2,
+    "today_regime": 0
+  },
+  "Consumer_Durables_Retail": {
+    "leader": "TITAN.NS",
+    "noise_pct": 71.78947368421052,
+    "active_clusters": 2,
+    "today_regime": -1
+  },
+  "Capital_Goods_Defense": {
+    "leader": "LT.NS",
+    "noise_pct": 84.63157894736842,
+    "active_clusters": 2,
+    "today_regime": -1
+  },
+  "Realty_Construction": {
+    "leader": "ADANIENT.NS",
+    "noise_pct": 82.94736842105263,
+    "active_clusters": 2,
+    "today_regime": -1
+  },
+  "Chemicals_Fertilizers": {
+    "leader": "PIDILITIND.NS",
+    "noise_pct": 100.0,
+    "active_clusters": 0,
+    "today_regime": -1
+  }
+}

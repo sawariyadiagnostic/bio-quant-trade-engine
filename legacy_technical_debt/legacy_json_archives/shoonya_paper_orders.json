@@ -1,0 +1,1462 @@
+[
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 36,
+    "price": 265.0917374019582,
+    "friction": 1.15,
+    "balance_after": 455.55,
+    "timestamp": "2026-11-02T00:37:55.913742"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 255.33142332351557,
+    "friction": 1.16,
+    "balance_after": 296.24,
+    "timestamp": "2026-11-02T00:38:04.340495"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 36,
+    "price": 268.90911415945493,
+    "friction": 1.16,
+    "balance_after": 318.11,
+    "timestamp": "2026-11-02T00:38:25.495094"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 255.23812694209678,
+    "friction": 1.16,
+    "balance_after": 299.79,
+    "timestamp": "2026-11-02T00:38:51.500912"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 259.50485434342085,
+    "friction": 1.15,
+    "balance_after": 397.17,
+    "timestamp": "2026-11-02T00:39:23.400235"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 36,
+    "price": 265.92214226339405,
+    "friction": 1.15,
+    "balance_after": 425.65,
+    "timestamp": "2026-11-02T01:12:00.575055"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.17151713991683,
+    "friction": 1.16,
+    "balance_after": 372.5,
+    "timestamp": "2026-11-02T02:00:41.726818"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 36,
+    "price": 264.8908923335266,
+    "friction": 1.14,
+    "balance_after": 462.78,
+    "timestamp": "2026-11-02T02:02:08.096663"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 259.7497539310722,
+    "friction": 1.15,
+    "balance_after": 388.11,
+    "timestamp": "2026-11-02T02:02:55.678089"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 264.8172109873479,
+    "friction": 1.18,
+    "balance_after": 200.59,
+    "timestamp": "2026-11-02T02:48:13.443802"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 35,
+    "price": 276.2543930984482,
+    "friction": 1.16,
+    "balance_after": 329.94,
+    "timestamp": "2026-11-02T19:51:41.442326"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 36,
+    "price": 267.93164267196056,
+    "friction": 1.16,
+    "balance_after": 353.3,
+    "timestamp": "2026-11-02T20:13:40.160859"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 262.49010172478705,
+    "friction": 1.17,
+    "balance_after": 286.7,
+    "timestamp": "2026-11-02T20:29:35.821637"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 252.81055806415358,
+    "friction": 1.15,
+    "balance_after": 392.05,
+    "timestamp": "2026-11-02T21:02:10.452230"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 258.7024356699723,
+    "friction": 1.15,
+    "balance_after": 426.86,
+    "timestamp": "2026-11-02T21:07:06.867566"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 36,
+    "price": 269.5661446541914,
+    "friction": 1.16,
+    "balance_after": 294.45,
+    "timestamp": "2026-11-02T21:39:10.540462"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 270.0,
+    "friction": 0.32,
+    "balance_after": 7299.68,
+    "timestamp": "2026-11-02T23:04:41.861690"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 258.8341736239132,
+    "friction": 1.15,
+    "balance_after": 421.99,
+    "timestamp": "2026-11-02T23:06:50.728726"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261102_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 35,
+    "price": 273.8824921006839,
+    "friction": 1.15,
+    "balance_after": 412.96,
+    "timestamp": "2026-11-02T23:55:24.342577"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 270.0,
+    "friction": 0.32,
+    "balance_after": 7299.68,
+    "timestamp": "2026-11-03T00:53:51.227984"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 258.8630447252444,
+    "friction": 1.15,
+    "balance_after": 420.92,
+    "timestamp": "2026-11-03T00:56:13.195105"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 261.6812584100027,
+    "friction": 1.16,
+    "balance_after": 316.63,
+    "timestamp": "2026-11-03T02:08:42.084317"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 36,
+    "price": 266.7372651666146,
+    "friction": 1.15,
+    "balance_after": 396.31,
+    "timestamp": "2026-11-03T02:21:34.991232"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 261.8800048828125,
+    "friction": 1.16,
+    "balance_after": 309.28,
+    "timestamp": "2026-11-03T02:22:28.595466"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 261.8800048828125,
+    "friction": 1.16,
+    "balance_after": 309.28,
+    "timestamp": "2026-11-03T02:22:38.986168"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 259.55641966539423,
+    "friction": 1.15,
+    "balance_after": 395.26,
+    "timestamp": "2026-11-03T02:23:25.223373"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 256.6305939032609,
+    "friction": 1.17,
+    "balance_after": 246.87,
+    "timestamp": "2026-11-03T02:23:25.557173"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.2946409461406,
+    "friction": 1.16,
+    "balance_after": 367.94,
+    "timestamp": "2026-11-03T02:43:30.752150"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 256.6305939032609,
+    "friction": 1.17,
+    "balance_after": 246.87,
+    "timestamp": "2026-11-03T02:43:30.985017"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 261.8800048828125,
+    "friction": 1.16,
+    "balance_after": 309.28,
+    "timestamp": "2026-11-03T02:43:49.673863"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 261.8800048828125,
+    "friction": 1.16,
+    "balance_after": 309.28,
+    "timestamp": "2026-11-03T02:47:08.541063"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 261.8800048828125,
+    "friction": 1.16,
+    "balance_after": 309.28,
+    "timestamp": "2026-11-03T02:47:17.146679"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 258.6865473831811,
+    "friction": 1.15,
+    "balance_after": 427.45,
+    "timestamp": "2026-11-03T02:47:48.368352"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 256.6305939032609,
+    "friction": 1.17,
+    "balance_after": 246.87,
+    "timestamp": "2026-11-03T02:47:48.679633"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 255.42680943956825,
+    "friction": 1.16,
+    "balance_after": 292.62,
+    "timestamp": "2026-11-03T12:13:24.323738"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 256.6305939032609,
+    "friction": 1.17,
+    "balance_after": 246.87,
+    "timestamp": "2026-11-03T12:13:24.630108"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 263.81508844650733,
+    "friction": 1.17,
+    "balance_after": 237.67,
+    "timestamp": "2026-11-03T12:15:58.422132"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:15:58.669611"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 38,
+    "price": 255.5008460100969,
+    "friction": 1.17,
+    "balance_after": 289.8,
+    "timestamp": "2026-11-03T12:17:55.476764"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:17:57.285760"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 40,
+    "price": 244.54218101362395,
+    "friction": 1.17,
+    "balance_after": 217.14,
+    "timestamp": "2026-11-03T12:20:36.387895"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:20:38.172327"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 35,
+    "price": 277.9363617484007,
+    "friction": 1.17,
+    "balance_after": 271.06,
+    "timestamp": "2026-11-03T12:22:08.727475"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:22:12.609224"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 259.6341717457042,
+    "friction": 1.15,
+    "balance_after": 392.38,
+    "timestamp": "2026-11-03T12:24:03.967414"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:24:08.916437"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 264.38250276602247,
+    "friction": 1.17,
+    "balance_after": 216.67,
+    "timestamp": "2026-11-03T12:26:26.512021"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:26:29.641455"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 39,
+    "price": 250.67935755452504,
+    "friction": 1.17,
+    "balance_after": 222.33,
+    "timestamp": "2026-11-03T12:29:33.289088"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:29:33.568469"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-03T12:31:49.577323"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:31:50.286251"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-03T12:35:05.242752"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:35:05.517049"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-03T12:37:20.804141"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:37:21.079976"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-03T12:41:41.459581"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:41:41.692997"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-03T12:45:45.664847"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:45:45.937989"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-03T12:53:50.646632"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261103_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-03T12:53:51.003272"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T09:46:23.461918"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T09:46:23.840685"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T10:28:57.102759"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T10:28:57.404067"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T11:58:25.787777"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T11:58:26.085585"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T21:50:01.627734"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T21:50:02.551435"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T22:16:27.391737"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T22:16:27.894289"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T22:32:11.257600"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T22:32:11.793878"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T22:52:21.614278"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T22:52:21.971644"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T23:02:27.065187"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T23:02:27.346414"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T23:17:03.098150"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T23:17:03.388040"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T23:29:43.596455"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T23:29:43.931024"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-04T23:50:08.771702"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-04T23:51:47.269801"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-04T23:52:33.871402"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261104_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-04T23:52:34.122967"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T16:39:25.426642"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-06T17:30:36.818738"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-06T17:30:37.125222"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-06T17:35:08.872064"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 257.99303651623023,
+    "friction": 1.15,
+    "balance_after": 453.11,
+    "timestamp": "2026-11-06T17:35:09.159382"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:35:21.725761"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:37:09.935883"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:39:00.906550"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:41:38.433221"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:44:53.012387"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:46:33.864364"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:48:44.473618"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:50:56.609086"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:52:38.601970"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:55:21.446870"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:57:06.526085"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T17:59:16.533886"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T18:02:45.452212"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1002",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "SELL",
+    "qty": 10,
+    "price": 252.0,
+    "friction": 0.3,
+    "balance_after": 50019.4,
+    "timestamp": "2026-11-06T18:02:45.470227"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T18:03:08.381107"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T18:05:20.984769"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 100,
+    "price": 250.0,
+    "friction": 3.0,
+    "balance_after": 24997.0,
+    "timestamp": "2026-11-06T18:14:51.319418"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 100,
+    "price": 250.0,
+    "friction": 3.0,
+    "balance_after": 24997.0,
+    "timestamp": "2026-11-06T18:16:12.457037"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-06T18:16:26.058799"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 259.40277118176067,
+    "friction": 1.15,
+    "balance_after": 400.95,
+    "timestamp": "2026-11-06T18:16:26.457081"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T18:16:28.216278"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1002",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "SELL",
+    "qty": 10,
+    "price": 252.0,
+    "friction": 0.3,
+    "balance_after": 50019.4,
+    "timestamp": "2026-11-06T18:16:28.230120"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 100,
+    "price": 250.0,
+    "friction": 3.0,
+    "balance_after": 24997.0,
+    "timestamp": "2026-11-06T18:18:32.866354"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 260.91200736387214,
+    "friction": 1.16,
+    "balance_after": 345.1,
+    "timestamp": "2026-11-06T18:18:39.689392"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 37,
+    "price": 259.40277118176067,
+    "friction": 1.15,
+    "balance_after": 400.95,
+    "timestamp": "2026-11-06T18:18:40.025917"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T18:18:41.414764"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1002",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "SELL",
+    "qty": 10,
+    "price": 252.0,
+    "friction": 0.3,
+    "balance_after": 50019.4,
+    "timestamp": "2026-11-06T18:18:41.429623"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261106_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-06T18:18:57.092965"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 100,
+    "price": 250.0,
+    "friction": 3.0,
+    "balance_after": 24997.0,
+    "timestamp": "2026-11-07T00:18:07.810022"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-07T00:18:25.437047"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 100,
+    "price": 250.0,
+    "friction": 3.0,
+    "balance_after": 24997.0,
+    "timestamp": "2026-11-07T00:40:10.876228"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 100,
+    "price": 250.0,
+    "friction": 3.0,
+    "balance_after": 24997.0,
+    "timestamp": "2026-11-07T00:45:14.744469"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-07T00:46:08.669842"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-07T01:45:26.912677"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-07T01:50:31.529957"
+  },
+  {
+    "stat": "Ok",
+    "norenordno": "SIM_20261107_1001",
+    "tsym": "NIFTYBEES-EQ",
+    "action": "BUY",
+    "qty": 10,
+    "price": 250.0,
+    "friction": 0.3,
+    "balance_after": 47499.7,
+    "timestamp": "2026-11-07T02:15:00.753056"
+  }
+]{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T02:19:04.561161"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T02:19:04.562161"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T02:19:04.564159"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T02:19:04.626688"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T02:19:33.004388"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T02:19:33.005664"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T02:19:33.006666"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T02:19:33.062823"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:19:46.169680"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:33:16.666060"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:35:06.480554"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:38:48.968704"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:48:09.304923"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:52:09.193902"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:56:19.693889"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T02:58:28.788293"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T03:03:13.916126"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T03:04:30.290457"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T03:04:30.290457"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T03:04:30.291454"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T03:04:30.343031"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T03:05:16.732844"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T03:05:16.733840"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T03:05:16.734844"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T03:05:16.815679"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T03:05:34.319515"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T03:41:27.192007"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T03:41:27.193949"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T03:41:27.194950"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T03:41:27.383264"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 24997.0, "timestamp": "2026-11-07T03:51:53.760021"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T03:53:18.711459"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T03:53:38.190860"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T03:53:38.191860"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T03:53:38.192866"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T03:53:38.250644"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T03:54:52.562431"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T03:54:52.562431"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T03:54:52.564433"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T03:54:52.615782"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T03:55:14.183198"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T12:25:11.202452"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T12:25:11.203430"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T12:25:11.205433"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T12:25:11.263495"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T12:25:34.016211"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T13:10:08.006261"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T14:32:40.139529"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T14:32:40.140528"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T14:32:40.142531"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T14:32:40.203362"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 250.0, "friction": 0.3, "balance_after": 47499.7, "timestamp": "2026-11-07T14:32:53.725415"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T14:57:07.538113"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T14:57:07.540595"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T14:57:07.541504"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T14:57:07.610924"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T15:20:18.639383"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T15:20:18.641393"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T15:20:18.642387"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T15:20:18.726526"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "SELL", "qty": 100, "price": 250.0, "friction": 3.0, "balance_after": 124997.0, "timestamp": "2026-11-07T15:59:43.603322"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1002", "tsym": "GOLDBEES-EQ", "action": "SELL", "qty": 50, "price": 60.0, "friction": 0.36, "balance_after": 127996.64, "timestamp": "2026-11-07T15:59:43.605323"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1003", "tsym": "RELIANCE-EQ", "action": "SELL", "qty": 10, "price": 2500.0, "friction": 62.5, "balance_after": 152934.14, "timestamp": "2026-11-07T15:59:43.607363"}
+{"stat": "Ok", "norenordno": "SIM_20261107_1001", "tsym": "NIFTYBEES-EQ", "action": "BUY", "qty": 10, "price": 0.0, "friction": 0.0, "balance_after": 100000.0, "timestamp": "2026-11-07T15:59:43.677825"}

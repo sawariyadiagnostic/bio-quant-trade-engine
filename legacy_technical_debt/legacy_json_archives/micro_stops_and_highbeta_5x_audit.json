@@ -1,0 +1,344 @@
+{
+  "micro_stop_sweep": {
+    "asset": "NIFTYBEES",
+    "sweep": [
+      {
+        "threshold_pct": 0.05,
+        "threshold_bps": 5.0,
+        "final_capital": 31535.48,
+        "net_return_pct": 215.35,
+        "win_rate_pct": 74.7,
+        "whipsaw_count": 5,
+        "whipsaw_rate_pct": 2.01
+      },
+      {
+        "threshold_pct": 0.1,
+        "threshold_bps": 10.0,
+        "final_capital": 28808.98,
+        "net_return_pct": 188.09,
+        "win_rate_pct": 74.3,
+        "whipsaw_count": 5,
+        "whipsaw_rate_pct": 2.01
+      },
+      {
+        "threshold_pct": 0.15,
+        "threshold_bps": 15.0,
+        "final_capital": 26588.84,
+        "net_return_pct": 165.89,
+        "win_rate_pct": 74.7,
+        "whipsaw_count": 5,
+        "whipsaw_rate_pct": 2.01
+      },
+      {
+        "threshold_pct": 0.2,
+        "threshold_bps": 20.0,
+        "final_capital": 24452.04,
+        "net_return_pct": 144.52,
+        "win_rate_pct": 73.09,
+        "whipsaw_count": 8,
+        "whipsaw_rate_pct": 3.21
+      },
+      {
+        "threshold_pct": 0.25,
+        "threshold_bps": 25.0,
+        "final_capital": 22553.94,
+        "net_return_pct": 125.54,
+        "win_rate_pct": 72.29,
+        "whipsaw_count": 11,
+        "whipsaw_rate_pct": 4.42
+      },
+      {
+        "threshold_pct": 0.5,
+        "threshold_bps": 50.0,
+        "final_capital": 16576.41,
+        "net_return_pct": 65.76,
+        "win_rate_pct": 67.47,
+        "whipsaw_count": 130,
+        "whipsaw_rate_pct": 52.21
+      },
+      {
+        "threshold_pct": 1.0,
+        "threshold_bps": 100.0,
+        "final_capital": 13586.1,
+        "net_return_pct": 35.86,
+        "win_rate_pct": 63.86,
+        "whipsaw_count": 72,
+        "whipsaw_rate_pct": 28.92
+      }
+    ]
+  },
+  "highbeta_leverage_stress": {
+    "HAL": {
+      "symbol": "HAL",
+      "bars": 250,
+      "start_date": "2025-10-24",
+      "end_date": "2026-10-28",
+      "buy_and_hold_return_pct": 1.79,
+      "average_overnight_gap_pct": 0.07,
+      "worst_overnight_gap_down_pct": -4.42,
+      "max_safe_leverage_ceiling": 11.3,
+      "leverage_results": {
+        "1x": {
+          "pure_open": {
+            "final_capital": 11087.17,
+            "return_pct": 10.87,
+            "max_drawdown_pct": -6.05,
+            "worst_single_day_loss_pct": -4.45
+          },
+          "dynamic_trail": {
+            "final_capital": 34172.71,
+            "return_pct": 241.73,
+            "max_drawdown_pct": -4.66,
+            "worst_single_day_loss_pct": -4.45
+          }
+        },
+        "2x": {
+          "pure_open": {
+            "final_capital": 11406.12,
+            "return_pct": 14.06,
+            "max_drawdown_pct": -12.96,
+            "worst_single_day_loss_pct": -8.92
+          },
+          "dynamic_trail": {
+            "final_capital": 103950.7,
+            "return_pct": 939.51,
+            "max_drawdown_pct": -9.26,
+            "worst_single_day_loss_pct": -8.92
+          }
+        },
+        "3x": {
+          "pure_open": {
+            "final_capital": 11574.68,
+            "return_pct": 15.75,
+            "max_drawdown_pct": -19.81,
+            "worst_single_day_loss_pct": -13.4
+          },
+          "dynamic_trail": {
+            "final_capital": 300067.82,
+            "return_pct": 2900.68,
+            "max_drawdown_pct": -13.72,
+            "worst_single_day_loss_pct": -13.4
+          }
+        },
+        "5x": {
+          "pure_open": {
+            "final_capital": 11424.38,
+            "return_pct": 14.24,
+            "max_drawdown_pct": -33.11,
+            "worst_single_day_loss_pct": -22.35
+          },
+          "dynamic_trail": {
+            "final_capital": 2154373.37,
+            "return_pct": 21443.73,
+            "max_drawdown_pct": -22.35,
+            "worst_single_day_loss_pct": -22.35
+          }
+        }
+      }
+    },
+    "MOTHERSON": {
+      "symbol": "MOTHERSON",
+      "bars": 250,
+      "start_date": "2025-10-24",
+      "end_date": "2026-10-28",
+      "buy_and_hold_return_pct": 51.63,
+      "average_overnight_gap_pct": 0.1,
+      "worst_overnight_gap_down_pct": -5.35,
+      "max_safe_leverage_ceiling": 9.3,
+      "leverage_results": {
+        "1x": {
+          "pure_open": {
+            "final_capital": 11827.7,
+            "return_pct": 18.28,
+            "max_drawdown_pct": -10.17,
+            "worst_single_day_loss_pct": -5.38
+          },
+          "dynamic_trail": {
+            "final_capital": 70997.87,
+            "return_pct": 609.98,
+            "max_drawdown_pct": -8.5,
+            "worst_single_day_loss_pct": -5.38
+          }
+        },
+        "2x": {
+          "pure_open": {
+            "final_capital": 12750.34,
+            "return_pct": 27.5,
+            "max_drawdown_pct": -19.91,
+            "worst_single_day_loss_pct": -10.78
+          },
+          "dynamic_trail": {
+            "final_capital": 421460.11,
+            "return_pct": 4114.6,
+            "max_drawdown_pct": -16.9,
+            "worst_single_day_loss_pct": -10.78
+          }
+        },
+        "3x": {
+          "pure_open": {
+            "final_capital": 13330.24,
+            "return_pct": 33.3,
+            "max_drawdown_pct": -29.24,
+            "worst_single_day_loss_pct": -16.19
+          },
+          "dynamic_trail": {
+            "final_capital": 2245790.84,
+            "return_pct": 22357.91,
+            "max_drawdown_pct": -25.03,
+            "worst_single_day_loss_pct": -16.19
+          }
+        },
+        "5x": {
+          "pure_open": {
+            "final_capital": 13305.23,
+            "return_pct": 33.05,
+            "max_drawdown_pct": -46.19,
+            "worst_single_day_loss_pct": -27.0
+          },
+          "dynamic_trail": {
+            "final_capital": 47482273.81,
+            "return_pct": 474722.74,
+            "max_drawdown_pct": -40.33,
+            "worst_single_day_loss_pct": -27.0
+          }
+        }
+      }
+    },
+    "DIXON": {
+      "symbol": "DIXON",
+      "bars": 250,
+      "start_date": "2025-10-24",
+      "end_date": "2026-10-28",
+      "buy_and_hold_return_pct": -26.35,
+      "average_overnight_gap_pct": 0.15,
+      "worst_overnight_gap_down_pct": -3.97,
+      "max_safe_leverage_ceiling": 12.6,
+      "leverage_results": {
+        "1x": {
+          "pure_open": {
+            "final_capital": 13608.83,
+            "return_pct": 36.09,
+            "max_drawdown_pct": -8.95,
+            "worst_single_day_loss_pct": -4.0
+          },
+          "dynamic_trail": {
+            "final_capital": 63641.43,
+            "return_pct": 536.41,
+            "max_drawdown_pct": -7.02,
+            "worst_single_day_loss_pct": -4.0
+          }
+        },
+        "2x": {
+          "pure_open": {
+            "final_capital": 16932.41,
+            "return_pct": 69.32,
+            "max_drawdown_pct": -17.61,
+            "worst_single_day_loss_pct": -8.02
+          },
+          "dynamic_trail": {
+            "final_capital": 343585.07,
+            "return_pct": 3335.85,
+            "max_drawdown_pct": -13.91,
+            "worst_single_day_loss_pct": -8.02
+          }
+        },
+        "3x": {
+          "pure_open": {
+            "final_capital": 20501.7,
+            "return_pct": 105.02,
+            "max_drawdown_pct": -25.69,
+            "worst_single_day_loss_pct": -12.04
+          },
+          "dynamic_trail": {
+            "final_capital": 1688451.4,
+            "return_pct": 16784.51,
+            "max_drawdown_pct": -20.55,
+            "worst_single_day_loss_pct": -12.04
+          }
+        },
+        "5x": {
+          "pure_open": {
+            "final_capital": 27776.19,
+            "return_pct": 177.76,
+            "max_drawdown_pct": -40.22,
+            "worst_single_day_loss_pct": -20.08
+          },
+          "dynamic_trail": {
+            "final_capital": 31620659.84,
+            "return_pct": 316106.6,
+            "max_drawdown_pct": -33.03,
+            "worst_single_day_loss_pct": -20.08
+          }
+        }
+      }
+    },
+    "NIFTYBEES": {
+      "symbol": "NIFTYBEES",
+      "bars": 250,
+      "start_date": "2025-10-27",
+      "end_date": "2026-10-29",
+      "buy_and_hold_return_pct": -10.73,
+      "average_overnight_gap_pct": 0.32,
+      "worst_overnight_gap_down_pct": -2.47,
+      "max_safe_leverage_ceiling": 20.2,
+      "leverage_results": {
+        "1x": {
+          "pure_open": {
+            "final_capital": 21420.27,
+            "return_pct": 114.2,
+            "max_drawdown_pct": -2.69,
+            "worst_single_day_loss_pct": -2.48
+          },
+          "dynamic_trail": {
+            "final_capital": 20062.47,
+            "return_pct": 100.62,
+            "max_drawdown_pct": -3.1,
+            "worst_single_day_loss_pct": -2.48
+          }
+        },
+        "2x": {
+          "pure_open": {
+            "final_capital": 42472.35,
+            "return_pct": 324.72,
+            "max_drawdown_pct": -5.55,
+            "worst_single_day_loss_pct": -4.99
+          },
+          "dynamic_trail": {
+            "final_capital": 37188.1,
+            "return_pct": 271.88,
+            "max_drawdown_pct": -6.35,
+            "worst_single_day_loss_pct": -4.99
+          }
+        },
+        "3x": {
+          "pure_open": {
+            "final_capital": 82927.71,
+            "return_pct": 729.28,
+            "max_drawdown_pct": -8.4,
+            "worst_single_day_loss_pct": -7.5
+          },
+          "dynamic_trail": {
+            "final_capital": 67758.59,
+            "return_pct": 577.59,
+            "max_drawdown_pct": -9.55,
+            "worst_single_day_loss_pct": -7.5
+          }
+        },
+        "5x": {
+          "pure_open": {
+            "final_capital": 302353.87,
+            "return_pct": 2923.54,
+            "max_drawdown_pct": -14.05,
+            "worst_single_day_loss_pct": -12.52
+          },
+          "dynamic_trail": {
+            "final_capital": 214073.86,
+            "return_pct": 2040.74,
+            "max_drawdown_pct": -15.86,
+            "worst_single_day_loss_pct": -12.52
+          }
+        }
+      }
+    }
+  }
+}
