@@ -8,10 +8,10 @@
     <link rel="stylesheet" href="/vendor/ag-grid.min.css">
     <link rel="stylesheet" href="/vendor/ag-theme-alpine.min.css">
     <script src="/vendor/tailwind.min.js"></script>
-    <script src="/vendor/plotly.min.js?v=3.7.1"></script>
+    <script src="/vendor/plotly-full.min.js?v=3.7.2"></script>
     <script src="/vendor/ag-grid-community.min.js"></script>
-    <script src="/audio_synth.js?v=2.0.2"></script>
-    <script src="/app.js?v=2.0.2"></script>
+    <script src="/audio_synth.js?v=2.0.4"></script>
+    <script src="/app.js?v=2.0.4"></script>
     <script defer src="/vendor/alpine.min.js"></script>
     <style>
         body { background-color: #0b0f19; color: #f1f5f9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
@@ -166,8 +166,36 @@
                         <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
                         Node 2: MAP-Elites Engine
                     </span>
-                    <span class="text-[10px] text-slate-500">Cores 2-3</span>
+                    <span class="text-[10px] text-slate-500" x-text="computeTarget === 'remote' ? 'Kaggle GPU ⚡' : 'Cores 2-3'">Cores 2-3</span>
                 </div>
+
+                <!-- Compute Target Selector (Local CPU vs Kaggle Cloud GPU) -->
+                <div class="flex space-x-1 bg-slate-900 p-0.5 rounded border border-slate-800 text-[10px]">
+                    <button type="button" @click="computeTarget = 'local'"
+                            :class="computeTarget === 'local' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                            class="flex-1 py-0.5 rounded text-center transition">
+                        Local CPU
+                    </button>
+                    <button type="button" @click="computeTarget = 'remote'"
+                            :class="computeTarget === 'remote' ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
+                            class="flex-1 py-0.5 rounded text-center transition">
+                        Kaggle GPU ⚡
+                    </button>
+                </div>
+
+                <!-- Remote Kaggle GPU Connection Panel -->
+                <div x-show="computeTarget === 'remote'" x-transition class="space-y-1.5 bg-purple-950/40 p-2 rounded border border-purple-800/50">
+                    <div class="flex justify-between items-center text-[10px]">
+                        <span class="text-purple-300 font-semibold">CLOUDFLARE TUNNEL URL</span>
+                        <button type="button" @click="testRemoteGpu()" class="text-purple-400 hover:text-purple-200 underline">
+                            Test Ping
+                        </button>
+                    </div>
+                    <input type="text" x-model="remoteUrl" placeholder="https://xxx.trycloudflare.com"
+                           class="w-full bg-slate-900 border border-purple-700/60 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-purple-400 font-mono">
+                    <div x-show="remoteGpuStatus" class="text-[10px]" :class="remoteGpuStatus && remoteGpuStatus.online ? 'text-emerald-400' : 'text-rose-400'" x-text="remoteGpuStatus ? remoteGpuStatus.message : ''"></div>
+                </div>
+
                 <div>
                     <div class="flex justify-between text-[10px] text-slate-400 mb-1">
                         <span>GENERATIONS</span>

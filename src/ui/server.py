@@ -12,11 +12,12 @@ import math
 import os
 import time
 from typing import Any, AsyncGenerator, Dict, Optional
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
+import threading
 from pydantic import BaseModel
 
 from src.evolution.archive_store import ArchiveStore
@@ -26,6 +27,7 @@ from src.manifold.lake_dataset_loader import LakeDatasetLoader
 from src.pipeline.evolution_worker import spawn_evolution_worker
 from src.pipeline.shared_telemetry import SharedMemoryBus
 from src.pipeline.windows_job import WindowsJobManager
+from src.remote.colab_bridge_client import ColabBridgeClient
 
 
 class IngestRequest(BaseModel):
@@ -39,6 +41,12 @@ class EvolveRequest(BaseModel):
     population_size: int = 50
     lookback_years: float = 1.0
     seed: Optional[int] = None
+    compute_target: str = "local"
+    remote_url: Optional[str] = None
+
+
+class RemoteHealthRequest(BaseModel):
+    url: str
 
 
 class WorkerSupervisor:
@@ -50,6 +58,8 @@ class WorkerSupervisor:
         self.shm_bus = SharedMemoryBus(create=True)
         self.archive_store = ArchiveStore(self.db_path)
         self.worker_process = None
+        self.remote_thread: Optional[threading.Thread] = None
+        self.is_remote: bool = False
         self.instrument: str = "NIFTYBEES"
         self.lookback_years: float = 1.0
         self.generations: int = 10
@@ -113,8 +123,108 @@ class WorkerSupervisor:
         logger.info(f"[Supervisor] Spawned Worker PID {self.worker_process.pid} bound to Job Object.")
         return True
 
+    def start_remote_worker(
+        self,
+        remote_url: str,
+        instrument: str,
+        generations: int = 10,
+        population_size: int = 50,
+        lookback_years: float = 1.0,
+        seed: Optional[int] = None
+    ) -> bool:
+        """Dispatches evolution job to remote Kaggle GPU worker via Cloudflare Tunnel."""
+        if self.is_worker_running():
+            logger.warning("[Supervisor] Worker is already running. Cannot start another.")
+            return False
+
+        self.instrument = instrument
+        self.generations = generations
+        self.population_size = population_size
+        self.lookback_years = lookback_years
+        self.is_remote = True
+
+        if self.shm_bus:
+            self.shm_bus.header.abort_requested = 0
+            self.shm_bus.update_header(
+                current_gen=0,
+                total_gens=generations,
+                worker_status=1
+            )
+
+        def _remote_runner():
+            lookback_str = f"{int(lookback_years)}y" if lookback_years >= 1.0 else "1y"
+            job_params = {
+                "ticker": f"{instrument}.NS" if not instrument.endswith(".NS") else instrument,
+                "generations": generations,
+                "population_size": population_size,
+                "lookback": lookback_str,
+                "warm_start": True
+            }
+            logger.info(f"[Supervisor] Streaming Kaggle GPU evolution from {remote_url} on {instrument}...")
+            try:
+                for event in ColabBridgeClient.stream_evolution(remote_url, job_params):
+                    if self.shm_bus and self.shm_bus.is_abort_requested():
+                        logger.warning("[Supervisor] Remote Kaggle evolution aborted by operator.")
+                        break
+
+                    ev_type = event.get("event")
+                    if ev_type == "generation":
+                        gen_num = int(event.get("generation", 0))
+                        top_calmar = float(event.get("top_calmar", 0.0))
+                        survivors = int(event.get("survivors", 0))
+                        if self.shm_bus:
+                            self.shm_bus.update_header(
+                                current_gen=gen_num,
+                                top_sharpe=top_calmar,
+                                survivor_count=survivors
+                            )
+                    elif ev_type == "complete":
+                        logger.success("[Supervisor] Kaggle GPU evolution cycle complete.")
+
+                # On completion, fetch full archive and sync into SQLite
+                archive_data = ColabBridgeClient.fetch_archive(remote_url, instrument, lookback=lookback_str)
+                if archive_data and "elites" in archive_data:
+                    elites = archive_data["elites"]
+                    logger.info(f"[Supervisor] Synchronizing {len(elites)} Kaggle GPU resident champions into SQLite...")
+                    self.archive_store.batch_upsert_elites(instrument, lookback_str, elites)
+                    for e in elites:
+                        if self.shm_bus:
+                            self.shm_bus.write_elite(
+                                row=int(e.get("row", 0)),
+                                col=int(e.get("col", 0)),
+                                fitness=float(e.get("fitness", 0.0)),
+                                net_return_pct=float(e.get("net_return_pct", 0.0)),
+                                cagr_pct=float(e.get("cagr_pct", 0.0)),
+                                max_drawdown=float(e.get("max_drawdown", 0.0)),
+                                win_rate=float(e.get("win_rate", 0.0)),
+                                turnover=float(e.get("turnover", 0.0)),
+                                volatility=float(e.get("volatility", 0.0)),
+                                sortino=float(e.get("sortino", 0.0)),
+                                profit_factor=float(e.get("profit_factor", 0.0)),
+                                trades_count=int(e.get("trades_count", 0)),
+                                formula_str=str(e.get("formula_str", ""))
+                            )
+
+                if self.shm_bus:
+                    self.shm_bus.update_header(
+                        current_gen=generations,
+                        worker_status=3
+                    )
+            except Exception as exc:
+                logger.error(f"[Supervisor] Remote GPU runner failed: {exc}")
+                if self.shm_bus:
+                    self.shm_bus.update_header(worker_status=2)
+            finally:
+                self.is_remote = False
+
+        self.remote_thread = threading.Thread(target=_remote_runner, daemon=True)
+        self.remote_thread.start()
+        return True
+
     def abort_worker(self) -> bool:
         """Sets atomic abort flag in shared memory for sub-millisecond worker termination."""
+        if self.is_remote:
+            self.is_remote = False
         if self.shm_bus:
             self.shm_bus.request_abort()
             logger.warning("[Supervisor] Atomic abort requested via SharedMemoryBus.")
@@ -123,6 +233,9 @@ class WorkerSupervisor:
 
     def is_worker_running(self) -> bool:
         """Returns True if worker is alive and actively emitting microsecond heartbeats."""
+        if self.is_remote:
+            return bool(self.remote_thread and self.remote_thread.is_alive())
+
         if self.worker_process is None or not self.worker_process.is_alive():
             return False
 
@@ -258,20 +371,37 @@ def ingest(payload: IngestRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.post("/api/remote/health")
+def remote_health(payload: RemoteHealthRequest) -> Dict[str, Any]:
+    """Tests connection to remote Kaggle GPU worker and queries GPU VRAM/specs."""
+    return ColabBridgeClient.check_health(payload.url)
+
+
 @app.post("/api/pipeline/evolve")
 def evolve(payload: EvolveRequest) -> Dict[str, Any]:
-    """Discrete pipeline evolution node triggering background worker."""
-    started = supervisor.start_worker(
-        instrument=payload.instrument,
-        generations=payload.generations,
-        population_size=payload.population_size,
-        lookback_years=payload.lookback_years,
-        seed=payload.seed
-    )
+    """Discrete pipeline evolution node triggering background worker (local or remote GPU)."""
+    if payload.compute_target == "remote" and payload.remote_url:
+        started = supervisor.start_remote_worker(
+            remote_url=payload.remote_url,
+            instrument=payload.instrument,
+            generations=payload.generations,
+            population_size=payload.population_size,
+            lookback_years=payload.lookback_years,
+            seed=payload.seed
+        )
+    else:
+        started = supervisor.start_worker(
+            instrument=payload.instrument,
+            generations=payload.generations,
+            population_size=payload.population_size,
+            lookback_years=payload.lookback_years,
+            seed=payload.seed
+        )
     if not started:
         raise HTTPException(status_code=409, detail="Evolution worker is already active.")
     return {
         "status": "STARTED",
+        "compute_target": payload.compute_target,
         "instrument": payload.instrument,
         "generations": payload.generations,
         "population_size": payload.population_size,
@@ -578,7 +708,21 @@ async def stream_evolution(
     )
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """Enforces no-cache headers across all mounted static files to eliminate browser cache skew."""
+
+    def is_not_modified(self, response_headers: Any, request_headers: Any) -> bool:
+        return False
+
+    async def get_response(self, path: str, scope: Any) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+
 # Static Assets Mounting
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+    app.mount("/", NoCacheStaticFiles(directory=static_dir, html=True), name="static")

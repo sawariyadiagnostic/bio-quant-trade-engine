@@ -28,6 +28,11 @@ function cockpitApp() {
         gridApi: null,
         rafPending: false,
 
+        // Compute Target & Remote GPU State
+        computeTarget: 'local',
+        remoteUrl: localStorage.getItem('bioquant_remote_url') || '',
+        remoteGpuStatus: null,
+
         // Universe Catalog State
         universeCategories: {},
         universeCount: 0,
@@ -249,9 +254,40 @@ function cockpitApp() {
                     { field: 'ticker', headerName: 'Ticker', width: 100, pinned: 'left' },
                     { field: 'fitness', headerName: 'Sharpe / Fitness', width: 140, sort: 'desc', valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(3) : '-' },
                     { field: 'sortino', headerName: 'Sortino', width: 110, valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(2) : '-' },
-                    { field: 'cagr_pct', headerName: 'CAGR %', width: 110, valueFormatter: p => (p.value !== undefined && p.value !== null) ? (p.value > 10000 ? '>10,000%' : p.value.toFixed(1) + '%') : '-' },
-                    { field: 'max_drawdown', headerName: 'Max DD %', width: 120, valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(1) + '%' : '-' },
-                    { field: 'win_rate', headerName: 'Win Rate %', width: 120, valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(1) + '%' : '-' },
+                    { 
+                        field: 'cagr_pct', 
+                        headerName: 'CAGR %', 
+                        width: 110, 
+                        valueFormatter: p => {
+                            if (p.value === undefined || p.value === null || isNaN(p.value)) return '-';
+                            let val = parseFloat(p.value);
+                            if (val <= 1.0 && val > 0.0) val = val * 100.0;
+                            return val > 10000 ? '>10,000%' : val.toFixed(1) + '%';
+                        }
+                    },
+                    { 
+                        field: 'max_drawdown', 
+                        headerName: 'Max DD %', 
+                        width: 120, 
+                        valueFormatter: p => {
+                            if (p.value === undefined || p.value === null || isNaN(p.value)) return '-';
+                            let val = parseFloat(p.value);
+                            if (val <= 1.0 && val > 0.0) val = val * 100.0;
+                            return val.toFixed(1) + '%';
+                        }
+                    },
+                    { 
+                        field: 'win_rate', 
+                        headerName: 'Win Rate %', 
+                        width: 120, 
+                        valueFormatter: p => {
+                            if (p.value === undefined || p.value === null || isNaN(p.value)) return '-';
+                            let val = parseFloat(p.value);
+                            if (val > 100.0) val = val / 100.0;
+                            else if (val <= 1.0 && val > 0.0) val = val * 100.0;
+                            return val.toFixed(1) + '%';
+                        }
+                    },
                     { field: 'trades_count', headerName: 'Trades', width: 90 },
                     { field: 'formula_str', headerName: 'Genomic Alpha Expression', flex: 1, minWidth: 250 }
                 ],
@@ -524,16 +560,57 @@ function cockpitApp() {
             }
         },
 
+        async testRemoteGpu() {
+            if (!this.remoteUrl) {
+                this.remoteGpuStatus = { online: false, message: 'Please enter a Cloudflare Tunnel URL.' };
+                return;
+            }
+            localStorage.setItem('bioquant_remote_url', this.remoteUrl);
+            this.remoteGpuStatus = { online: false, message: 'Testing remote connection...' };
+            try {
+                const res = await fetch('/api/remote/health', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: this.remoteUrl })
+                });
+                const data = await res.json();
+                if (data.online) {
+                    this.remoteGpuStatus = {
+                        online: true,
+                        message: `🟢 ${data.device || 'GPU'} (${data.vram_gb || '16'} GB) · ${data.latency_ms}ms`
+                    };
+                    this.log(`Remote GPU verified: ${data.device} (${data.latency_ms}ms latency)`, 'success');
+                } else {
+                    this.remoteGpuStatus = { online: false, message: `❌ ${data.error || 'Connection failed'}` };
+                    this.log(`Remote GPU check failed: ${data.error}`, 'error');
+                }
+            } catch (err) {
+                this.remoteGpuStatus = { online: false, message: `❌ Failed: ${err}` };
+            }
+        },
+
         async startEvolution() {
+            if (this.computeTarget === 'remote') {
+                if (!this.remoteUrl) {
+                    this.log("Please provide a Kaggle Cloudflare Tunnel URL before starting.", "error");
+                    this.remoteGpuStatus = { online: false, message: 'Please enter a Cloudflare Tunnel URL.' };
+                    return;
+                }
+                localStorage.setItem('bioquant_remote_url', this.remoteUrl);
+            }
+
             this.status = 'EVOLVING';
+            const targetLabel = this.computeTarget === 'remote' ? 'Kaggle Cloud GPU' : 'Local CPU (Cores 2-3)';
             const seedStr = this.randomSeed ? ` (Seed: ${this.randomSeed})` : '';
-            this.log(`Node 2: Spawning isolated compute worker for ${this.instrument}, ${this.generations} generations${seedStr}...`);
+            this.log(`Node 2: Dispatching compute to ${targetLabel} for ${this.instrument}, ${this.generations} generations${seedStr}...`);
             try {
                 const payload = {
                     instrument: this.instrument,
                     generations: parseInt(this.generations),
                     population_size: parseInt(this.populationSize),
-                    lookback_years: parseFloat(this.lookbackYears)
+                    lookback_years: parseFloat(this.lookbackYears),
+                    compute_target: this.computeTarget,
+                    remote_url: this.remoteUrl
                 };
                 if (this.randomSeed !== null && !isNaN(this.randomSeed)) {
                     payload.seed = parseInt(this.randomSeed);
@@ -545,7 +622,8 @@ function cockpitApp() {
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    this.log(`Node 2 Started: Worker running on Cores 2-3 (Seed: ${data.seed ?? 'auto'}).`, 'success');
+                    const modeMsg = data.compute_target === 'remote' ? 'Kaggle GPU Worker via Cloudflare Tunnel' : 'Local Cores 2-3';
+                    this.log(`Node 2 Started: Compute running on ${modeMsg} (Seed: ${data.seed ?? 'auto'}).`, 'success');
                 } else {
                     this.log(`Evolve start error: ${data.detail}`, 'error');
                 }
