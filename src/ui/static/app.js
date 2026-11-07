@@ -382,17 +382,21 @@ function cockpitApp() {
                 mode: 'markers',
                 type: 'scatter3d',
                 marker: {
-                    size: pts.map(p => p.is_orthogonal ? 8 : (p.is_survivor ? 6 : 4)),
+                    size: pts.map(p => p.is_orthogonal ? 11 : (p.is_survivor ? 8 : 5)),
                     color: pts.map(p => p.cluster),
-                    colorscale: 'Plasma',
+                    colorscale: 'Turbo',
                     showscale: true,
-                    colorbar: { title: 'Cluster ID', tickfont: { color: '#94a3b8' } },
+                    colorbar: {
+                        title: { text: 'Cluster ID', font: { color: '#e2e8f0', size: 10 } },
+                        tickfont: { color: '#94a3b8' }
+                    },
                     opacity: pts.map(p => p.is_survivor ? 0.95 : 0.45)
                 },
                 text: pts.map(p => {
                     const fStr = (p.formula || '').slice(0, 60);
-                    return `<b>Cluster ${p.cluster}</b> (${p.is_orthogonal ? 'Orthogonal' : (p.is_survivor ? 'Occam Survivor' : 'Pruned Clone')})<br>` +
-                           `Formula: <code>${fStr}..</code><br>` +
+                    const tag = p.is_orthogonal ? 'Orthogonal Stream' : (p.is_survivor ? 'Occam Survivor' : 'Pruned Clone');
+                    return `<b>Cluster ${p.cluster} (${tag})</b><br>` +
+                           `Formula: ${fStr}..<br>` +
                            `Sharpe: ${p.fitness?.toFixed(2)} | CAGR: ${p.cagr_pct?.toFixed(1)}% | MaxDD: ${p.max_drawdown?.toFixed(1)}%`;
                 }),
                 hovertemplate: '%{text}<extra></extra>'
@@ -402,13 +406,35 @@ function cockpitApp() {
                 paper_bgcolor: '#0f172a',
                 font: { color: '#94a3b8', family: 'monospace' },
                 scene: {
-                    xaxis: { title: 'Dim 1 (Topology)', backgroundcolor: '#0b0f19', gridcolor: '#1e293b' },
-                    yaxis: { title: 'Dim 2 (Regime)', backgroundcolor: '#0b0f19', gridcolor: '#1e293b' },
-                    zaxis: { title: 'Dim 3 (Trajectory)', backgroundcolor: '#0b0f19', gridcolor: '#1e293b' }
+                    bgcolor: '#0b0f19',
+                    xaxis: {
+                        title: { text: 'Dim 1 (AST Topology)', font: { color: '#94a3b8' } },
+                        backgroundcolor: '#0f172a',
+                        gridcolor: '#1e293b',
+                        showbackground: true,
+                        zerolinecolor: '#334155'
+                    },
+                    yaxis: {
+                        title: { text: 'Dim 2 (Regime Sensitivity)', font: { color: '#94a3b8' } },
+                        backgroundcolor: '#0f172a',
+                        gridcolor: '#1e293b',
+                        showbackground: true,
+                        zerolinecolor: '#334155'
+                    },
+                    zaxis: {
+                        title: { text: 'Dim 3 (Execution Trajectory)', font: { color: '#94a3b8' } },
+                        backgroundcolor: '#0f172a',
+                        gridcolor: '#1e293b',
+                        showbackground: true,
+                        zerolinecolor: '#334155'
+                    },
+                    camera: {
+                        eye: { x: 1.5, y: 1.5, z: 1.2 }
+                    }
                 },
                 margin: { t: 30, b: 20, l: 20, r: 20 },
                 title: {
-                    text: `🌌 3D Phenotype Manifold & Occam Pruning: ${this.instrument} (${pts.length} Champions · ${data.clusters_count} Clusters · ${this.manifoldCompression}% Redundant Clones Pruned)`,
+                    text: `🌌 3D Strategy Manifold & Occam Pruning: ${this.instrument} (${pts.length} Champions · ${data.clusters_count} Clusters · ${this.manifoldCompression}% Clones Pruned)`,
                     font: { color: '#c084fc', size: 13 }
                 }
             };
