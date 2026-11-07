@@ -37,8 +37,8 @@ class IngestRequest(BaseModel):
 
 class EvolveRequest(BaseModel):
     instrument: str = "NIFTYBEES"
-    generations: int = 10
-    population_size: int = 50
+    generations: int = 100
+    population_size: int = 100
     lookback_years: float = 1.0
     seed: Optional[int] = None
     compute_target: str = "local"
@@ -62,8 +62,8 @@ class WorkerSupervisor:
         self.is_remote: bool = False
         self.instrument: str = "NIFTYBEES"
         self.lookback_years: float = 1.0
-        self.generations: int = 10
-        self.population_size: int = 50
+        self.generations: int = 100
+        self.population_size: int = 100
 
         # Seed shared memory header from archive store on startup
         try:
@@ -87,8 +87,8 @@ class WorkerSupervisor:
     def start_worker(
         self,
         instrument: str,
-        generations: int = 10,
-        population_size: int = 50,
+        generations: int = 100,
+        population_size: int = 100,
         lookback_years: float = 1.0,
         seed: Optional[int] = None
     ) -> bool:
@@ -127,8 +127,8 @@ class WorkerSupervisor:
         self,
         remote_url: str,
         instrument: str,
-        generations: int = 10,
-        population_size: int = 50,
+        generations: int = 100,
+        population_size: int = 100,
         lookback_years: float = 1.0,
         seed: Optional[int] = None
     ) -> bool:

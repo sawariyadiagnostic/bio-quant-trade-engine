@@ -17,8 +17,8 @@ function cockpitApp() {
         status: 'STANDBY',
         instrument: 'NIFTYBEES',
         lookbackYears: 1.0,
-        generations: 10,
-        populationSize: 50,
+        generations: 100,
+        populationSize: 100,
         randomSeed: null,
         isMuted: false,
         activeTab: 'tactical', // 'tactical' | 'manifold' | 'cosine' | 'leaderboard' | 'telemetry'
@@ -53,7 +53,7 @@ function cockpitApp() {
         logs: [],
         telemetry: {
             current_gen: 0,
-            total_gens: 10,
+            total_gens: 100,
             resident_count: 0,
             survivor_count: 0,
             occupancy_pct: 0.0,
@@ -85,6 +85,14 @@ function cockpitApp() {
         randomizeSeed() {
             this.randomSeed = Math.floor(Math.random() * 900000) + 100000;
             this.log(`Exploration seed set: ${this.randomSeed}`);
+        },
+
+        setGenerations(val) {
+            this.generations = Math.max(1, parseInt(val) || 1);
+        },
+
+        setPopulation(val) {
+            this.populationSize = Math.max(10, parseInt(val) || 10);
         },
 
         setTab(tab) {

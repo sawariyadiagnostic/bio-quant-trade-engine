@@ -175,9 +175,10 @@ class GeneticEvolutionEngine:
                         next_population_candidates.append(ind.clone())
 
             # Seed breeding pool with top chunk survivors if needed
-            if len(next_population_candidates) < 50:
-                for ind in chunk_offspring[:10]:
-                    if len(next_population_candidates) < 50:
+            target_breeding_size = min(self.pop_size, 250)
+            if len(next_population_candidates) < target_breeding_size:
+                for ind in chunk_offspring[:25]:
+                    if len(next_population_candidates) < target_breeding_size:
                         next_population_candidates.append(ind.clone())
 
             del chunk_offspring
@@ -186,7 +187,7 @@ class GeneticEvolutionEngine:
 
         # Refresh compact active population for next generation's breeding pool
         if next_population_candidates:
-            self.population = next_population_candidates[:min(self.pop_size, 100)]
+            self.population = next_population_candidates[:min(self.pop_size, 500)]
         elif not self.population:
             self.initialize_population()
 

@@ -22,8 +22,8 @@ def run_evolution_process(
     shm_name: str,
     ticker: str = "NIFTYBEES",
     lookback: str = "5y",
-    generations: int = 10,
-    population: int = 50,
+    generations: int = 100,
+    population: int = 100,
     custom_formula: Optional[str] = None,
     seed: Optional[int] = None
 ) -> Dict[str, Any]:
@@ -221,8 +221,8 @@ def run_evolution_process(
 def spawn_evolution_worker(
     instrument: str = "NIFTYBEES",
     lookback_years: float = 1.0,
-    generations: int = 10,
-    population_size: int = 50,
+    generations: int = 100,
+    population_size: int = 100,
     archive_db_path: str = "audit/alpha_elites.db",
     shm_name: str = "",
     seed: Optional[int] = None
