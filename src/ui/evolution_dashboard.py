@@ -205,14 +205,14 @@ def get_first_pot_of_gold_preset() -> Tuple[str, str, str, str, float, int, int]
     )
 
 
-def launch_dashboard(host: str = "127.0.0.1", port: int = 7860) -> None:
+def launch_dashboard(host: str = "127.0.0.1", port: int = 7860, reload: bool = True) -> None:
     """Launches the modern decoupled FastAPI cockpit on port 7860."""
     logger.info("=" * 80)
     logger.info("⚡ BIO-QUANT INSTITUTIONAL DECOUPLED ALPHA COCKPIT ⚡")
     logger.info("MIGRATION NOTICE: Legacy Gradio upgraded to Tri-Process FastAPI Cockpit.")
     logger.info(f"Serving Cockpit UI on: http://{host}:{port}")
     logger.info("=" * 80)
-    uvicorn.run("src.ui.server:app", host=host, port=port, reload=False)
+    uvicorn.run("src.ui.server:app", host=host, port=port, reload=reload)
 
 
 if __name__ == "__main__":
