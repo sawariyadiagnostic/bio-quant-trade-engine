@@ -171,6 +171,7 @@ class WorkerSupervisor:
         if self.shm_bus:
             try:
                 self.shm_bus.close()
+                self.shm_bus.unlink()
             except Exception:
                 pass
         self.job_manager.close()
@@ -204,6 +205,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    """Enforces no-cache headers across all static and API responses to eliminate browser cache skew."""
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.get("/health")
@@ -399,7 +410,26 @@ def elites_manifold(
             "labels": []
         }
 
-    extractor = PhenotypeExtractor.create_mock(n_assets=3, n_bars=100)
+    # Load real multi-asset lakes from data/lake, fallback to mock if unpopulated
+    try:
+        from src.manifold.lake_dataset_loader import LakeDatasetLoader
+        from src.data.vector_lake import VectorDataLake
+        loader = LakeDatasetLoader()
+        core_tickers = [ticker]
+        for candidate in ["NIFTYBEES", "BANKBEES", "GOLDBEES"]:
+            if candidate != ticker and len(core_tickers) < 3:
+                core_tickers.append(candidate)
+        lakes = {}
+        for t in core_tickers:
+            try:
+                df_t = loader.load_dataset(t, lookback_years=1.0)
+                if len(df_t) >= 55:
+                    lakes[t] = VectorDataLake.from_dataframe(df_t, ticker=t)
+            except Exception:
+                pass
+        extractor = PhenotypeExtractor(asset_lakes=lakes) if lakes else PhenotypeExtractor.create_mock(n_assets=3, n_bars=100)
+    except Exception:
+        extractor = PhenotypeExtractor.create_mock(n_assets=3, n_bars=100)
     embeddings = extractor.extract_dense_batch(parsed_nodes, target_dim=1024)
     cosine_matrix = np.clip(embeddings @ embeddings.T, 0.0, 1.0)
 
@@ -465,6 +495,7 @@ async def sse_event_generator(
     """Generates differential Server-Sent Events with 10Hz tick and 1Hz ping."""
     yield f"event: connected\ndata: {json.dumps({'time': time.time(), 'status': 'CONNECTED'})}\n\n"
     last_ping = time.time()
+    last_seen_ts = supervisor.archive_store.get_max_updated_at()
     seen_elites_count = supervisor.archive_store.count_champions()
     tick_count = 0
 
@@ -493,17 +524,24 @@ async def sse_event_generator(
             yield f"event: tick\ndata: {json.dumps(supervisor.get_telemetry(), default=str)}\n\n"
             tick_count += 1
 
-            # Check if new elites were saved
-            current_elites_count = supervisor.archive_store.count_champions()
-            if current_elites_count > seen_elites_count:
-                delta = current_elites_count - seen_elites_count
-                seen_elites_count = current_elites_count
-                recent_elites = supervisor.archive_store.get_recent_elites(limit=delta)
-                for elite in recent_elites:
-                    try:
-                        yield f"event: elite_added\ndata: {json.dumps(elite, default=str)}\n\n"
-                    except Exception as err:
-                        logger.error(f"[SSE] Failed to serialize elite: {err}")
+            # Check if new or replaced elites were saved (dual-trigger: timestamp and count)
+            current_max_ts = supervisor.archive_store.get_max_updated_at()
+            current_count = supervisor.archive_store.count_champions()
+            updated_elites = []
+            if current_max_ts > last_seen_ts:
+                updated_elites = supervisor.archive_store.get_elites_updated_since(last_seen_ts, limit=50)
+                last_seen_ts = current_max_ts
+                seen_elites_count = current_count
+            elif current_count > seen_elites_count:
+                delta = current_count - seen_elites_count
+                seen_elites_count = current_count
+                updated_elites = supervisor.archive_store.get_recent_elites(limit=delta)
+
+            for elite in updated_elites:
+                try:
+                    yield f"event: elite_added\ndata: {json.dumps(elite, default=str)}\n\n"
+                except Exception as err:
+                    logger.error(f"[SSE] Failed to serialize elite: {err}")
 
             # Check for completion or abort (signal once without severing connection)
             is_running = supervisor.is_worker_running()

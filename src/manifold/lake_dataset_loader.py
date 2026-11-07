@@ -56,6 +56,8 @@ class LakeDatasetLoader:
                 if not r.empty and len(r) > len(df_raw):
                     if isinstance(r.columns, pd.MultiIndex):
                         r.columns = [col[0] for col in r.columns]
+                    if "Adj Close" in r.columns and "Close_Adj" not in r.columns:
+                        r["Close_Adj"] = r["Adj Close"]
                     df_raw = r.sort_index()
                     df_raw.index = pd.to_datetime(df_raw.index).tz_localize(None).normalize()
             except Exception:
@@ -66,7 +68,7 @@ class LakeDatasetLoader:
         if end_date:
             df_raw = df_raw.loc[df_raw.index <= pd.to_datetime(end_date)]
 
-        if lookback_years and lookback_years <= 5.0:
+        if lookback_years:
             target_bars = int(lookback_years * 252)
             if len(df_raw) > target_bars:
                 df_raw = df_raw.iloc[-target_bars:]
@@ -90,7 +92,9 @@ class LakeDatasetLoader:
 
         # 1. Structural Spreads & Ranges
         df["Spread"] = (h - l) / (c + 1e-8)
-        df["True_Range"] = (h - l) / (c + 1e-8)
+        c_prev = c.shift(1).fillna(c)
+        tr_raw = np.maximum(h - l, np.maximum((h - c_prev).abs(), (l - c_prev).abs()))
+        df["True_Range"] = tr_raw / (c + 1e-8)
         tr_mean = df["True_Range"].rolling(20, min_periods=1).mean()
         df["TR_Expansion"] = df["True_Range"] / tr_mean.replace(0, 1.0)
 
@@ -130,12 +134,12 @@ class LakeDatasetLoader:
         co_ratio = np.log(c / o.replace(0, 1e-6))
         df["Garman_Klass_Vol"] = (0.5 * hl_ratio**2 - (2 * np.log(2) - 1) * co_ratio**2).rolling(20, min_periods=1).mean()
 
-        # 8. Align with Global Lead Feeds
+        # 8. Align with Global Lead Feeds (Strict 1-day lag to eliminate lookahead bias)
         sp_path = os.path.join(self.lake_dir, "Global", "SP500.parquet")
         if os.path.exists(sp_path):
             df_sp = pd.read_parquet(sp_path).sort_index()
             df_sp.index = pd.to_datetime(df_sp.index).tz_localize(None).normalize()
-            sp_ret = df_sp.get("Close_Adj", df_sp.get("Close")).pct_change().fillna(0.0)
+            sp_ret = df_sp.get("Close_Adj", df_sp.get("Close")).pct_change().shift(1).fillna(0.0)
             sp_map = dict(zip(df_sp.index, sp_ret))
             df["SP500_Ret"] = [sp_map.get(d, 0.0) for d in df.index]
         else:
@@ -150,7 +154,7 @@ class LakeDatasetLoader:
         if os.path.exists(adr_path):
             df_adr = pd.read_parquet(adr_path).sort_index()
             df_adr.index = pd.to_datetime(df_adr.index).tz_localize(None).normalize()
-            adr_ret = df_adr.get("Close_Adj", df_adr.get("Close")).pct_change().fillna(0.0)
+            adr_ret = df_adr.get("Close_Adj", df_adr.get("Close")).pct_change().shift(1).fillna(0.0)
             adr_map = dict(zip(df_adr.index, adr_ret))
             df["ADR_Ret"] = [adr_map.get(d, 0.0) for d in df.index]
         else:

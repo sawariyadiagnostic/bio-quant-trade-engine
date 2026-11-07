@@ -84,15 +84,23 @@ function cockpitApp() {
 
         setTab(tab) {
             this.activeTab = tab;
-            this.$nextTick(() => {
+            setTimeout(() => {
                 if (tab === 'tactical' && this.currentGridData) {
-                    this.renderMapElitesHeatmap(this.currentGridData);
+                    const chartDiv = document.getElementById('mapElitesChart');
+                    if (chartDiv && window.Plotly) {
+                        Plotly.Plots.resize(chartDiv);
+                        this.renderMapElitesHeatmap(this.currentGridData);
+                    }
                 } else if (tab === 'manifold') {
+                    const chartDiv = document.getElementById('manifoldChart3d');
+                    if (chartDiv && window.Plotly) Plotly.Plots.resize(chartDiv);
                     this.fetchManifold();
                 } else if (tab === 'cosine') {
+                    const chartDiv = document.getElementById('cosineHeatmapChart');
+                    if (chartDiv && window.Plotly) Plotly.Plots.resize(chartDiv);
                     this.fetchCosine();
                 }
-            });
+            }, 50);
         },
 
         // Universe Catalog & Asset Selection
@@ -163,9 +171,9 @@ function cockpitApp() {
                 this.log(`New Elite Champion discovered: ${elite.formula_str || 'Alpha'} (Sharpe: ${elite.fitness?.toFixed(2)})`, 'success');
                 window.cockpitAudio.playEliteSound();
 
-                // Delta append to AG Grid virtualized table
+                // Delta upsert to AG Grid virtualized table
                 if (this.gridApi) {
-                    this.gridApi.applyTransactionAsync({ add: [elite] });
+                    this.gridApi.applyTransactionAsync({ update: [elite] });
                 }
 
                 // Incrementally paint cell in 20x20 Heatmap
@@ -239,11 +247,11 @@ function cockpitApp() {
             const gridOptions = {
                 columnDefs: [
                     { field: 'ticker', headerName: 'Ticker', width: 100, pinned: 'left' },
-                    { field: 'fitness', headerName: 'Sharpe / Fitness', width: 140, sort: 'desc', valueFormatter: p => p.value?.toFixed(3) },
-                    { field: 'sortino', headerName: 'Sortino', width: 110, valueFormatter: p => p.value?.toFixed(2) },
-                    { field: 'cagr_pct', headerName: 'CAGR %', width: 110, valueFormatter: p => (p.value * 100)?.toFixed(1) + '%' },
-                    { field: 'max_drawdown', headerName: 'Max DD %', width: 120, valueFormatter: p => (p.value * 100)?.toFixed(1) + '%' },
-                    { field: 'win_rate', headerName: 'Win Rate %', width: 120, valueFormatter: p => (p.value * 100)?.toFixed(1) + '%' },
+                    { field: 'fitness', headerName: 'Sharpe / Fitness', width: 140, sort: 'desc', valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(3) : '-' },
+                    { field: 'sortino', headerName: 'Sortino', width: 110, valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(2) : '-' },
+                    { field: 'cagr_pct', headerName: 'CAGR %', width: 110, valueFormatter: p => (p.value !== undefined && p.value !== null) ? (p.value > 10000 ? '>10,000%' : p.value.toFixed(1) + '%') : '-' },
+                    { field: 'max_drawdown', headerName: 'Max DD %', width: 120, valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(1) + '%' : '-' },
+                    { field: 'win_rate', headerName: 'Win Rate %', width: 120, valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(1) + '%' : '-' },
                     { field: 'trades_count', headerName: 'Trades', width: 90 },
                     { field: 'formula_str', headerName: 'Genomic Alpha Expression', flex: 1, minWidth: 250 }
                 ],
@@ -252,6 +260,7 @@ function cockpitApp() {
                     filter: true,
                     resizable: true
                 },
+                getRowId: params => `${params.data.ticker || 'ASSET'}_${params.data.niche_row}_${params.data.niche_col}`,
                 rowModelType: 'clientSide',
                 animateRows: true,
                 rowData: []
@@ -336,7 +345,7 @@ function cockpitApp() {
                 }
                 this.currentGridData.z[r][c] = metricVal;
                 const fShort = (elite.formula_str || '').slice(0, 50);
-                this.currentGridData.hover_text[r][c] = `Niche [${r}, ${c}]<br>Formula: ${fShort}..<br>Sharpe: ${elite.fitness?.toFixed(2)}<br>CAGR: ${(elite.cagr_pct*100)?.toFixed(1)}%<br>Trades: ${elite.trades_count}`;
+                this.currentGridData.hover_text[r][c] = `Niche [${r}, ${c}]<br>Formula: ${fShort}..<br>Sharpe: ${elite.fitness?.toFixed(2)}<br>CAGR: ${elite.cagr_pct?.toFixed(1)}%<br>Trades: ${elite.trades_count}`;
 
                 const chartDiv = document.getElementById('mapElitesChart');
                 if (chartDiv && window.Plotly) {
@@ -584,7 +593,8 @@ function cockpitApp() {
 
         async fetchLeaderboard() {
             try {
-                const res = await fetch(`/api/elites/leaderboard?limit=100&metric=sharpe&ticker=${this.instrument}`);
+                const lookbackParam = this.lookbackYears ? `${parseInt(this.lookbackYears)}y` : 'all';
+                const res = await fetch(`/api/elites/leaderboard?limit=100&metric=sharpe&ticker=${this.instrument}&lookback=${lookbackParam}`);
                 const data = await res.json();
                 if (data.status === 'ok' && this.gridApi) {
                     this.gridApi.setGridOption('rowData', data.elites);

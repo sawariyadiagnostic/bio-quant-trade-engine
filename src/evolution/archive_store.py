@@ -219,6 +219,22 @@ class ArchiveStore:
                 cur = conn.execute("SELECT count(*) FROM resident_elites")
             return cur.fetchone()[0]
 
+    def get_max_updated_at(self) -> float:
+        """Returns maximum updated_at timestamp across resident elites."""
+        with self._get_connection() as conn:
+            cur = conn.execute("SELECT coalesce(max(updated_at), 0.0) FROM resident_elites")
+            row = cur.fetchone()
+            return float(row[0]) if row and row[0] is not None else 0.0
+
+    def get_elites_updated_since(self, since_ts: float, limit: int = 50) -> List[Dict[str, Any]]:
+        """Returns all resident elites updated strictly after since_ts."""
+        with self._get_connection() as conn:
+            cur = conn.execute(
+                "SELECT * FROM resident_elites WHERE updated_at > ? ORDER BY updated_at ASC LIMIT ?",
+                (since_ts, limit)
+            )
+            return [self._sanitize_row(row) for row in cur.fetchall()]
+
     def get_resident_tickers(self) -> List[str]:
         """Returns distinct tickers currently resident in the archive."""
         with self._get_connection() as conn:

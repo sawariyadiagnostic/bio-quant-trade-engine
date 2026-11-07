@@ -222,6 +222,34 @@ class MapElitesArchive:
 
         return False
 
+    def insert(
+        self,
+        row: int,
+        col: int,
+        fitness: float,
+        formula: ASTNode,
+        metrics: Optional[dict] = None
+    ) -> bool:
+        """Directly inserts a resident elite into the archive grid for warm-start."""
+        m = metrics or {}
+        if 0 <= row < self.rows and 0 <= col < self.cols:
+            self.grid[row, col] = EliteIndividual(
+                formula=formula,
+                fitness=round(fitness, 2),
+                volatility=round(float(m.get("volatility", 0.0)), 4),
+                turnover=round(float(m.get("turnover", 0.0)), 2),
+                win_rate=round(float(m.get("win_rate", 0.0)), 2),
+                net_return_pct=round(float(m.get("net_return_pct", 0.0)), 2),
+                behavior_signature=np.zeros(60, dtype=np.float32),
+                sortino=round(float(m.get("sortino", 0.0)), 2),
+                profit_factor=round(min(float(m.get("profit_factor", 0.0)), 99.0), 2),
+                trades_count=int(m.get("trades_count", 0)),
+                max_drawdown=round(float(m.get("max_drawdown", 0.0)), 2),
+                cagr_pct=round(float(m.get("cagr_pct", 0.0)), 2)
+            )
+            return True
+        return False
+
     def stress_test_friction(
         self,
         df: pd.DataFrame,

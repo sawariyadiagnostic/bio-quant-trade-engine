@@ -189,6 +189,22 @@ class ShoonyaGateway:
         logger.warning("ShoonyaGateway: No active access token. Run scripts/connect_shoonya.py to authorize.")
         return False
 
+    def _is_session_expired(self, res: Any) -> bool:
+        """Detects whether Shoonya response indicates an expired or invalid session token."""
+        if not isinstance(res, dict):
+            return False
+        msg = str(res.get("emsg", "")).lower()
+        return any(k in msg for k in ("session expired", "invalid token", "token expired", "session not found", "session error"))
+
+    def handle_session_expiry(self) -> bool:
+        """Invalidates dead session token and executes zero-touch re-authentication."""
+        logger.warning("ShoonyaGateway: Broker session token expired. Clearing token and refreshing auth...")
+        self.susertoken = None
+        if self.creds.access_token:
+            # Token from env expired, cannot magically refresh without fresh auth_code or credentials
+            pass
+        return self.authenticate()
+
     @staticmethod
     def format_trading_symbol(symbol: str) -> str:
         """Converts raw symbol to NSE trading symbol (e.g. NIFTYBEES -> NIFTYBEES-EQ). Preserves futures and series."""
@@ -338,6 +354,8 @@ class ShoonyaGateway:
                     remarks="auto_trade"
                 )
                 if ret is None or (isinstance(ret, dict) and ret.get("stat") != "Ok"):
+                    if isinstance(ret, dict) and self._is_session_expired(ret):
+                        self.handle_session_expiry()
                     emsg = ret.get("emsg", "Order rejected by broker (None response)") if isinstance(ret, dict) else "Order rejected by broker (None response)"
                     return {"stat": "Not_Ok", "emsg": emsg}
                 return ret if isinstance(ret, dict) else {"stat": "Ok", "result": ret}
@@ -362,7 +380,10 @@ class ShoonyaGateway:
                 headers=headers,
                 timeout=10
             )
-            return resp.json()
+            res_dict = resp.json()
+            if self._is_session_expired(res_dict):
+                self.handle_session_expiry()
+            return res_dict
         except Exception as e:
             logger.error(f"Shoonya live order failed: {e}")
             return {"stat": "Not_Ok", "emsg": str(e)}

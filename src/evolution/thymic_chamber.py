@@ -47,8 +47,12 @@ class ThymicStressChamber:
                     continue
                 c = profile.get("Close_Adj", profile.get("Close", profile.get("Close_Raw")))
                 strat_rets = pos[:-1] * c.pct_change().fillna(0.0).to_numpy()[1:]
-                if len(strat_rets) > 0 and float(np.min(np.cumsum(strat_rets))) < -max_dd_tolerance:
-                    return False
+                if len(strat_rets) > 0:
+                    cum_eq = np.cumprod(1.0 + strat_rets)
+                    peaks = np.maximum.accumulate(cum_eq)
+                    drawdowns = (peaks - cum_eq) / (peaks + 1e-8)
+                    if float(np.max(drawdowns)) > max_dd_tolerance:
+                        return False
             except Exception:
                 return False
         return True

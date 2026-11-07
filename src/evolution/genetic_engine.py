@@ -147,6 +147,13 @@ class GeneticEvolutionEngine:
                 if random.random() < self.p_methylation:
                     c2 = GeneticMutator.mutate_methylation(c2)
 
+                # Complexity Guard (Occam's razor): Reject runaway tree bloat
+                max_tree_depth = self.max_depth + 2
+                if c1.depth() > max_tree_depth or c1.size() > 40:
+                    c1 = p1.clone()
+                if c2.depth() > max_tree_depth or c2.size() > 40:
+                    c2 = p2.clone()
+
                 chunk_offspring.extend([c1, c2])
 
             chunk_offspring = chunk_offspring[:chunk_target]

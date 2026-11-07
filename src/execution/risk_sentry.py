@@ -235,6 +235,35 @@ class RiskSentry:
             qty = p["quantity"]
             price = p["price"]
             prd = p.get("prd", "C")
+            lower_circuit = float(p.get("lower_circuit", 0.0))
+            bid_depth = int(p.get("bid_depth", 100))
+
+            # Circuit Proximity or Evaporation Trap: Synthetic Delta Hedge
+            if force_hedge_if_circuit and qty > 0 and lower_circuit > 0.0 and self.hedge_mgr.is_circuit_locked(price, lower_circuit, bid_depth):
+                hedge_qty = self.hedge_mgr.calculate_hedge_quantity([p], hedge_price=250.0)
+                if hedge_qty > 0:
+                    hedge_order = self.hedge_mgr.create_hedge_order(hedge_qty, hedge_symbol="NIFTYBEES")
+                    hedge_count += 1
+                    liquidated_symbols.append(f"{sym}_HEDGED_NIFTYBEES")
+                    if hasattr(self.gateway, "place_order_async"):
+                        tasks.append(self.gateway.place_order_async(
+                            symbol=hedge_order["symbol"],
+                            quantity=hedge_order["quantity"],
+                            price=0.0,
+                            action=hedge_order["action"],
+                            product=hedge_order["product"],
+                            order_type=hedge_order["order_type"]
+                        ))
+                    else:
+                        loop = asyncio.get_running_loop()
+                        tasks.append(loop.run_in_executor(
+                            self._executor,
+                            self.gateway.place_order,
+                            hedge_order["symbol"], hedge_order["quantity"], 0.0,
+                            hedge_order["action"], hedge_order["product"], hedge_order["order_type"]
+                        ))
+                    continue
+
             action = "SELL" if qty > 0 else "BUY"
             liquidated_symbols.append(sym)
 
@@ -257,10 +286,13 @@ class RiskSentry:
 
         if tasks:
             try:
-                await asyncio.wait_for(
+                results = await asyncio.wait_for(
                     asyncio.gather(*tasks, return_exceptions=True),
                     timeout=self.SOCKET_TIMEOUT_SECONDS
                 )
+                for res in results:
+                    if isinstance(res, Exception):
+                        logger.error(f"[RiskSentry] Exception during parallel liquidation order: {res}")
             except asyncio.TimeoutError:
                 logger.error(f"[RiskSentry] Timeout ({self.SOCKET_TIMEOUT_SECONDS}s) during parallel liquidation orders!")
 

@@ -53,7 +53,14 @@ class ExecutionDispatcher:
 
         if action == "SELL":
             tsym = self.gateway.format_trading_symbol(ticker)
-            held = self.gateway.paper_positions.get(tsym, {}).get("quantity", 0)
+            if getattr(self.gateway, "paper_trading", True):
+                held = self.gateway.paper_positions.get(tsym, {}).get("quantity", 0)
+            else:
+                try:
+                    pos_list = self.gateway.api.get_positions() if hasattr(self.gateway, "api") and self.gateway.api else []
+                    held = next((int(p.get("netqty", 0)) for p in (pos_list or []) if p.get("tsym") == tsym), 0)
+                except Exception:
+                    held = 0
             if held > 0:
                 res = self.gateway.place_order(ticker, held, p, action="SELL", is_etf=is_etf)
                 ok = res.get("stat") == "Ok" or res.get("status") in ("COMPLETE", "PLACED", "OPEN")

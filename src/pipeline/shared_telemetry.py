@@ -13,6 +13,7 @@ import numpy as np
 
 # Structured NumPy Dtype for 400 MAP-Elites niches
 NICHE_DTYPE = np.dtype([
+    ('version_id', np.uint32),
     ('occupied', np.bool_),
     ('row', np.int32),
     ('col', np.int32),
@@ -156,9 +157,12 @@ class SharedMemoryBus:
         formula_str: str = "",
         niche_name: str = ""
     ) -> None:
-        """Writes elite record directly into structured RAM cell in <1µs."""
+        """Writes elite record with atomic seqlock versioning to prevent torn reads."""
         idx = (row * 20 + col) % NUM_NICHES
         cell = self.niches[idx]
+        cur_v = int(cell['version_id'])
+        # Odd sequence indicates write in progress
+        cell['version_id'] = (cur_v + 1) & 0xFFFFFFFF
         cell['occupied'] = True
         cell['row'] = row
         cell['col'] = col
@@ -174,28 +178,39 @@ class SharedMemoryBus:
         cell['trades_count'] = trades_count
         cell['formula_str'] = formula_str.encode('utf-8')[:255]
         cell['niche_name'] = niche_name.encode('utf-8')[:63]
+        # Even sequence indicates write committed and consistent
+        cell['version_id'] = (cur_v + 2) & 0xFFFFFFFF
 
     def read_niche(self, row: int, col: int) -> Dict[str, Any]:
-        """Returns decoded dictionary for single niche point query."""
+        """Returns decoded dictionary with seqlock integrity check against torn reads."""
         idx = (row * 20 + col) % NUM_NICHES
         cell = self.niches[idx]
-        return {
-            "occupied": bool(cell['occupied']),
-            "row": int(cell['row']),
-            "col": int(cell['col']),
-            "fitness": float(cell['fitness']),
-            "net_return_pct": float(cell['net_return_pct']),
-            "cagr_pct": float(cell['cagr_pct']),
-            "max_drawdown": float(cell['max_drawdown']),
-            "win_rate": float(cell['win_rate']),
-            "turnover": float(cell['turnover']),
-            "volatility": float(cell['volatility']),
-            "sortino": float(cell['sortino']),
-            "profit_factor": float(cell['profit_factor']),
-            "trades_count": int(cell['trades_count']),
-            "formula_str": cell['formula_str'].decode('utf-8', errors='ignore').rstrip('\x00'),
-            "niche_name": cell['niche_name'].decode('utf-8', errors='ignore').rstrip('\x00'),
-        }
+        for _ in range(5):
+            v1 = int(cell['version_id'])
+            if v1 % 2 != 0:
+                time.sleep(0.0001)
+                continue
+            rec = {
+                "occupied": bool(cell['occupied']),
+                "row": int(cell['row']),
+                "col": int(cell['col']),
+                "fitness": float(cell['fitness']),
+                "net_return_pct": float(cell['net_return_pct']),
+                "cagr_pct": float(cell['cagr_pct']),
+                "max_drawdown": float(cell['max_drawdown']),
+                "win_rate": float(cell['win_rate']),
+                "turnover": float(cell['turnover']),
+                "volatility": float(cell['volatility']),
+                "sortino": float(cell['sortino']),
+                "profit_factor": float(cell['profit_factor']),
+                "trades_count": int(cell['trades_count']),
+                "formula_str": cell['formula_str'].decode('utf-8', errors='ignore').rstrip('\x00'),
+                "niche_name": cell['niche_name'].decode('utf-8', errors='ignore').rstrip('\x00'),
+            }
+            v2 = int(cell['version_id'])
+            if v1 == v2:
+                return rec
+        return rec
 
     def request_abort(self) -> None:
         """Sets atomic abort flag (<50ns)."""
