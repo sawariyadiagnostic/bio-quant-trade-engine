@@ -1,9 +1,9 @@
 {
-  "phase": "Phase 1: Institutional Decoupled Cockpit & Engine - COMPLETED",
-  "updated_at": "2026-11-07T12:26:00+05:30",
+  "phase": "Phase 1: Institutional Decoupled Cockpit & Engine - COMPLETED & AUDITED",
+  "updated_at": "2026-11-07T14:33:00+05:30",
   "active_task": "COMPLETED",
   "active_subtask": "ALL_PASSED",
-  "last_stable_commit": "72418f3",
+  "last_stable_commit": "1580c1d",
   "tasks": {
     "TASK_0": {
       "title": "Latent Gateway Remediation & SQLite WAL Migration Baseline",
@@ -120,6 +120,28 @@
       },
       "verification_cmd": "python -m unittest tests/test_cockpit_server_api.py tests/test_web_cockpit_ui.py tests/test_shm_worker_isolation.py && python scripts/red_team_harness.py --mode=full",
       "commit": "fdaa2cd"
+    },
+    "TASK_9": {
+      "title": "Red Team Hostile Audit & Architectural Remediation",
+      "status": "PASSED",
+      "subtasks": {
+        "9.1_remediate_ag_grid_percentages_and_lookback_partitioning": "PASSED",
+        "9.2_remediate_genetic_engine_warmstart_insert": "PASSED",
+        "9.3_remediate_annualized_cagr_cumulative_overwrites": "PASSED",
+        "9.4_remediate_causal_lookahead_bias_in_global_leads": "PASSED",
+        "9.5_remediate_stock_split_price_basis_corruption": "PASSED",
+        "9.6_remediate_true_range_welles_wilder_formula": "PASSED",
+        "9.7_remediate_thymic_peak_to_trough_drawdown": "PASSED",
+        "9.8_remediate_live_broker_held_positions_check": "PASSED",
+        "9.9_remediate_synthetic_lower_circuit_delta_hedging": "PASSED",
+        "9.10_remediate_ast_depth_and_node_bloat_guards": "PASSED",
+        "9.11_remediate_shared_memory_seqlock_versioning": "PASSED",
+        "9.12_remediate_sse_timestamp_replacement_streaming": "PASSED",
+        "9.13_remediate_shoonya_session_expiry_rollover": "PASSED",
+        "9.14_remediate_browser_static_cache_invalidation": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_risk_sentry_isolation.py tests/test_cockpit_server_api.py tests/test_web_cockpit_ui.py tests/test_gateway_hardening.py tests/test_invariants.py && python scripts/red_team_harness.py --mode=full",
+      "commit": "1580c1d"
     }
   }
 }
