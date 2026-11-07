@@ -24,7 +24,8 @@ def run_evolution_process(
     lookback: str = "5y",
     generations: int = 10,
     population: int = 50,
-    custom_formula: Optional[str] = None
+    custom_formula: Optional[str] = None,
+    seed: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Child process entrypoint for genetic evolution.
@@ -32,12 +33,19 @@ def run_evolution_process(
     """
     my_pid = os.getpid()
     ProcessGovernor.configure_worker(my_pid)
-    logger.info(f"[Worker PID {my_pid}] Evolution Worker initialized for {ticker} ({lookback}), {generations} gens.")
+    logger.info(f"[Worker PID {my_pid}] Evolution Worker initialized for {ticker} ({lookback}), {generations} gens (Seed: {seed}).")
 
     bus = SharedMemoryBus(name=shm_name, create=False)
     archive_store = ArchiveStore(db_path="audit/alpha_elites.db")
 
     try:
+        if seed is not None:
+            import random
+            import numpy as np
+            random.seed(seed)
+            np.random.seed(seed)
+            logger.info(f"[Worker PID {my_pid}] Seed applied: {seed}")
+
         bus.update_header(
             current_gen=0,
             total_gens=generations,
@@ -216,7 +224,8 @@ def spawn_evolution_worker(
     generations: int = 10,
     population_size: int = 50,
     archive_db_path: str = "audit/alpha_elites.db",
-    shm_name: str = ""
+    shm_name: str = "",
+    seed: Optional[int] = None
 ) -> multiprocessing.Process:
     """Spawns an isolated evolution worker process via multiprocessing 'spawn' context."""
     lookback_str = f"{int(lookback_years)}y" if lookback_years >= 1.0 else "1y"
@@ -229,6 +238,7 @@ def spawn_evolution_worker(
             "lookback": lookback_str,
             "generations": generations,
             "population": population_size,
+            "seed": seed,
         },
         daemon=True
     )

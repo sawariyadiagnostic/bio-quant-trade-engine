@@ -38,6 +38,7 @@ class EvolveRequest(BaseModel):
     generations: int = 10
     population_size: int = 50
     lookback_years: float = 1.0
+    seed: Optional[int] = None
 
 
 class WorkerSupervisor:
@@ -78,7 +79,8 @@ class WorkerSupervisor:
         instrument: str,
         generations: int = 10,
         population_size: int = 50,
-        lookback_years: float = 1.0
+        lookback_years: float = 1.0,
+        seed: Optional[int] = None
     ) -> bool:
         """Launches a new child worker process under Windows Job Object guard."""
         if self.is_worker_running():
@@ -104,7 +106,8 @@ class WorkerSupervisor:
             generations=generations,
             population_size=population_size,
             archive_db_path=self.db_path,
-            shm_name=self.shm_bus.shm_name
+            shm_name=self.shm_bus.shm_name,
+            seed=seed
         )
         self.job_manager.assign_process(self.worker_process.pid)
         logger.info(f"[Supervisor] Spawned Worker PID {self.worker_process.pid} bound to Job Object.")
@@ -251,7 +254,8 @@ def evolve(payload: EvolveRequest) -> Dict[str, Any]:
         instrument=payload.instrument,
         generations=payload.generations,
         population_size=payload.population_size,
-        lookback_years=payload.lookback_years
+        lookback_years=payload.lookback_years,
+        seed=payload.seed
     )
     if not started:
         raise HTTPException(status_code=409, detail="Evolution worker is already active.")
@@ -259,7 +263,8 @@ def evolve(payload: EvolveRequest) -> Dict[str, Any]:
         "status": "STARTED",
         "instrument": payload.instrument,
         "generations": payload.generations,
-        "population_size": payload.population_size
+        "population_size": payload.population_size,
+        "seed": payload.seed
     }
 
 
@@ -285,6 +290,149 @@ def elites_leaderboard(
         lookback=lookback
     )
     return {"status": "ok", "count": len(elites), "elites": elites}
+
+
+@app.get("/api/elites/grid")
+def elites_grid(
+    ticker: str = Query("NIFTYBEES"),
+    lookback: Optional[str] = Query(None),
+    metric: str = Query("fitness")
+) -> Dict[str, Any]:
+    """Returns dense 20x20 MAP-Elites grid with metrics, occupancy, and hover metadata."""
+    return supervisor.archive_store.get_grid_matrix(ticker=ticker, lookback=lookback, metric=metric)
+
+
+@app.get("/api/universe/assets")
+def universe_assets() -> Dict[str, Any]:
+    """Discovers all partitioned assets from data lake and SQLite archive."""
+    lake_dir = os.path.join(os.getcwd(), "data", "lake")
+    categories: Dict[str, List[str]] = {}
+    all_assets: List[str] = []
+
+    if os.path.exists(lake_dir):
+        for entry in os.scandir(lake_dir):
+            if entry.is_dir():
+                cat_name = entry.name.replace("_", " ")
+                tickers = []
+                for f in os.scandir(entry.path):
+                    if f.name.endswith(".parquet"):
+                        t = f.name[:-8]
+                        tickers.append(t)
+                        all_assets.append(t)
+                if tickers:
+                    categories[cat_name] = sorted(tickers)
+
+    resident_tickers = supervisor.archive_store.get_resident_tickers()
+    clean_resident = sorted(list(set([t.replace(".NS", "") for t in resident_tickers])))
+
+    return {
+        "status": "ok",
+        "total_count": len(all_assets),
+        "categories": categories,
+        "all_assets": sorted(list(set(all_assets))),
+        "resident_tickers": clean_resident
+    }
+
+
+@app.get("/api/elites/manifold")
+def elites_manifold(
+    ticker: str = Query("NIFTYBEES"),
+    lookback: Optional[str] = Query(None),
+    limit: int = Query(50, ge=4, le=200),
+    method: str = Query("auto")
+) -> Dict[str, Any]:
+    """Generates 3D strategy manifold projection and 1024D pairwise cosine similarity."""
+    from src.domain.formula_parser import FormulaParser
+    from src.clustering.phenotype_extractor import PhenotypeExtractor
+    from src.clustering.alpha_manifold import AlphaManifoldPruner
+    import numpy as np
+
+    elites = supervisor.archive_store.get_top_elites(
+        limit=limit,
+        metric="fitness",
+        ticker=ticker,
+        lookback=lookback
+    )
+    if not elites or len(elites) < 4:
+        elites = supervisor.archive_store.get_top_elites(limit=limit, metric="fitness")
+
+    if not elites or len(elites) < 2:
+        return {
+            "status": "empty",
+            "count": 0,
+            "compression_ratio": 0.0,
+            "clusters_count": 0,
+            "points": [],
+            "cosine_matrix": [],
+            "labels": []
+        }
+
+    parsed_nodes = []
+    valid_elites = []
+    for e in elites:
+        try:
+            node = FormulaParser.parse(e["formula_str"])
+            parsed_nodes.append(node)
+            valid_elites.append(e)
+        except Exception:
+            continue
+
+    if len(parsed_nodes) < 2:
+        return {
+            "status": "empty",
+            "count": 0,
+            "compression_ratio": 0.0,
+            "clusters_count": 0,
+            "points": [],
+            "cosine_matrix": [],
+            "labels": []
+        }
+
+    extractor = PhenotypeExtractor.create_mock(n_assets=3, n_bars=100)
+    embeddings = extractor.extract_dense_batch(parsed_nodes, target_dim=1024)
+    cosine_matrix = np.clip(embeddings @ embeddings.T, 0.0, 1.0)
+
+    ast_lens = [len(e["formula_str"]) for e in valid_elites]
+    sortinos = [float(e.get("sortino", e.get("fitness", 1.0))) for e in valid_elites]
+
+    pruner = AlphaManifoldPruner(min_cluster_size=max(2, min(4, len(valid_elites) // 3)))
+    use_umap = (method == "umap") or (method == "auto" and len(valid_elites) <= 30)
+    if method in {"fast", "svd"}:
+        use_umap = False
+    prune_res = pruner.cluster_and_prune(embeddings, ast_lens, sortinos, use_umap=use_umap)
+
+    coords = prune_res["embedding_3d"]
+    raw_labels = prune_res["cluster_labels"]
+    labels = raw_labels.tolist() if hasattr(raw_labels, "tolist") else list(raw_labels)
+    surv_set = set(prune_res["surviving_indices"])
+    orth_set = set(prune_res["orthogonal_indices"])
+
+    points = []
+    for i, e in enumerate(valid_elites):
+        points.append({
+            "x": round(float(coords[i, 0]), 4),
+            "y": round(float(coords[i, 1]), 4),
+            "z": round(float(coords[i, 2]), 4),
+            "cluster": int(labels[i]),
+            "is_survivor": i in surv_set,
+            "is_orthogonal": i in orth_set,
+            "ticker": e.get("ticker", ticker),
+            "fitness": round(float(e.get("fitness", 0.0)), 2),
+            "cagr_pct": round(float(e.get("cagr_pct", 0.0)), 1),
+            "max_drawdown": round(float(e.get("max_drawdown", 0.0)), 1),
+            "formula": e.get("formula_str", "")
+        })
+
+    return {
+        "status": "ok",
+        "ticker": ticker,
+        "count": len(points),
+        "compression_ratio": round(float(prune_res["compression_ratio"]), 4),
+        "clusters_count": int(prune_res["clusters_count"]),
+        "points": points,
+        "cosine_matrix": [[round(float(v), 3) for v in row] for row in cosine_matrix],
+        "labels": [f"#{i+1} {e['formula_str'][:16]}.." for i, e in enumerate(valid_elites)]
+    }
 
 
 @app.post("/api/emergency/freeze")

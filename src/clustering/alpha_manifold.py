@@ -29,7 +29,8 @@ class AlphaManifoldPruner:
         self,
         phenotype_matrix: np.ndarray,
         ast_lengths: List[int],
-        sortinos: List[float]
+        sortinos: List[float],
+        use_umap: bool = True
     ) -> Dict[str, Any]:
         """
         Deduplicates redundant strategy clones while preserving orthogonal alpha streams.
@@ -38,6 +39,7 @@ class AlphaManifoldPruner:
             phenotype_matrix: 2D array of binary trade decisions (shape: [N, D]).
             ast_lengths: String/depth complexity lengths of candidate formulas.
             sortinos: Annualized Sortino ratios of candidate formulas.
+            use_umap: If True and UMAP is available, uses UMAP; otherwise fast SVD.
 
         Returns:
             Dictionary with surviving indices, orthogonal indices, labels, and 3D coordinates.
@@ -47,7 +49,7 @@ class AlphaManifoldPruner:
             return {"surviving_indices": [], "orthogonal_indices": [], "compression_ratio": 0.0, "embedding_3d": np.empty((0, 3))}
 
         # 1. 3D Manifold Dimensionality Reduction (UMAP or Fallback SVD)
-        if UMAP_AVAILABLE and N >= 10:
+        if UMAP_AVAILABLE and N >= 10 and use_umap:
             n_neighbors = max(2, min(15, N - 1))
             reducer = umap.UMAP(
                 n_components=3,

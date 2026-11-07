@@ -138,6 +138,72 @@ class TestCockpitServerApi(unittest.TestCase):
                 # Ensure no unhandled 500 error occurred
                 self.assertNotIn("Internal Server Error", text)
 
+    def test_elites_grid_endpoint(self):
+        """GET /api/elites/grid returns dense 20x20 matrix with metrics and hover metadata."""
+        res = self.client.get("/api/elites/grid?ticker=NIFTYBEES&metric=fitness")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertEqual(data["ticker"], "NIFTYBEES")
+        self.assertEqual(len(data["z"]), 20)
+        self.assertEqual(len(data["z"][0]), 20)
+        self.assertEqual(len(data["hover_text"]), 20)
+        self.assertEqual(len(data["hover_text"][0]), 20)
+        self.assertEqual(len(data["x_bins"]), 20)
+        self.assertEqual(len(data["y_bins"]), 20)
+        self.assertGreaterEqual(data["occupied_count"], 0)
+        self.assertGreaterEqual(data["occupancy_pct"], 0.0)
+
+    def test_universe_assets_endpoint(self):
+        """GET /api/universe/assets returns categorized instruments from lake and database."""
+        res = self.client.get("/api/universe/assets")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertGreater(data["total_count"], 50)
+        self.assertIn("categories", data)
+        self.assertIn("resident_tickers", data)
+        self.assertIn("NIFTYBEES", data["resident_tickers"])
+
+    def test_elites_manifold_endpoint(self):
+        """GET /api/elites/manifold returns 3D points, clusters, and pairwise cosine matrix."""
+        res = self.client.get("/api/elites/manifold?ticker=NIFTYBEES&method=fast&limit=20")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["status"], "ok")
+        self.assertIn("points", data)
+        self.assertIn("cosine_matrix", data)
+        self.assertIn("compression_ratio", data)
+        self.assertIn("clusters_count", data)
+        if len(data["points"]) > 0:
+            first = data["points"][0]
+            self.assertIn("x", first)
+            self.assertIn("y", first)
+            self.assertIn("z", first)
+            self.assertIn("cluster", first)
+
+    def test_evolve_with_seed(self):
+        """POST /api/pipeline/evolve accepts deterministic/random seed and passes it to worker."""
+        with patch.object(supervisor, "start_worker", return_value=True) as mock_start:
+            payload = {
+                "instrument": "BANKBEES",
+                "generations": 5,
+                "population_size": 20,
+                "seed": 12345
+            }
+            res = self.client.post("/api/pipeline/evolve", json=payload)
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertEqual(data["status"], "STARTED")
+            self.assertEqual(data["seed"], 12345)
+            mock_start.assert_called_once_with(
+                instrument="BANKBEES",
+                generations=5,
+                population_size=20,
+                lookback_years=1.0,
+                seed=12345
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

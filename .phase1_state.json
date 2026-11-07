@@ -107,6 +107,19 @@
       },
       "verification_cmd": "python -m unittest tests/test_chaos_fault_injection.py",
       "commit": "009bf41"
+    },
+    "TASK_8": {
+      "title": "20x20 MAP-Elites Heatmap, Dynamic Universe Selector, Seed Governor, and 3D Strategy Manifold",
+      "status": "PASSED",
+      "subtasks": {
+        "8.1_restore_20x20_map_elites_heatmap": "PASSED",
+        "8.2_dynamic_100_asset_universe_selector": "PASSED",
+        "8.3_random_seed_governor": "PASSED",
+        "8.4_3d_phenotype_manifold_and_latent_cosine_heatmap": "PASSED",
+        "8.5_empirical_verification_and_red_team_gate": "PASSED"
+      },
+      "verification_cmd": "python -m unittest tests/test_cockpit_server_api.py tests/test_web_cockpit_ui.py tests/test_shm_worker_isolation.py && python scripts/red_team_harness.py --mode=full",
+      "commit": "PENDING"
     }
   }
 }

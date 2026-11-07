@@ -1,28 +1,50 @@
 /**
  * Bio-Quant Institutional Alpha Cockpit - Main Application Controller
  * Features:
- * 1. Differential SSE listener with Web Audio sound effects.
- * 2. AG Grid DOM virtualization with transactional delta updates.
- * 3. 250ms RequestAnimationFrame WebGL throttler for Plotly.
- * 4. 5-second dead-man switch heartbeat watchdog.
+ * 1. 20x20 MAP-Elites WebGL Behavioral Heatmap (400 Niches with Fog-of-War).
+ * 2. Dynamic 100+ Asset Universe Selector with automatic leaderboard and grid illumination.
+ * 3. Random Seed Governor for speciation and deterministic replay.
+ * 4. 3D Phenotype Strategy Manifold (UMAP & HDBSCAN Clones Pruner).
+ * 5. 1024D Protein Latent Space Pairwise Cosine Similarity Heatmap.
+ * 6. Differential SSE listener with Web Audio sound effects.
+ * 7. AG Grid DOM virtualization with transactional delta updates.
+ * 8. 5-second dead-man switch heartbeat watchdog.
  */
 
 function cockpitApp() {
     return {
-        // State
+        // Core State
         status: 'STANDBY',
         instrument: 'NIFTYBEES',
         lookbackYears: 1.0,
         generations: 10,
         populationSize: 50,
+        randomSeed: null,
         isMuted: false,
-        activeTab: 'tactical', // 'tactical' | 'leaderboard' | 'telemetry'
+        activeTab: 'tactical', // 'tactical' | 'manifold' | 'cosine' | 'leaderboard' | 'telemetry'
         deadManDisconnected: false,
         lastHeartbeat: Date.now(),
         eventSource: null,
         gridApi: null,
         rafPending: false,
-        pendingChartData: [],
+
+        // Universe Catalog State
+        universeCategories: {},
+        universeCount: 0,
+        residentTickers: [],
+
+        // MAP-Elites Grid State
+        gridMetric: 'fitness',
+        gridOccupancy: 0.0,
+        gridOccupiedCount: 0,
+        currentGridData: null,
+
+        // Manifold State
+        manifoldMethod: 'auto',
+        manifoldClusters: 0,
+        manifoldCompression: 0.0,
+
+        // Logs & Telemetry
         logs: [],
         telemetry: {
             current_gen: 0,
@@ -38,10 +60,11 @@ function cockpitApp() {
         init() {
             this.log("Avionics HUD initialized. Connecting telemetry bus...");
             this.initGrid();
-            this.initPlotly();
             this.connectSSE();
             this.startDeadManWatchdog();
-            this.fetchInitialData();
+            this.fetchUniverseAssets();
+            this.fetchGridMatrix();
+            this.fetchLeaderboard();
         },
 
         log(msg, type = 'info') {
@@ -54,6 +77,50 @@ function cockpitApp() {
             this.isMuted = window.cockpitAudio.toggleMute();
         },
 
+        randomizeSeed() {
+            this.randomSeed = Math.floor(Math.random() * 900000) + 100000;
+            this.log(`Exploration seed set: ${this.randomSeed}`);
+        },
+
+        setTab(tab) {
+            this.activeTab = tab;
+            this.$nextTick(() => {
+                if (tab === 'tactical' && this.currentGridData) {
+                    this.renderMapElitesHeatmap(this.currentGridData);
+                } else if (tab === 'manifold') {
+                    this.fetchManifold();
+                } else if (tab === 'cosine') {
+                    this.fetchCosine();
+                }
+            });
+        },
+
+        // Universe Catalog & Asset Selection
+        async fetchUniverseAssets() {
+            try {
+                const res = await fetch('/api/universe/assets');
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    this.universeCategories = data.categories || {};
+                    this.universeCount = data.total_count || 0;
+                    this.residentTickers = data.resident_tickers || [];
+                }
+            } catch (err) {
+                this.log(`Failed to discover universe assets: ${err}`, 'warning');
+            }
+        },
+
+        async onAssetChange() {
+            this.log(`Switched target asset to ${this.instrument} (${this.lookbackYears}y)`);
+            await this.fetchGridMatrix();
+            await this.fetchLeaderboard();
+            if (this.activeTab === 'manifold') {
+                await this.fetchManifold();
+            } else if (this.activeTab === 'cosine') {
+                await this.fetchCosine();
+            }
+        },
+
         // 1. Differential SSE Telemetry Stream
         connectSSE() {
             if (this.eventSource) {
@@ -62,13 +129,13 @@ function cockpitApp() {
 
             this.eventSource = new EventSource('/api/stream/evolution');
 
-            this.eventSource.addEventListener('connected', (e) => {
+            this.eventSource.addEventListener('connected', () => {
                 this.lastHeartbeat = Date.now();
                 this.deadManDisconnected = false;
                 this.log("Connected to Differential SSE telemetry bus.");
             });
 
-            this.eventSource.addEventListener('ping', (e) => {
+            this.eventSource.addEventListener('ping', () => {
                 this.lastHeartbeat = Date.now();
                 this.deadManDisconnected = false;
             });
@@ -87,7 +154,7 @@ function cockpitApp() {
                     this.status = 'ABORTED';
                 }
 
-                // Batch redraw via 250ms RAF throttler
+                // Batch redraw via 250ms RequestAnimationFrame throttler
                 this.scheduleChartUpdate(data);
             });
 
@@ -100,31 +167,56 @@ function cockpitApp() {
                 if (this.gridApi) {
                     this.gridApi.applyTransactionAsync({ add: [elite] });
                 }
+
+                // Incrementally paint cell in 20x20 Heatmap
+                this.patchHeatmapCell(elite);
             });
 
-            this.eventSource.addEventListener('complete', (e) => {
+            this.eventSource.addEventListener('complete', () => {
                 if (this.status !== 'COMPLETE') {
                     this.status = 'COMPLETE';
                     this.log("Evolution cycle complete. Champions committed to SQLite WAL.", 'success');
                     window.cockpitAudio.playCompleteSound();
                     this.fetchLeaderboard();
+                    this.fetchGridMatrix();
                 }
             });
 
-            this.eventSource.addEventListener('abort', (e) => {
+            this.eventSource.addEventListener('abort', () => {
                 if (this.status !== 'ABORTED') {
                     this.status = 'ABORTED';
                     this.log("Worker execution aborted by operator.", 'warning');
                     this.fetchLeaderboard();
+                    this.fetchGridMatrix();
                 }
             });
 
             this.eventSource.onerror = () => {
-                // SSE reconnect is handled natively by browser
+                // Native SSE reconnection handled by browser EventSource
             };
         },
 
         // 2. 5-Second Dead-Man Switch Watchdog
+        scheduleChartUpdate(telemetry) {
+            if (this.rafPending) return;
+            this.rafPending = true;
+
+            window.requestAnimationFrame(() => {
+                this.updatePlotlyHeader(telemetry);
+                this.rafPending = false;
+            });
+        },
+
+        updatePlotlyHeader(telemetry) {
+            const chartDiv = document.getElementById('mapElitesChart');
+            if (!chartDiv || !window.Plotly) return;
+            if (this.status === 'EVOLVING') {
+                Plotly.relayout(chartDiv, {
+                    'title.text': `🗺️ MAP-Elites 400-Niche Space: ${this.instrument} (Live Gen ${telemetry.current_gen}/${telemetry.total_gens} · ${this.gridOccupancy}%)`
+                });
+            }
+        },
+
         startDeadManWatchdog() {
             setInterval(() => {
                 const silenceMs = Date.now() - this.lastHeartbeat;
@@ -168,55 +260,209 @@ function cockpitApp() {
             this.gridApi = agGrid.createGrid(gridDiv, gridOptions);
         },
 
-        // 4. Plotly 250ms RequestAnimationFrame Throttler
-        initPlotly() {
+        // 4. MAP-Elites 20x20 Behavioral Space Heatmap
+        async fetchGridMatrix() {
+            try {
+                const lookbackParam = this.lookbackYears ? `${parseInt(this.lookbackYears)}y` : 'all';
+                const url = `/api/elites/grid?ticker=${this.instrument}&lookback=${lookbackParam}&metric=${this.gridMetric}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    this.currentGridData = data;
+                    this.gridOccupancy = data.occupancy_pct || 0.0;
+                    this.gridOccupiedCount = data.occupied_count || 0;
+                    this.renderMapElitesHeatmap(data);
+                }
+            } catch (err) {
+                this.log(`Failed to fetch 20x20 grid matrix: ${err}`, 'error');
+            }
+        },
+
+        renderMapElitesHeatmap(data) {
             const chartDiv = document.getElementById('mapElitesChart');
             if (!chartDiv || !window.Plotly) return;
 
-            const data = [{
-                x: [0.1, 0.3, 0.5, 0.7, 0.9],
-                y: [0.2, 0.4, 0.6, 0.8, 1.0],
-                mode: 'markers',
-                type: 'scattergl',
-                marker: {
-                    size: 10,
-                    color: [1.2, 1.8, 2.4, 3.1, 3.8],
-                    colorscale: 'Viridis',
-                    showscale: true,
-                    colorbar: { title: 'Sharpe' }
-                }
-            }];
+            const metricLabels = {
+                'fitness': 'Sharpe / Fitness',
+                'net_return_pct': 'Net Return %',
+                'cagr_pct': 'Annual CAGR %',
+                'max_drawdown': 'Max Drawdown %',
+                'win_rate': 'Win Rate %',
+                'trades_count': 'Trades'
+            };
+
+            const trace = {
+                z: data.z,
+                x: data.x_bins,
+                y: data.y_bins,
+                text: data.hover_text,
+                hovertemplate: '%{text}<extra></extra>',
+                type: 'heatmap',
+                colorscale: this.gridMetric === 'max_drawdown' ? 'Reds' : 'Viridis',
+                colorbar: {
+                    title: metricLabels[this.gridMetric] || this.gridMetric.toUpperCase(),
+                    tickfont: { color: '#94a3b8' },
+                    titlefont: { color: '#e2e8f0', size: 11 }
+                },
+                xgap: 2,
+                ygap: 2
+            };
 
             const layout = {
                 paper_bgcolor: '#0f172a',
-                plot_bgcolor: '#0f172a',
+                plot_bgcolor: '#0b0f19',
                 font: { color: '#94a3b8', family: 'monospace' },
-                margin: { t: 30, b: 40, l: 50, r: 20 },
-                xaxis: { title: 'Volatile Regime Sigma', gridcolor: '#1e293b' },
-                yaxis: { title: 'Turnover Factor Tau', gridcolor: '#1e293b' }
+                margin: { t: 40, b: 50, l: 80, r: 20 },
+                xaxis: { title: 'Turnover Factor Tau (Annualized Portfolio Velocity)', gridcolor: '#1e293b' },
+                yaxis: { title: 'Volatile Regime Sigma (Annualized Standard Deviation)', gridcolor: '#1e293b' },
+                title: {
+                    text: `🗺️ MAP-Elites 400-Niche Space: ${this.instrument} (${data.occupied_count}/400 Illuminated · ${data.occupancy_pct}%)`,
+                    font: { color: '#38bdf8', size: 13 }
+                }
             };
 
-            Plotly.newPlot(chartDiv, data, layout, { responsive: true, displayModeBar: false });
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false });
         },
 
-        scheduleChartUpdate(telemetry) {
-            if (this.rafPending) return;
-            this.rafPending = true;
+        patchHeatmapCell(elite) {
+            if (!this.currentGridData || !this.currentGridData.z) return;
+            const r = parseInt(elite.niche_row);
+            const c = parseInt(elite.niche_col);
+            if (r >= 0 && r < 20 && c >= 0 && c < 20) {
+                const metricVal = parseFloat(elite[this.gridMetric] ?? elite.fitness ?? 0.0);
+                if (this.currentGridData.z[r][c] === null) {
+                    this.gridOccupiedCount += 1;
+                    this.gridOccupancy = parseFloat(((this.gridOccupiedCount / 400.0) * 100.0).toFixed(1));
+                }
+                this.currentGridData.z[r][c] = metricVal;
+                const fShort = (elite.formula_str || '').slice(0, 50);
+                this.currentGridData.hover_text[r][c] = `Niche [${r}, ${c}]<br>Formula: ${fShort}..<br>Sharpe: ${elite.fitness?.toFixed(2)}<br>CAGR: ${(elite.cagr_pct*100)?.toFixed(1)}%<br>Trades: ${elite.trades_count}`;
 
-            window.requestAnimationFrame(() => {
-                this.updatePlotly(telemetry);
-                this.rafPending = false;
-            });
+                const chartDiv = document.getElementById('mapElitesChart');
+                if (chartDiv && window.Plotly) {
+                    Plotly.restyle(chartDiv, {
+                        z: [this.currentGridData.z],
+                        text: [this.currentGridData.hover_text]
+                    });
+                }
+            }
         },
 
-        updatePlotly(telemetry) {
-            const chartDiv = document.getElementById('mapElitesChart');
+        // 5. 3D Phenotype Manifold (UMAP & HDBSCAN Clones Pruner)
+        async fetchManifold() {
+            const chartDiv = document.getElementById('manifoldChart3d');
             if (!chartDiv || !window.Plotly) return;
 
-            // Update title or live indicator
-            Plotly.relayout(chartDiv, {
-                title: `MAP-Elites Live Grid: Gen ${telemetry.current_gen}/${telemetry.total_gens} (Occupancy: ${telemetry.occupancy_pct?.toFixed(1)}%)`
-            });
+            try {
+                this.log(`Computing 3D Phenotype Manifold for ${this.instrument} (${this.manifoldMethod})...`);
+                const url = `/api/elites/manifold?ticker=${this.instrument}&method=${this.manifoldMethod}&limit=50`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    this.manifoldClusters = data.clusters_count || 0;
+                    this.manifoldCompression = parseFloat(((data.compression_ratio || 0.0) * 100.0).toFixed(1));
+                    this.renderManifoldPlot(data);
+                } else {
+                    this.log(`Manifold note: ${data.message || 'Need more resident champions.'}`, 'warning');
+                }
+            } catch (err) {
+                this.log(`Failed to fetch manifold: ${err}`, 'error');
+            }
+        },
+
+        renderManifoldPlot(data) {
+            const chartDiv = document.getElementById('manifoldChart3d');
+            if (!chartDiv || !window.Plotly || !data.points || data.points.length === 0) return;
+
+            const pts = data.points;
+            const trace = {
+                x: pts.map(p => p.x),
+                y: pts.map(p => p.y),
+                z: pts.map(p => p.z),
+                mode: 'markers',
+                type: 'scatter3d',
+                marker: {
+                    size: pts.map(p => p.is_orthogonal ? 8 : (p.is_survivor ? 6 : 4)),
+                    color: pts.map(p => p.cluster),
+                    colorscale: 'Plasma',
+                    showscale: true,
+                    colorbar: { title: 'Cluster ID', tickfont: { color: '#94a3b8' } },
+                    opacity: pts.map(p => p.is_survivor ? 0.95 : 0.45)
+                },
+                text: pts.map(p => {
+                    const fStr = (p.formula || '').slice(0, 60);
+                    return `<b>Cluster ${p.cluster}</b> (${p.is_orthogonal ? 'Orthogonal' : (p.is_survivor ? 'Occam Survivor' : 'Pruned Clone')})<br>` +
+                           `Formula: <code>${fStr}..</code><br>` +
+                           `Sharpe: ${p.fitness?.toFixed(2)} | CAGR: ${p.cagr_pct?.toFixed(1)}% | MaxDD: ${p.max_drawdown?.toFixed(1)}%`;
+                }),
+                hovertemplate: '%{text}<extra></extra>'
+            };
+
+            const layout = {
+                paper_bgcolor: '#0f172a',
+                font: { color: '#94a3b8', family: 'monospace' },
+                scene: {
+                    xaxis: { title: 'Dim 1 (Topology)', backgroundcolor: '#0b0f19', gridcolor: '#1e293b' },
+                    yaxis: { title: 'Dim 2 (Regime)', backgroundcolor: '#0b0f19', gridcolor: '#1e293b' },
+                    zaxis: { title: 'Dim 3 (Trajectory)', backgroundcolor: '#0b0f19', gridcolor: '#1e293b' }
+                },
+                margin: { t: 30, b: 20, l: 20, r: 20 },
+                title: {
+                    text: `🌌 3D Phenotype Manifold & Occam Pruning: ${this.instrument} (${pts.length} Champions · ${data.clusters_count} Clusters · ${this.manifoldCompression}% Redundant Clones Pruned)`,
+                    font: { color: '#c084fc', size: 13 }
+                }
+            };
+
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false });
+        },
+
+        // 6. 1024D Protein Latent Space Cosine Similarity Heatmap
+        async fetchCosine() {
+            const chartDiv = document.getElementById('cosineHeatmapChart');
+            if (!chartDiv || !window.Plotly) return;
+
+            try {
+                this.log(`Computing 1024D latent cosine similarity for ${this.instrument}...`);
+                const url = `/api/elites/manifold?ticker=${this.instrument}&method=fast&limit=25`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.status === 'ok' && data.cosine_matrix && data.cosine_matrix.length > 0) {
+                    this.renderCosineHeatmap(data);
+                }
+            } catch (err) {
+                this.log(`Failed to fetch cosine matrix: ${err}`, 'error');
+            }
+        },
+
+        renderCosineHeatmap(data) {
+            const chartDiv = document.getElementById('cosineHeatmapChart');
+            if (!chartDiv || !window.Plotly) return;
+
+            const trace = {
+                z: data.cosine_matrix,
+                x: data.labels,
+                y: data.labels,
+                type: 'heatmap',
+                colorscale: 'Viridis',
+                zmin: 0.0,
+                zmax: 1.0,
+                colorbar: { title: 'Cosine Sim', tickfont: { color: '#94a3b8' } },
+                xgap: 1,
+                ygap: 1
+            };
+
+            const layout = {
+                paper_bgcolor: '#0f172a',
+                plot_bgcolor: '#0b0f19',
+                font: { color: '#94a3b8', family: 'monospace', size: 10 },
+                margin: { t: 40, b: 100, l: 120, r: 20 },
+                title: {
+                    text: `🧬 1024D Latent Space Diversity: ${this.instrument} (Unit-Norm Pairwise Cosine Matrix)`,
+                    font: { color: '#34d399', size: 13 }
+                }
+            };
+
+            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false });
         },
 
         // API Node Actions
@@ -245,21 +491,26 @@ function cockpitApp() {
 
         async startEvolution() {
             this.status = 'EVOLVING';
-            this.log(`Node 2: Spawning isolated compute worker for ${this.generations} generations...`);
+            const seedStr = this.randomSeed ? ` (Seed: ${this.randomSeed})` : '';
+            this.log(`Node 2: Spawning isolated compute worker for ${this.instrument}, ${this.generations} generations${seedStr}...`);
             try {
+                const payload = {
+                    instrument: this.instrument,
+                    generations: parseInt(this.generations),
+                    population_size: parseInt(this.populationSize),
+                    lookback_years: parseFloat(this.lookbackYears)
+                };
+                if (this.randomSeed !== null && !isNaN(this.randomSeed)) {
+                    payload.seed = parseInt(this.randomSeed);
+                }
                 const res = await fetch('/api/pipeline/evolve', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        instrument: this.instrument,
-                        generations: parseInt(this.generations),
-                        population_size: parseInt(this.populationSize),
-                        lookback_years: parseFloat(this.lookbackYears)
-                    })
+                    body: JSON.stringify(payload)
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    this.log(`Node 2 Started: Worker running on Cores 2-3.`, 'success');
+                    this.log(`Node 2 Started: Worker running on Cores 2-3 (Seed: ${data.seed ?? 'auto'}).`, 'success');
                 } else {
                     this.log(`Evolve start error: ${data.detail}`, 'error');
                 }
@@ -315,10 +566,6 @@ function cockpitApp() {
             } catch (err) {
                 this.log(`Failed to fetch leaderboard: ${err}`, 'error');
             }
-        },
-
-        async fetchInitialData() {
-            this.fetchLeaderboard();
         }
     };
 }

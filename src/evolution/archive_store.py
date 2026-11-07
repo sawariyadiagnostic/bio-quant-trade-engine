@@ -154,9 +154,11 @@ class ArchiveStore:
         where_clauses = []
         params = []
         if ticker:
-            where_clauses.append("ticker = ?")
-            params.append(ticker)
-        if lookback:
+            base_t = ticker[:-3] if ticker.endswith(".NS") else ticker
+            ns_t = f"{base_t}.NS"
+            where_clauses.append("(ticker = ? OR ticker = ?)")
+            params.extend([base_t, ns_t])
+        if lookback and lookback != "all":
             where_clauses.append("lookback = ?")
             params.append(lookback)
 
@@ -182,9 +184,11 @@ class ArchiveStore:
         where_clauses = []
         params = []
         if ticker:
-            where_clauses.append("ticker = ?")
-            params.append(ticker)
-        if lookback:
+            base_t = ticker[:-3] if ticker.endswith(".NS") else ticker
+            ns_t = f"{base_t}.NS"
+            where_clauses.append("(ticker = ? OR ticker = ?)")
+            params.extend([base_t, ns_t])
+        if lookback and lookback != "all":
             where_clauses.append("lookback = ?")
             params.append(lookback)
 
@@ -204,10 +208,22 @@ class ArchiveStore:
         """Returns total champion count."""
         with self._get_connection() as conn:
             if ticker and lookback:
-                cur = conn.execute("SELECT count(*) FROM resident_elites WHERE ticker = ? AND lookback = ?", (ticker, lookback))
+                base_t = ticker[:-3] if ticker.endswith(".NS") else ticker
+                ns_t = f"{base_t}.NS"
+                cur = conn.execute("SELECT count(*) FROM resident_elites WHERE (ticker = ? OR ticker = ?) AND lookback = ?", (base_t, ns_t, lookback))
+            elif ticker:
+                base_t = ticker[:-3] if ticker.endswith(".NS") else ticker
+                ns_t = f"{base_t}.NS"
+                cur = conn.execute("SELECT count(*) FROM resident_elites WHERE (ticker = ? OR ticker = ?)", (base_t, ns_t))
             else:
                 cur = conn.execute("SELECT count(*) FROM resident_elites")
             return cur.fetchone()[0]
+
+    def get_resident_tickers(self) -> List[str]:
+        """Returns distinct tickers currently resident in the archive."""
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT DISTINCT ticker FROM resident_elites ORDER BY ticker").fetchall()
+            return [str(r[0]) for r in rows]
 
     def wipe_archive(self, ticker: str, lookback: str) -> int:
         """Deletes resident champions for specific universe slice."""
@@ -215,3 +231,90 @@ class ArchiveStore:
             cur = conn.execute("DELETE FROM resident_elites WHERE ticker = ? AND lookback = ?", (ticker, lookback))
             conn.commit()
             return cur.rowcount
+
+    def get_grid_matrix(
+        self,
+        ticker: str,
+        lookback: Optional[str] = None,
+        metric: str = "fitness"
+    ) -> Dict[str, Any]:
+        """Builds dense 20x20 matrix of resident elites for WebGL heatmap visualization."""
+        allowed_metrics = {"fitness", "net_return_pct", "cagr_pct", "max_drawdown", "win_rate", "trades_count"}
+        safe_metric = "fitness" if metric in {"sharpe", "fitness"} else metric
+        if safe_metric not in allowed_metrics:
+            safe_metric = "fitness"
+
+        base_t = ticker[:-3] if ticker.endswith(".NS") else ticker
+        ns_t = f"{base_t}.NS"
+        params: List[Any] = [base_t, ns_t]
+        where_lookback = ""
+        if lookback and lookback != "all":
+            where_lookback = "AND lookback = ?"
+            params.append(lookback)
+
+        sql = f"""
+            SELECT niche_row, niche_col, fitness, net_return_pct, cagr_pct,
+                   max_drawdown, win_rate, trades_count, formula_str
+            FROM resident_elites
+            WHERE (ticker = ? OR ticker = ?) {where_lookback}
+        """
+        with self._get_connection() as conn:
+            rows = conn.execute(sql, tuple(params)).fetchall()
+
+            # If lookback was specified but returned 0 rows, fallback to any lookback for ticker
+            if not rows and lookback and lookback != "all":
+                rows = conn.execute(
+                    "SELECT niche_row, niche_col, fitness, net_return_pct, cagr_pct, max_drawdown, win_rate, trades_count, formula_str FROM resident_elites WHERE (ticker = ? OR ticker = ?)",
+                    (base_t, ns_t)
+                ).fetchall()
+
+        z = [[None for _ in range(20)] for _ in range(20)]
+        hover_text = [["Empty Niche (Fog of War)" for _ in range(20)] for _ in range(20)]
+        formulas = [["" for _ in range(20)] for _ in range(20)]
+        seen_fit = [[-999999.0 for _ in range(20)] for _ in range(20)]
+        occupied_count = 0
+
+        for r_data in rows:
+            r = int(r_data["niche_row"])
+            c = int(r_data["niche_col"])
+            if 0 <= r < 20 and 0 <= c < 20:
+                fit_val = float(r_data["fitness"])
+                if z[r][c] is not None and fit_val <= seen_fit[r][c]:
+                    continue
+                seen_fit[r][c] = fit_val
+
+                val = float(r_data[safe_metric])
+                if math.isinf(val):
+                    val = 999999.0 if val > 0 else -999999.0
+                elif math.isnan(val):
+                    val = 0.0
+                if z[r][c] is None:
+                    occupied_count += 1
+                z[r][c] = round(val, 2)
+                f_short = str(r_data["formula_str"])
+                if len(f_short) > 60:
+                    f_short = f_short[:57] + "..."
+                hover_text[r][c] = (
+                    f"Niche [{r}, {c}]<br>"
+                    f"Formula: {f_short}<br>"
+                    f"Sharpe: {float(r_data['fitness']):.2f}<br>"
+                    f"CAGR: {float(r_data['cagr_pct']):.1f}%<br>"
+                    f"MaxDD: {float(r_data['max_drawdown']):.1f}%<br>"
+                    f"Trades: {int(r_data['trades_count'])}"
+                )
+                formulas[r][c] = str(r_data["formula_str"])
+
+        occupancy_pct = (occupied_count / 400.0) * 100.0
+        return {
+            "status": "ok",
+            "ticker": ticker,
+            "lookback": lookback or "all",
+            "metric": safe_metric,
+            "occupied_count": occupied_count,
+            "occupancy_pct": round(occupancy_pct, 1),
+            "z": z,
+            "hover_text": hover_text,
+            "formulas": formulas,
+            "x_bins": [f"Tau {c}" for c in range(20)],
+            "y_bins": [f"Sigma {r}" for r in range(20)]
+        }
