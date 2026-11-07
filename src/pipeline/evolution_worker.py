@@ -160,7 +160,7 @@ def run_evolution_process(
                             sortino=getattr(elite, "sortino", 0.0),
                             profit_factor=getattr(elite, "profit_factor", 0.0),
                             trades_count=getattr(elite, "trades_count", 0),
-                            formula_str=str(elite.formula)
+                            formula_str=elite.formula.to_formula_str() if hasattr(elite.formula, "to_formula_str") else str(elite.formula)
                         )
                         new_records.append({
                             "row": r,
@@ -175,7 +175,7 @@ def run_evolution_process(
                             "sortino": getattr(elite, "sortino", 0.0),
                             "profit_factor": getattr(elite, "profit_factor", 0.0),
                             "trades_count": getattr(elite, "trades_count", 0),
-                            "formula_str": str(elite.formula)
+                            "formula_str": elite.formula.to_formula_str() if hasattr(elite.formula, "to_formula_str") else str(elite.formula)
                         })
 
             if new_records:

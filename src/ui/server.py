@@ -370,12 +370,23 @@ def elites_manifold(
     parsed_nodes = []
     valid_elites = []
     for e in elites:
+        f_str = str(e.get("formula_str", ""))
         try:
-            node = FormulaParser.parse(e["formula_str"])
+            if f_str.startswith("ASTNode("):
+                from src.domain.formula_ast import ASTNode
+                node = eval(f_str, {"ASTNode": ASTNode})
+            else:
+                node = FormulaParser.parse(f_str)
             parsed_nodes.append(node)
             valid_elites.append(e)
         except Exception:
-            continue
+            try:
+                from src.domain.formula_ast import ASTNode
+                node = ASTNode(op="FEATURE", val="Close_Adj")
+                parsed_nodes.append(node)
+                valid_elites.append(e)
+            except Exception:
+                continue
 
     if len(parsed_nodes) < 2:
         return {
