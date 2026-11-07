@@ -56,15 +56,16 @@ class WorkerSupervisor:
 
         # Seed shared memory header from archive store on startup
         try:
-            initial_count = self.archive_store.count_champions()
-            top_elites = self.archive_store.get_top_elites(limit=1)
+            initial_count = self.archive_store.count_champions(ticker=self.instrument)
+            top_elites = self.archive_store.get_top_elites(limit=1, ticker=self.instrument)
             top_fitness = top_elites[0]["fitness"] if top_elites else 0.0
             best_return = top_elites[0]["net_return_pct"] if top_elites else 0.0
+            occ = min(100.0, (initial_count / 400.0 * 100.0)) if initial_count else 0.0
             self.shm_bus.update_header(
                 current_gen=0,
                 total_gens=self.generations,
                 resident_count=initial_count,
-                occupancy_pct=(initial_count / 400.0 * 100.0) if initial_count else 0.0,
+                occupancy_pct=occ,
                 top_sharpe=top_fitness,
                 best_net_return=best_return,
                 worker_status=0
@@ -88,6 +89,14 @@ class WorkerSupervisor:
         self.generations = generations
         self.population_size = population_size
         self.lookback_years = lookback_years
+
+        if self.shm_bus:
+            self.shm_bus.header.abort_requested = 0
+            self.shm_bus.update_header(
+                current_gen=0,
+                total_gens=generations,
+                worker_status=1
+            )
 
         self.worker_process = spawn_evolution_worker(
             instrument=instrument,
@@ -300,6 +309,10 @@ async def sse_event_generator(
     seen_elites_count = supervisor.archive_store.count_champions()
     tick_count = 0
 
+    hdr_init = supervisor.shm_bus.header if supervisor.shm_bus else None
+    complete_signaled = bool(hdr_init and hdr_init.worker_status == 3)
+    abort_signaled = bool(hdr_init and (hdr_init.worker_status == 2 or hdr_init.abort_requested == 1))
+
     while True:
         if await request.is_disconnected():
             break
@@ -333,11 +346,20 @@ async def sse_event_generator(
                     except Exception as err:
                         logger.error(f"[SSE] Failed to serialize elite: {err}")
 
-            # Check for completion or abort
-            if (total_gens > 0 and current_gen >= total_gens) or hdr.abort_requested == 1:
-                if not supervisor.is_worker_running():
-                    yield f"event: complete\ndata: {json.dumps({'status': 'COMPLETE', 'gen': current_gen}, default=str)}\n\n"
-                    break
+            # Check for completion or abort (signal once without severing connection)
+            is_running = supervisor.is_worker_running()
+            if is_running:
+                complete_signaled = False
+                abort_signaled = False
+            else:
+                if (total_gens > 0 and current_gen >= total_gens) or hdr.worker_status == 3:
+                    if not complete_signaled:
+                        complete_signaled = True
+                        yield f"event: complete\ndata: {json.dumps({'status': 'COMPLETE', 'gen': current_gen}, default=str)}\n\n"
+                elif hdr.abort_requested == 1 or hdr.worker_status == 2:
+                    if not abort_signaled:
+                        abort_signaled = True
+                        yield f"event: abort\ndata: {json.dumps({'status': 'ABORTED', 'gen': current_gen}, default=str)}\n\n"
 
         await asyncio.sleep(0.05)  # 20Hz streaming tick rate
 

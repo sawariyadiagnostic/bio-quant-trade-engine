@@ -103,28 +103,37 @@ class SharedMemoryBus:
 
     def update_header(
         self,
-        current_gen: int = 0,
-        total_gens: int = 0,
-        resident_count: int = 0,
-        survivor_count: int = 0,
-        quarantined_count: int = 0,
-        occupancy_pct: float = 0.0,
-        top_sharpe: float = 0.0,
-        best_net_return: float = 0.0,
-        worker_status: int = 1
+        current_gen: Optional[int] = None,
+        total_gens: Optional[int] = None,
+        resident_count: Optional[int] = None,
+        survivor_count: Optional[int] = None,
+        quarantined_count: Optional[int] = None,
+        occupancy_pct: Optional[float] = None,
+        top_sharpe: Optional[float] = None,
+        best_net_return: Optional[float] = None,
+        worker_status: Optional[int] = None
     ) -> None:
-        """Updates scalar telemetry and advances monotonic sequence counter."""
+        """Updates scalar telemetry non-destructively for non-None arguments."""
         self.header.sequence_id += 1
         self.header.heartbeat_ns = time.time_ns()
-        self.header.current_gen = current_gen
-        self.header.total_gens = total_gens
-        self.header.resident_count = resident_count
-        self.header.survivor_count = survivor_count
-        self.header.quarantined_count = quarantined_count
-        self.header.occupancy_pct = occupancy_pct
-        self.header.top_sharpe = top_sharpe
-        self.header.best_net_return = best_net_return
-        self.header.worker_status = worker_status
+        if current_gen is not None:
+            self.header.current_gen = current_gen
+        if total_gens is not None:
+            self.header.total_gens = total_gens
+        if resident_count is not None:
+            self.header.resident_count = resident_count
+        if survivor_count is not None:
+            self.header.survivor_count = survivor_count
+        if quarantined_count is not None:
+            self.header.quarantined_count = quarantined_count
+        if occupancy_pct is not None:
+            self.header.occupancy_pct = occupancy_pct
+        if top_sharpe is not None:
+            self.header.top_sharpe = top_sharpe
+        if best_net_return is not None:
+            self.header.best_net_return = best_net_return
+        if worker_status is not None:
+            self.header.worker_status = worker_status
 
     def read_header(self) -> HeaderStruct:
         """Returns direct ctypes reference to 256-byte header."""

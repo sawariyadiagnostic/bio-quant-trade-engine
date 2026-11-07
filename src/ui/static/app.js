@@ -81,6 +81,10 @@ function cockpitApp() {
 
                 if (data.worker_status === 1) {
                     this.status = 'EVOLVING';
+                } else if (data.worker_status === 3 && this.status !== 'COMPLETE') {
+                    this.status = 'COMPLETE';
+                } else if (data.worker_status === 2 && this.status !== 'ABORTED') {
+                    this.status = 'ABORTED';
                 }
 
                 // Batch redraw via 250ms RAF throttler
@@ -99,10 +103,20 @@ function cockpitApp() {
             });
 
             this.eventSource.addEventListener('complete', (e) => {
-                this.status = 'COMPLETE';
-                this.log("Evolution cycle complete. Champions committed to SQLite WAL.", 'success');
-                window.cockpitAudio.playCompleteSound();
-                this.fetchLeaderboard();
+                if (this.status !== 'COMPLETE') {
+                    this.status = 'COMPLETE';
+                    this.log("Evolution cycle complete. Champions committed to SQLite WAL.", 'success');
+                    window.cockpitAudio.playCompleteSound();
+                    this.fetchLeaderboard();
+                }
+            });
+
+            this.eventSource.addEventListener('abort', (e) => {
+                if (this.status !== 'ABORTED') {
+                    this.status = 'ABORTED';
+                    this.log("Worker execution aborted by operator.", 'warning');
+                    this.fetchLeaderboard();
+                }
             });
 
             this.eventSource.onerror = () => {

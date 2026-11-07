@@ -186,14 +186,20 @@ def run_evolution_process(
                 worker_status=1 # RUNNING
             )
 
-        final_count = len(engine.archive.get_resident_elites())
+        all_residents = engine.archive.get_resident_elites()
+        final_count = len(all_residents)
+        top_elite = max(all_residents, key=lambda e: e.fitness, default=None)
+        occ = float(final_count) / float(engine.archive.rows * engine.archive.cols) * 100.0
         bus.update_header(
             current_gen=generations,
             total_gens=generations,
             resident_count=final_count,
+            occupancy_pct=occ,
+            top_sharpe=top_elite.fitness if top_elite else 0.0,
+            best_net_return=top_elite.net_return_pct if top_elite else 0.0,
             worker_status=3 # COMPLETED
         )
-        logger.success(f"[Worker] Evolution complete: {final_count} resident champions.")
+        logger.success(f"[Worker] Evolution complete: {final_count} resident champions (Occupancy: {occ:.1f}%).")
         return {"status": "SUCCESS", "resident_elites": final_count}
 
     except Exception as err:
