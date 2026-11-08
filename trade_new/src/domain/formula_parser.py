@@ -14,6 +14,9 @@ class FormulaParser:
         if not s or _depth > 40:
             return ASTNode(op="FEATURE", val="0.0", active_regimes=set(regimes))
 
+        if _depth == 0 and not FormulaParser._is_balanced(s):
+            raise ValueError(f"Unbalanced parentheses in formula: {s}")
+
         while s.startswith("(") and s.endswith(")") and FormulaParser._is_balanced(s[1:-1]):
             s = s[1:-1].strip()
 
@@ -36,6 +39,18 @@ class FormulaParser:
                     active_regimes=set(regimes),
                     children=[FormulaParser.parse(a, regimes, _depth + 1) for a in sub_args]
                 )
+            if op_name in ("ADD", "SUB", "MUL", "DIV", "DIV_SAFE"):
+                sub_args = FormulaParser._split_top_level_args(m.group(2))
+                if len(sub_args) == 2:
+                    op_clean = "DIV_SAFE" if op_name == "DIV" else op_name
+                    return ASTNode(
+                        op=op_clean,
+                        active_regimes=set(regimes),
+                        children=[
+                            FormulaParser.parse(sub_args[0], regimes, _depth + 1),
+                            FormulaParser.parse(sub_args[1], regimes, _depth + 1)
+                        ]
+                    )
             if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING + OPERATORS_CROSS_SECTIONAL):
                 return ASTNode(
                     op=op_name,

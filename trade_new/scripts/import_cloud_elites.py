@@ -128,6 +128,15 @@ def normalize_candidate(raw: Any) -> Dict[str, Any]:
     }
 
 
+def is_valid_ast(node: Optional[ASTNode]) -> bool:
+    """Recursively validates that the AST contains no corrupted or stray syntactic tokens."""
+    if node is None:
+        return False
+    if node.op == "FEATURE":
+        return not any(c in node.val for c in ("(", ")", ","))
+    return all(is_valid_ast(c) for c in node.children)
+
+
 def audit_candidate(
     candidate: Dict[str, Any],
     chamber: ThymicChamber,
@@ -143,7 +152,7 @@ def audit_candidate(
 
     try:
         ast_node = FormulaParser.parse(f_str)
-        if ast_node is None:
+        if not is_valid_ast(ast_node):
             return {**candidate, "status": "PARSE_ERROR", "stress_dd": 1.0, "passed": False}
     except Exception:
         return {**candidate, "status": "PARSE_ERROR", "stress_dd": 1.0, "passed": False}
