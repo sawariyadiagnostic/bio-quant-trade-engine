@@ -287,6 +287,96 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Node 4: Overnight Execution Deck -->
+            <div class="node-card p-3 rounded-lg space-y-2.5 text-xs">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></span>
+                        Node 4: Overnight Execution Deck
+                    </span>
+                    <span class="text-[10px] text-purple-400 font-bold">ALPHA-OS</span>
+                </div>
+
+                <div class="space-y-1">
+                    <label class="text-[11px] text-slate-400 flex justify-between">
+                        <span>Allocated Capital (₹):</span>
+                        <span class="text-purple-300 font-mono font-bold" x-text="'₹' + Number(strategyCapital || 0).toLocaleString('en-IN')"></span>
+                    </label>
+                    <input type="number" x-model.number="strategyCapital" min="5000" step="5000"
+                           class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white font-mono focus:border-purple-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-1.5 pt-0.5">
+                    <button @click="runBankbeesStrategy()"
+                            :disabled="strategyLoading"
+                            class="bg-blue-600/80 hover:bg-blue-500 text-white font-medium py-1.5 px-2 rounded flex items-center justify-center gap-1 text-[11px] disabled:opacity-50 transition shadow-sm">
+                        <span x-show="!strategyLoading || strategyRunningType !== 'bankbees'">▶ BANKBEES SCAN</span>
+                        <span x-show="strategyLoading && strategyRunningType === 'bankbees'" class="flex items-center gap-1">
+                            <svg class="animate-spin h-3 w-3 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> SCANNING...
+                        </span>
+                    </button>
+                    <button @click="runMultiAssetStrategy()"
+                            :disabled="strategyLoading"
+                            class="bg-purple-600/80 hover:bg-purple-500 text-white font-medium py-1.5 px-2 rounded flex items-center justify-center gap-1 text-[11px] disabled:opacity-50 transition shadow-sm">
+                        <span x-show="!strategyLoading || strategyRunningType !== 'multi'">▶ MULTI-ASSET SCAN</span>
+                        <span x-show="strategyLoading && strategyRunningType === 'multi'" class="flex items-center gap-1">
+                            <svg class="animate-spin h-3 w-3 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> RUNNING...
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Live Results Card -->
+                <div x-show="strategyResult !== null" class="bg-slate-900/90 border border-purple-500/30 rounded p-2.5 space-y-2 mt-1">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                        <span class="text-[11px] font-bold text-slate-300" x-text="strategyResult?.mode === 'single' ? 'BANKBEES OVERNIGHT ALPHA' : 'MULTI-ASSET RISK PARITY'"></span>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold"
+                              :class="(strategyResult?.action_bias === 'BUY' || (strategyResult?.allocations && strategyResult.allocations.some(a => a.action === 'BUY'))) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'"
+                              x-text="strategyResult?.mode === 'single' ? strategyResult?.action_bias : (strategyResult?.allocations?.filter(a => a.action === 'BUY').length + ' ASSETS BUY')">
+                        </span>
+                    </div>
+
+                    <!-- Key Backtest & Conviction Metrics -->
+                    <div class="grid grid-cols-2 gap-1.5 text-[11px]">
+                        <div class="bg-slate-950/60 p-1.5 rounded border border-slate-800">
+                            <div class="text-[10px] text-slate-400">Conviction</div>
+                            <div class="text-white font-mono font-bold" x-text="((strategyResult?.conviction_score || 0) * 100).toFixed(1) + '%'"></div>
+                        </div>
+                        <div class="bg-slate-950/60 p-1.5 rounded border border-slate-800">
+                            <div class="text-[10px] text-slate-400">CAGR / Sortino</div>
+                            <div class="text-emerald-400 font-mono font-bold" x-text="(strategyResult?.cagr_pct?.toFixed(1) || '0.0') + '% / ' + (strategyResult?.sortino?.toFixed(2) || '0.00')"></div>
+                        </div>
+                        <div class="bg-slate-950/60 p-1.5 rounded border border-slate-800">
+                            <div class="text-[10px] text-slate-400">Cash Reserve</div>
+                            <div class="text-blue-300 font-mono font-bold" x-text="'₹' + Math.round(strategyResult?.cash_reserve || 0).toLocaleString('en-IN')"></div>
+                        </div>
+                        <div class="bg-slate-950/60 p-1.5 rounded border border-slate-800">
+                            <div class="text-[10px] text-slate-400">Total Friction</div>
+                            <div class="text-amber-400 font-mono font-bold" x-text="'₹' + (strategyResult?.statutory_friction?.toFixed(2) || '0.00')"></div>
+                        </div>
+                    </div>
+
+                    <!-- Mini Allocations List in Live Results Card -->
+                    <div x-show="strategyResult?.allocations && strategyResult.allocations.length > 0" class="space-y-1 pt-0.5">
+                        <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Top Execution Actions:</div>
+                        <template x-for="item in (strategyResult?.allocations || [])" :key="item.ticker">
+                            <div class="flex items-center justify-between text-[11px] py-0.5 border-b border-slate-800/40">
+                                <span class="font-mono text-slate-200" x-text="item.ticker"></span>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-[10px] text-slate-400 font-mono" x-text="item.weight_pct + '% (₹' + Math.round(item.allocated_inr) + ')'"></span>
+                                    <span class="text-[9px] px-1 py-0.2 rounded font-bold"
+                                          :class="item.action === 'BUY' ? 'bg-emerald-900/60 text-emerald-300' : 'bg-slate-800 text-slate-400'"
+                                          x-text="item.action"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <button @click="setTab('strategy')" class="w-full text-center text-[10px] text-purple-400 hover:text-purple-300 underline pt-0.5">
+                        View Full Execution Matrix in Strategy Deck →
+                    </button>
+                </div>
+            </div>
         </aside>
 
         <!-- Right Column: Tactical Deck & Visualizers -->
@@ -294,6 +384,11 @@
             <!-- Tactical Tabs -->
             <div class="bg-slate-950 border-b border-slate-800 px-4 flex items-center justify-between text-xs">
                 <div class="flex space-x-1 py-1.5">
+                    <button @click="setTab('strategy')"
+                            :class="activeTab === 'strategy' ? 'bg-slate-800 text-white border-b-2 border-purple-400' : 'text-slate-400 hover:text-slate-200'"
+                            class="px-3.5 py-1.5 font-medium rounded-t transition">
+                        ⚡ Overnight Execution Deck
+                    </button>
                     <button @click="setTab('tactical')"
                             :class="activeTab === 'tactical' ? 'bg-slate-800 text-white border-b-2 border-blue-400' : 'text-slate-400 hover:text-slate-200'"
                             class="px-3.5 py-1.5 font-medium rounded-t transition">
@@ -323,6 +418,103 @@
                 <div class="text-slate-500 text-[11px] flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                     Differential SSE Bus: Port 7860
+                </div>
+            </div>
+
+            <!-- Tab Content 0: Overnight Execution Deck (Full Portfolio View) -->
+            <div x-show="activeTab === 'strategy'" class="flex-1 p-4 flex flex-col space-y-3 overflow-y-auto">
+                <!-- Top Execution Ribbon & KPI Summary -->
+                <div class="grid grid-cols-4 gap-3">
+                    <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3">
+                        <div class="text-xs text-slate-400">Total Portfolio Capital</div>
+                        <div class="text-lg font-mono font-bold text-white" x-text="'₹' + Number(strategyCapital || 0).toLocaleString('en-IN')"></div>
+                        <div class="text-[10px] text-slate-500 mt-1">Sovereign allocation pool</div>
+                    </div>
+                    <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3">
+                        <div class="text-xs text-slate-400">Allocated / Cash Reserve</div>
+                        <div class="text-lg font-mono font-bold text-purple-300" x-text="'₹' + Math.round(strategyResult?.allocated_capital || 0).toLocaleString('en-IN') + ' / ₹' + Math.round(strategyResult?.cash_reserve || 0).toLocaleString('en-IN')"></div>
+                        <div class="text-[10px] text-slate-500 mt-1">Risk-parity exposure limit: 30% per asset</div>
+                    </div>
+                    <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3">
+                        <div class="text-xs text-slate-400">Backtest CAGR / Sortino</div>
+                        <div class="text-lg font-mono font-bold text-emerald-400" x-text="(strategyResult?.cagr_pct?.toFixed(1) || '0.0') + '% / ' + (strategyResult?.sortino?.toFixed(2) || '0.00')"></div>
+                        <div class="text-[10px] text-slate-500 mt-1" x-text="'Max DD: ' + (strategyResult?.max_drawdown?.toFixed(1) || '0.0') + '% | Win: ' + (strategyResult?.win_rate?.toFixed(1) || '0.0') + '%'"></div>
+                    </div>
+                    <div class="bg-slate-950/80 border border-slate-800 rounded-lg p-3">
+                        <div class="text-xs text-slate-400">Statutory Tax Friction</div>
+                        <div class="text-lg font-mono font-bold text-amber-400" x-text="'₹' + (strategyResult?.statutory_friction?.toFixed(2) || '0.00')"></div>
+                        <div class="text-[10px] text-slate-500 mt-1">STT + Exchange + SEBI + GST</div>
+                    </div>
+                </div>
+
+                <!-- Allocations Data Table -->
+                <div class="bg-slate-950/90 border border-slate-800 rounded-lg p-3 flex-1 flex flex-col">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                            <span class="text-xs font-bold text-white tracking-wide uppercase">Institutional Overnight Asset Allocation Matrix</span>
+                            <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono" x-text="(strategyResult?.allocations?.length || 0) + ' Basket Assets'"></span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="runMultiAssetStrategy()" :disabled="strategyLoading" class="text-xs bg-purple-600/80 hover:bg-purple-500 text-white px-3 py-1 rounded font-medium disabled:opacity-50 transition">
+                                🔄 Refresh Multi-Asset Run
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto flex-1">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-900/80 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
+                                <tr>
+                                    <th class="p-2.5">Asset / Ticker</th>
+                                    <th class="p-2.5">Instrument Class</th>
+                                    <th class="p-2.5">Statutory Friction</th>
+                                    <th class="p-2.5">Ensemble Conviction</th>
+                                    <th class="p-2.5">Target Weight</th>
+                                    <th class="p-2.5">Allocated INR</th>
+                                    <th class="p-2.5">Units (Qty)</th>
+                                    <th class="p-2.5">Execution Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/60 font-mono">
+                                <template x-if="!strategyResult?.allocations || strategyResult.allocations.length === 0">
+                                    <tr>
+                                        <td colspan="8" class="p-6 text-center text-slate-500 italic">
+                                            No strategy scan executed yet. Click [▶ RUN BANKBEES SCAN] or [▶ RUN MULTI-ASSET SCAN] on the left deck.
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-for="item in (strategyResult?.allocations || [])" :key="item.ticker">
+                                    <tr class="hover:bg-slate-900/50 transition">
+                                        <td class="p-2.5 font-bold text-white flex items-center gap-2">
+                                            <span class="w-1.5 h-1.5 rounded-full" :class="item.action === 'BUY' ? 'bg-emerald-400' : 'bg-slate-500'"></span>
+                                            <span x-text="item.ticker"></span>
+                                        </td>
+                                        <td class="p-2.5 text-slate-300">
+                                            <span class="px-1.5 py-0.5 rounded text-[10px]" :class="item.instrument === 'ETF' ? 'bg-blue-900/50 text-blue-300' : 'bg-purple-900/50 text-purple-300'" x-text="item.instrument"></span>
+                                        </td>
+                                        <td class="p-2.5 text-slate-300" x-text="item.friction_bps + ' bps'"></td>
+                                        <td class="p-2.5">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-16 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                                    <div class="h-full bg-emerald-400 rounded-full" :style="'width: ' + Math.min(item.conviction * 100, 100) + '%'"></div>
+                                                </div>
+                                                <span class="text-emerald-300" x-text="(item.conviction * 100).toFixed(1) + '%'"></span>
+                                            </div>
+                                        </td>
+                                        <td class="p-2.5 font-bold text-slate-200" x-text="item.weight_pct.toFixed(2) + '%'"></td>
+                                        <td class="p-2.5 font-bold text-purple-300" x-text="'₹' + Math.round(item.allocated_inr).toLocaleString('en-IN')"></td>
+                                        <td class="p-2.5 text-slate-200" x-text="item.units.toLocaleString('en-IN')"></td>
+                                        <td class="p-2.5">
+                                            <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                                                  :class="item.action === 'BUY' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-slate-800 text-slate-400'"
+                                                  x-text="item.action"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 

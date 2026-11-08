@@ -105,6 +105,35 @@ class TestCockpitServerAPI(unittest.TestCase):
         self.assertIn("champions_count", data)
         self.assertGreater(data["champions_count"], 0)
 
+    def test_multi_asset_strategy_run(self):
+        """Validates POST /api/strategy/multi_asset/run returns valid multi-asset portfolio telemetry."""
+        resp = self.client.post(
+            "/api/strategy/multi_asset/run",
+            json={"capital": 100000.0, "threshold": 0.40}
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data.get("status"), "ok")
+        self.assertIn("timestamp", data)
+        self.assertEqual(data.get("capital"), 100000.0)
+        self.assertIn("allocated_capital", data)
+        self.assertIn("cash_reserve", data)
+        self.assertIn("statutory_friction", data)
+        self.assertIn("cagr_pct", data)
+        self.assertIn("sortino", data)
+        self.assertIn("max_drawdown", data)
+        self.assertIn("win_rate", data)
+        self.assertIn("allocations", data)
+        self.assertIsInstance(data["allocations"], list)
+        self.assertGreater(len(data["allocations"]), 0)
+        first_alloc = data["allocations"][0]
+        expected_keys = [
+            "ticker", "instrument", "friction_bps", "conviction",
+            "weight_pct", "allocated_inr", "units", "action"
+        ]
+        for key in expected_keys:
+            self.assertIn(key, first_alloc)
+
     def test_universe_assets(self):
         """Validates /api/universe/assets returns discovered lake assets and resident tickers."""
         resp = self.client.get("/api/universe/assets")

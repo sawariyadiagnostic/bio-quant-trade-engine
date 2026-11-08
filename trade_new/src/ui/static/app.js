@@ -21,12 +21,19 @@ function cockpitApp() {
         populationSize: 100,
         randomSeed: null,
         isMuted: false,
-        activeTab: 'tactical', // 'tactical' | 'manifold' | 'cosine' | 'leaderboard' | 'telemetry'
+        activeTab: 'strategy', // 'strategy' | 'tactical' | 'manifold' | 'cosine' | 'leaderboard' | 'telemetry'
         deadManDisconnected: false,
         lastHeartbeat: Date.now(),
         eventSource: null,
         gridApi: null,
         rafPending: false,
+
+        // Strategy Deck Execution State
+        strategyCapital: 100000,
+        strategyThreshold: 0.40,
+        strategyLoading: false,
+        strategyRunningType: null,
+        strategyResult: null,
 
         // Compute Target & Remote GPU State
         computeTarget: 'local',
@@ -687,6 +694,85 @@ function cockpitApp() {
                 }
             } catch (err) {
                 this.log(`Failed to fetch leaderboard: ${err}`, 'error');
+            }
+        },
+
+        async runBankbeesStrategy() {
+            this.strategyLoading = true;
+            this.strategyRunningType = 'bankbees';
+            if (window.cockpitAudio) window.cockpitAudio.playTickSound();
+            this.log(`Initiating BANKBEES overnight alpha scan (Capital: ₹${this.strategyCapital.toLocaleString()})...`, 'info');
+            try {
+                const res = await fetch('/api/strategy/bankbees/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ capital: this.strategyCapital, lookback_years: 1.0 })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    const isBuy = data.action_bias === 'BUY';
+                    const friction = isBuy ? (this.strategyCapital * 0.00012) : 0.0;
+                    const allocInr = isBuy ? this.strategyCapital : 0.0;
+                    const units = data.benchmark_price > 0 ? Math.floor(allocInr / data.benchmark_price) : 0;
+                    this.strategyResult = {
+                        mode: 'single', benchmark_price: data.benchmark_price,
+                        conviction_score: data.conviction_score, action_bias: data.action_bias,
+                        cagr_pct: data.cagr_pct, sortino: data.sortino, max_drawdown: data.max_drawdown,
+                        win_rate: data.win_rate, champions_count: data.champions_count,
+                        capital: this.strategyCapital, allocated_capital: allocInr,
+                        cash_reserve: isBuy ? 0.0 : this.strategyCapital, statutory_friction: friction,
+                        allocations: [{
+                            ticker: 'BANKBEES', instrument: 'ETF', friction_bps: 1.2,
+                            conviction: data.conviction_score, weight_pct: isBuy ? 100.0 : 0.0,
+                            allocated_inr: allocInr, units: units, action: data.action_bias
+                        }]
+                    };
+                    if (window.cockpitAudio) window.cockpitAudio.playEliteSound();
+                    this.log(`BANKBEES Scan Success: ${data.action_bias} | Conviction: ${(data.conviction_score * 100).toFixed(1)}% | CAGR: ${data.cagr_pct.toFixed(1)}%`, 'success');
+                } else {
+                    this.log(`BANKBEES strategy run error: ${data.detail || 'Execution failed'}`, 'error');
+                }
+            } catch (err) {
+                this.log(`BANKBEES Network Error: ${err}`, 'error');
+                if (window.cockpitAudio) window.cockpitAudio.playPanicSound();
+            } finally {
+                this.strategyLoading = false;
+                this.strategyRunningType = null;
+            }
+        },
+
+        async runMultiAssetStrategy() {
+            this.strategyLoading = true;
+            this.strategyRunningType = 'multi';
+            if (window.cockpitAudio) window.cockpitAudio.playTickSound();
+            this.log(`Initiating Multi-Asset Overnight scan (Capital: ₹${this.strategyCapital.toLocaleString()}, Threshold: ${this.strategyThreshold})...`, 'info');
+            try {
+                const res = await fetch('/api/strategy/multi_asset/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ capital: this.strategyCapital, threshold: this.strategyThreshold, lookback_years: 2.0 })
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    this.strategyResult = {
+                        mode: 'multi', capital: data.capital, allocated_capital: data.allocated_capital,
+                        cash_reserve: data.cash_reserve, statutory_friction: data.statutory_friction,
+                        cagr_pct: data.cagr_pct, sortino: data.sortino, max_drawdown: data.max_drawdown, win_rate: data.win_rate,
+                        conviction_score: data.allocations.length > 0 ? (data.allocations.reduce((acc, a) => acc + a.conviction, 0) / data.allocations.length) : 0.0,
+                        allocations: data.allocations
+                    };
+                    if (window.cockpitAudio) window.cockpitAudio.playCompleteSound();
+                    const buyCount = data.allocations.filter(a => a.action === 'BUY').length;
+                    this.log(`Multi-Asset Portfolio Success: ${buyCount}/${data.allocations.length} assets allocated | Cash: ₹${Math.round(data.cash_reserve).toLocaleString()} | Friction: ₹${data.statutory_friction.toFixed(2)}`, 'success');
+                } else {
+                    this.log(`Multi-Asset strategy error: ${data.detail || 'Execution failed'}`, 'error');
+                }
+            } catch (err) {
+                this.log(`Multi-Asset Network Error: ${err}`, 'error');
+                if (window.cockpitAudio) window.cockpitAudio.playPanicSound();
+            } finally {
+                this.strategyLoading = false;
+                this.strategyRunningType = null;
             }
         }
     };

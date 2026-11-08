@@ -35,6 +35,7 @@ try:
     from ..execution.risk_sentry import RiskSentry
     from ..execution.shoonya_gateway import ShoonyaGateway
     from ..pipeline.bankbees_pipeline import BankbeesOvernightPipeline
+    from ..pipeline.multi_asset_pipeline import MultiAssetOvernightPipeline
     from ..pipeline.process_governor import ProcessGovernor
     from ..clustering.return_clustering import ReturnClusterer
     from ..data.vector_lake import VectorDataLake
@@ -45,6 +46,7 @@ except (ImportError, ValueError):
     from trade_new.src.execution.risk_sentry import RiskSentry
     from trade_new.src.execution.shoonya_gateway import ShoonyaGateway
     from trade_new.src.pipeline.bankbees_pipeline import BankbeesOvernightPipeline
+    from trade_new.src.pipeline.multi_asset_pipeline import MultiAssetOvernightPipeline
     from trade_new.src.pipeline.process_governor import ProcessGovernor
     from trade_new.src.clustering.return_clustering import ReturnClusterer
     from trade_new.src.data.vector_lake import VectorDataLake
@@ -78,6 +80,13 @@ class BankbeesRunRequest(BaseModel):
     """Payload model for BANKBEES strategy run endpoint."""
     capital: float = 10000.0
     lookback_years: float = 5.0
+
+
+class MultiAssetRunRequest(BaseModel):
+    """Payload model for Multi-Asset strategy run endpoint."""
+    capital: float = 100000.0
+    threshold: float = 0.40
+    lookback_years: float = 2.0
 
 
 @dataclass
@@ -607,6 +616,46 @@ def run_bankbees_strategy(payload: Optional[BankbeesRunRequest] = None) -> Dict[
         }
     except Exception as exc:
         logger.error(f"[Server] Bankbees overnight pipeline execution failed: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/strategy/multi_asset/run")
+def run_multi_asset_strategy(payload: Optional[MultiAssetRunRequest] = None) -> Dict[str, Any]:
+    """Runs MultiAssetOvernightPipeline across core basket and returns allocation matrix."""
+    capital = payload.capital if payload is not None else 100000.0
+    threshold = payload.threshold if payload is not None else 0.40
+    lookback = payload.lookback_years if payload is not None else 2.0
+    try:
+        pipeline = MultiAssetOvernightPipeline(capital=capital, conviction_threshold=threshold)
+        result = pipeline.run(lookback_years=lookback, gateway=gateway, dry_run=True)
+        allocations = [
+            {
+                "ticker": str(ev.ticker),
+                "instrument": ev.instrument_type.value if hasattr(ev.instrument_type, "value") else str(ev.instrument_type),
+                "friction_bps": float(ev.statutory_friction_bps),
+                "conviction": float(ev.conviction_score),
+                "weight_pct": round(float(ev.target_weight) * 100.0, 2),
+                "allocated_inr": float(ev.allocated_capital),
+                "units": int(ev.quantity),
+                "action": str(ev.action),
+            }
+            for ev in result.evaluations.values()
+        ]
+        return {
+            "status": "ok",
+            "timestamp": time.time(),
+            "capital": float(result.total_capital),
+            "allocated_capital": float(result.total_allocated_capital),
+            "cash_reserve": float(result.cash_reserve),
+            "statutory_friction": float(result.total_statutory_friction),
+            "cagr_pct": float(result.portfolio_backtest.cagr_pct),
+            "sortino": float(result.portfolio_backtest.sortino),
+            "max_drawdown": float(result.portfolio_backtest.max_drawdown_pct),
+            "win_rate": float(result.portfolio_backtest.win_rate_pct),
+            "allocations": allocations,
+        }
+    except Exception as exc:
+        logger.error(f"[Server] Multi-asset overnight pipeline execution failed: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
