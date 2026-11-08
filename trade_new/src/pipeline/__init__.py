@@ -14,6 +14,15 @@ from src.pipeline.bankbees_pipeline import (
     EnsembleDecision,
     PipelineResult,
 )
+from src.pipeline.multi_asset_pipeline import (
+    MultiAssetOvernightPipeline,
+    MultiAssetPipelineResult,
+    AssetEvaluation,
+    PortfolioBacktestSummary,
+    CORE_MULTI_ASSET_BASKET,
+    classify_instrument,
+    apply_exposure_limits,
+)
 
 __all__ = [
     "configure_process",
@@ -27,4 +36,11 @@ __all__ = [
     "BacktestSummary",
     "EnsembleDecision",
     "PipelineResult",
+    "MultiAssetOvernightPipeline",
+    "MultiAssetPipelineResult",
+    "AssetEvaluation",
+    "PortfolioBacktestSummary",
+    "CORE_MULTI_ASSET_BASKET",
+    "classify_instrument",
+    "apply_exposure_limits",
 ]

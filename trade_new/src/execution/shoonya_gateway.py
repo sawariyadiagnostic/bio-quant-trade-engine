@@ -235,7 +235,8 @@ class ShoonyaGateway:
         product: str = "C",
         order_type: str = "MKT",
         is_etf: bool = True,
-        client_order_id: Optional[str] = None
+        client_order_id: Optional[str] = None,
+        custom_bps: Optional[float] = None,
     ) -> dict[str, Any]:
         """
         Places order in either Paper Trading or Live Exchange mode.
@@ -262,7 +263,7 @@ class ShoonyaGateway:
 
         trading_symbol = self.format_trading_symbol(symbol)
         if self.paper_trading:
-            res = self._execute_paper_order(trading_symbol, int(quantity), float(price), clean_action, is_etf)
+            res = self._execute_paper_order(trading_symbol, int(quantity), float(price), clean_action, is_etf, custom_bps=custom_bps)
         else:
             res = self._send_live_order(trading_symbol, int(quantity), float(price), clean_action, product, order_type)
 
@@ -276,11 +277,12 @@ class ShoonyaGateway:
         quantity: int,
         price: float,
         action: str,
-        is_etf: bool
+        is_etf: bool,
+        custom_bps: Optional[float] = None,
     ) -> dict[str, Any]:
         """Internal paper order simulation with statutory friction tracking."""
         trade_value = price * quantity
-        friction = self.calculate_friction(trade_value, is_etf=is_etf)
+        friction = self.calculate_friction(trade_value, is_etf=is_etf, custom_bps=custom_bps)
         total_cost = trade_value + friction if action == "BUY" else friction
 
         if action == "BUY" and total_cost > self.balance:

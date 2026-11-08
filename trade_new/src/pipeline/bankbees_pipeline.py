@@ -107,7 +107,8 @@ def _compute_standard_features(
     df: pd.DataFrame, lake: VectorDataLake
 ) -> Dict[str, np.ndarray]:
     """Computes all 20 standard institutional features matching STANDARD_FEATURES."""
-    c = df.get("Close_Adj", df["Close"]).to_numpy(dtype=np.float32)
+    c_series = df["Close_Adj"] if "Close_Adj" in df.columns else (df["Close"] if "Close" in df.columns else df["Close_Raw"])
+    c = c_series.to_numpy(dtype=np.float32)
     o = df["Open"].to_numpy(dtype=np.float32)
     h = df["High"].to_numpy(dtype=np.float32)
     l = df["Low"].to_numpy(dtype=np.float32)

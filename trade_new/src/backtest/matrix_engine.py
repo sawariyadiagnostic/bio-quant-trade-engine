@@ -1,13 +1,13 @@
 """Vectorized Matrix Backtesting Engine (Wave 1: Task 1.2)."""
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict, Any, Union, List, Sequence
 import numpy as np
 
 
 @dataclass
 class MatrixSimulator:
     """Ultra-fast vectorized backtester processing thousands of formulas simultaneously."""
-    friction_bps: float = 1.2  # 0.00012 for ETF Delivery
+    friction_bps: Union[float, np.ndarray, List[float], Sequence[float]] = 1.2  # 0.00012 for ETF Delivery
 
     def simulate_batch(
         self,
@@ -26,12 +26,13 @@ class MatrixSimulator:
         Returns:
             Dictionary of performance metric arrays (each of shape: [B]).
         """
-        friction = self.friction_bps / 10000.0
+        friction_arr = np.asarray(self.friction_bps, dtype=np.float32) / 10000.0
 
         if positions.ndim == 2:
             B, T = positions.shape
             if len(returns) != T:
                 raise ValueError(f"returns length ({len(returns)}) must match positions columns ({T})")
+            friction = float(friction_arr.flat[0])
             zero_col = np.zeros((B, 1), dtype=positions.dtype)
             flips = np.abs(np.diff(positions, axis=1, prepend=zero_col))
             net_rets = (positions * returns[np.newaxis, :]) - (flips * friction)
@@ -53,7 +54,10 @@ class MatrixSimulator:
 
             zero_col = np.zeros((B, N, 1), dtype=positions.dtype)
             flips = np.abs(np.diff(positions, axis=2, prepend=zero_col))
-            turnover_loss = np.sum(flips, axis=1) * friction
+            if friction_arr.ndim == 1:
+                turnover_loss = np.sum(flips * friction_arr[np.newaxis, :, np.newaxis], axis=1)
+            else:
+                turnover_loss = np.sum(flips, axis=1) * float(friction_arr)
             gross_port_rets = np.sum(positions * rets_2d[np.newaxis, :, :], axis=1)
             net_rets = gross_port_rets - turnover_loss
             active_mask = np.sum(np.abs(positions) > 0.0, axis=1) > 0.0
