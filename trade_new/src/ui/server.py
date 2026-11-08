@@ -26,6 +26,10 @@ import pandas as pd
 import psutil
 from pydantic import BaseModel
 
+_root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if _root_dir not in sys.path:
+    sys.path.insert(0, _root_dir)
+
 try:
     from ..evolution.archive_store import ArchiveStore
     from ..execution.risk_sentry import RiskSentry
@@ -37,15 +41,15 @@ try:
     from ..domain.formula_parser import FormulaParser
     from ..domain.formula_ast import ASTNode
 except (ImportError, ValueError):
-    from src.evolution.archive_store import ArchiveStore
-    from src.execution.risk_sentry import RiskSentry
-    from src.execution.shoonya_gateway import ShoonyaGateway
-    from src.pipeline.bankbees_pipeline import BankbeesOvernightPipeline
-    from src.pipeline.process_governor import ProcessGovernor
-    from src.clustering.return_clustering import ReturnClusterer
-    from src.data.vector_lake import VectorDataLake
-    from src.domain.formula_parser import FormulaParser
-    from src.domain.formula_ast import ASTNode
+    from trade_new.src.evolution.archive_store import ArchiveStore
+    from trade_new.src.execution.risk_sentry import RiskSentry
+    from trade_new.src.execution.shoonya_gateway import ShoonyaGateway
+    from trade_new.src.pipeline.bankbees_pipeline import BankbeesOvernightPipeline
+    from trade_new.src.pipeline.process_governor import ProcessGovernor
+    from trade_new.src.clustering.return_clustering import ReturnClusterer
+    from trade_new.src.data.vector_lake import VectorDataLake
+    from trade_new.src.domain.formula_parser import FormulaParser
+    from trade_new.src.domain.formula_ast import ASTNode
 
 
 class IngestRequest(BaseModel):

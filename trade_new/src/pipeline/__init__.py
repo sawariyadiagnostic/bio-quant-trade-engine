@@ -1,5 +1,5 @@
 """Pipeline and Process Governance Bounded Context."""
-from src.pipeline.process_governor import (
+from .process_governor import (
     configure_process,
     configure_worker,
     configure_sentry,
@@ -7,14 +7,14 @@ from src.pipeline.process_governor import (
     get_core_topology,
     get_process_info,
 )
-from src.pipeline.bankbees_pipeline import (
+from .bankbees_pipeline import (
     BankbeesOvernightPipeline,
     AlphaChampion,
     BacktestSummary,
     EnsembleDecision,
     PipelineResult,
 )
-from src.pipeline.multi_asset_pipeline import (
+from .multi_asset_pipeline import (
     MultiAssetOvernightPipeline,
     MultiAssetPipelineResult,
     AssetEvaluation,

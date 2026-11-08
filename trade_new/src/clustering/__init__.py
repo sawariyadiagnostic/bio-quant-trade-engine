@@ -1,5 +1,5 @@
 """Clustering Bounded Context."""
-from src.clustering.return_clustering import (
+from .return_clustering import (
     compute_correlation_matrix,
     compute_correlation_distance,
     hierarchical_linkage,
