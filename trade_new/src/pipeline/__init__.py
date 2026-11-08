@@ -7,6 +7,13 @@ from src.pipeline.process_governor import (
     get_core_topology,
     get_process_info,
 )
+from src.pipeline.bankbees_pipeline import (
+    BankbeesOvernightPipeline,
+    AlphaChampion,
+    BacktestSummary,
+    EnsembleDecision,
+    PipelineResult,
+)
 
 __all__ = [
     "configure_process",
@@ -15,4 +22,9 @@ __all__ = [
     "configure_server",
     "get_core_topology",
     "get_process_info",
+    "BankbeesOvernightPipeline",
+    "AlphaChampion",
+    "BacktestSummary",
+    "EnsembleDecision",
+    "PipelineResult",
 ]
