@@ -3,7 +3,15 @@ import os
 import sys
 import psutil
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+test_dir = os.path.dirname(os.path.abspath(__file__))
+trade_new_dir = os.path.abspath(os.path.join(test_dir, ".."))
+if "" in sys.path:
+    sys.path.remove("")
+cwd = os.getcwd()
+if cwd in sys.path and os.path.abspath(cwd) != trade_new_dir:
+    sys.path.remove(cwd)
+if trade_new_dir not in sys.path:
+    sys.path.insert(0, trade_new_dir)
 
 
 def test_configure_process_current_pid():

@@ -119,3 +119,37 @@ def get_process_info(pid: int) -> Dict[str, Any]:
         }
     except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
         return {"pid": pid, "error": "not_accessible"}
+
+
+class ProcessGovernor:
+    """Cross-platform hardware process governor and affinity manager."""
+
+    @staticmethod
+    def configure_process(
+        pid: int,
+        priority_level: str = "normal",
+        cpu_cores: Optional[List[int]] = None,
+    ) -> bool:
+        """Sets process priority level and CPU affinity with graceful fallback."""
+        return configure_process(pid, priority_level=priority_level, cpu_cores=cpu_cores)
+
+    @classmethod
+    def configure_worker(cls, pid: int, num_cores: Optional[int] = None) -> bool:
+        """Configures worker process to below normal priority pinned to worker cores."""
+        return configure_worker(pid, num_cores=num_cores)
+
+    @classmethod
+    def configure_sentry(cls, pid: int) -> bool:
+        """Configures risk sentry to high priority pinned to Core 0/1."""
+        return configure_sentry(pid)
+
+    @classmethod
+    def configure_server(cls, pid: int) -> bool:
+        """Configures server process to normal priority pinned to Core 0/1."""
+        return configure_server(pid)
+
+    @staticmethod
+    def get_process_info(pid: int) -> Dict[str, Any]:
+        """Retrieves current process priority, affinity, and resource diagnostics."""
+        return get_process_info(pid)
+
