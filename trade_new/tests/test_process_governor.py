@@ -31,33 +31,40 @@ def test_configure_process_current_pid():
 def test_configure_worker_sentry_server():
     """Verify configure_worker, configure_sentry, and configure_server dispatch properly."""
     from src.pipeline.process_governor import (
+        ProcessGovernor,
         configure_worker,
         configure_sentry,
         configure_server,
     )
 
     pid = os.getpid()
+    was_main = ProcessGovernor.is_main_process(pid)
+    if was_main:
+        ProcessGovernor.unregister_main_process(pid)
 
-    # Configure as worker
-    worker_ok = configure_worker(pid, num_cores=1)
-    assert worker_ok is True
+    try:
+        # Configure as worker
+        worker_ok = configure_worker(pid, num_cores=1)
+        assert worker_ok is True
 
-    # Configure as sentry (high priority)
-    sentry_ok = configure_sentry(pid)
-    assert sentry_ok is True
+        # Configure as sentry (high priority)
+        sentry_ok = configure_sentry(pid)
+        assert sentry_ok is True
 
-    # Configure as server (normal priority)
-    server_ok = configure_server(pid)
-    assert server_ok is True
-
-    # Reset affinity to all cores for clean test state
-    proc = psutil.Process(pid)
-    if hasattr(proc, "cpu_affinity"):
-        try:
-            total_cpus = psutil.cpu_count() or 1
-            proc.cpu_affinity(list(range(total_cpus)))
-        except Exception:
-            pass
+        # Configure as server (normal priority)
+        server_ok = configure_server(pid)
+        assert server_ok is True
+    finally:
+        if was_main:
+            ProcessGovernor.register_main_process(pid)
+        # Reset affinity to all cores for clean test state
+        proc = psutil.Process(pid)
+        if hasattr(proc, "cpu_affinity"):
+            try:
+                total_cpus = psutil.cpu_count() or 1
+                proc.cpu_affinity(list(range(total_cpus)))
+            except Exception:
+                pass
 
     print("[PASS] test_configure_worker_sentry_server")
 
