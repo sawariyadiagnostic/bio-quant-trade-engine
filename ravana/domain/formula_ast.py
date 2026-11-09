@@ -25,7 +25,8 @@ OPERATORS_UNARY: Tuple[str, ...] = (
     "SIGN", "ABS", "LOG_ABS", "SIGMOID", "TANH", "RELU", "EXP_SAFE", "LOG_SAFE", "NEG", "SQRT_ABS"
 )
 OPERATORS_ROLLING_UNARY: Tuple[str, ...] = (
-    "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20", "TS_ZSCORE_20", "TS_DECAY_LINEAR_10"
+    "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20", "TS_ZSCORE_20", "TS_DECAY_LINEAR_10",
+    "TS_DELAY_1", "TS_DELAY_5"
 )
 OPERATORS_TERNARY: Tuple[str, ...] = ("BLEND",)
 
@@ -325,7 +326,11 @@ class ASTEvaluator:
         if node.op == "TS_DECAY_LINEAR_10":
             return _fast_ts_decay_linear(child, w=10)
         s = pd.Series(child)
-        if node.op == "DELTA_5":
+        if node.op == "TS_DELAY_1":
+            return s.shift(1).bfill().fillna(0.0).to_numpy()
+        elif node.op == "TS_DELAY_5":
+            return s.shift(5).bfill().fillna(0.0).to_numpy()
+        elif node.op == "DELTA_5":
             res = s.diff(5).fillna(0.0).to_numpy()
         elif node.op == "EMA_10":
             res = s.ewm(span=10, adjust=False).mean().to_numpy()

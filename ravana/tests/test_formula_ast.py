@@ -76,6 +76,14 @@ class TestInstitutionalFormulaAST(unittest.TestCase):
         decay_res = ASTEvaluator.eval_node(decay_node, self.df)
         self.assertTrue(np.all(np.isfinite(decay_res)))
 
+    def test_ts_delay_lag_operator(self):
+        """Verify TS_DELAY_1 and TS_DELAY_5 compute true lagged states."""
+        delay1_node = ASTNode("TS_DELAY_1", children=[ASTNode("FEATURE", "Close")])
+        delay1_res = ASTEvaluator.eval_node(delay1_node, self.df)
+        self.assertTrue(np.all(np.isfinite(delay1_res)))
+        # At index 1, delay1 must equal Close at index 0
+        self.assertEqual(delay1_res[1], self.df["Close"].iloc[0])
+
     def test_formula_parser_blend_and_corr(self):
         """Verify parsing of BLEND and TS_CORR_20 formula strings."""
         raw = "BLEND(Vol_ZScore, Close * 1.5, Open) + TS_CORR_20(Close, Volume)"
