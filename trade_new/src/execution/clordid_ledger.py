@@ -5,15 +5,28 @@ import os
 import sqlite3
 import threading
 import time
+from decimal import Decimal
 from typing import Any, Dict, Iterator, Optional
+
+
+def _clordid_json_default(obj: Any) -> Any:
+    """Serializes Decimal and date objects safely to JSON."""
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    return str(obj)
 
 
 class ClientOrderIdLedger:
     """Thread-safe persistent ledger tracking client order IDs across process restarts."""
 
     def __init__(self, db_path: str) -> None:
-        self.db_path = os.path.abspath(db_path)
-        os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
+        if db_path == ":memory:":
+            self.db_path = ":memory:"
+        else:
+            self.db_path = os.path.abspath(db_path)
+            os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
         self._lock = threading.Lock()
         self._init_db()
 
@@ -75,7 +88,7 @@ class ClientOrderIdLedger:
                 float(price or response.get("price", 0.0)),
                 str(response.get("status", response.get("stat", "Ok"))),
                 str(response.get("norenordno", "")),
-                json.dumps(response),
+                json.dumps(response, default=_clordid_json_default),
             ))
 
     def __contains__(self, client_order_id: str) -> bool:

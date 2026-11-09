@@ -92,7 +92,8 @@ class PreOpenAuctionRouter:
             "indicative_price": float(indicative_price),
             "limit_price": float(limit_p),
             "order_type": "LIMIT",
-            "time_in_force": "PRE_OPEN_AUCTION"
+            "time_in_force": "DAY",
+            "session": "PRE_OPEN"
         }
 
 
@@ -241,7 +242,10 @@ class OvernightExecutionEngine:
 
         raw_price_ret = (exit_price - entry_price) / entry_price
         gross_profit = position_size * raw_price_ret
-        friction = TaxCalculator.calculate(position_size, instrument)
+        friction_buy = TaxCalculator.calculate(position_size, instrument, is_sell=False)
+        exit_turnover = position_size * (exit_price / entry_price) if entry_price > 0 else position_size
+        friction_sell = TaxCalculator.calculate(exit_turnover, instrument, is_sell=True)
+        friction = friction_buy + friction_sell
         net_profit = gross_profit - friction
 
         self.capital = max(0.0, self.capital + net_profit)

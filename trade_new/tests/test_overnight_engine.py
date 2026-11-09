@@ -46,7 +46,8 @@ def test_preopen_auction_limit_order_routing():
     assert order_buy["side"] == "BUY"
     assert order_buy["quantity"] == 100
     assert order_buy["limit_price"] == 250.38
-    assert order_buy["time_in_force"] == "PRE_OPEN_AUCTION"
+    assert order_buy["time_in_force"] == "DAY"
+    assert order_buy.get("session") == "PRE_OPEN"
 
     order_sell = router.route_auction_order(
         ticker="NIFTYBEES.NS",

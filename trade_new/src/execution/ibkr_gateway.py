@@ -85,6 +85,8 @@ class InteractiveBrokersGateway(AbstractBrokerGateway):
         self, symbol: str, quantity: Decimal, price: Decimal, action: str, currency: Currency, clordid: str
     ) -> dict[str, Any]:
         """Simulates multi-currency portfolio fill with FX isolation."""
+        if price <= Decimal("0.0"):
+            return {"stat": "Not_Ok", "emsg": "Execution price must be positive for paper fill"}
         trade_value = quantity * price
         cur_bal = self.balances.get(currency, Decimal("0.0"))
         if action == "BUY" and trade_value > cur_bal:
@@ -117,15 +119,43 @@ class InteractiveBrokersGateway(AbstractBrokerGateway):
         self.orders[order_id] = record
         return record
 
+    def _resolve_conid(self, symbol: str) -> int:
+        """Resolves exchange contract ID (conid) for ticker symbol."""
+        if symbol.isdigit():
+            return int(symbol)
+        if not hasattr(self, "_conid_cache"):
+            self._conid_cache: dict[str, int] = {}
+        if symbol in self._conid_cache:
+            return self._conid_cache[symbol]
+        try:
+            url = f"{self.creds.base_url}/iserver/secdef/search"
+            resp = requests.post(
+                url, json={"symbol": symbol, "name": False, "secType": "STK"},
+                verify=self.creds.ssl_verify, timeout=5
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list) and data and "conid" in data[0]:
+                    cid = int(data[0]["conid"])
+                    self._conid_cache[symbol] = cid
+                    return cid
+        except Exception as e:
+            logger.warning(f"Could not resolve conid for {symbol}: {e}")
+        return 0
+
     def _send_live_order(
         self, symbol: str, quantity: Decimal, price: Decimal, action: str,
         currency: Currency, order_type: str, clordid: str
     ) -> dict[str, Any]:
-        """Routes real order to IBKR Client Portal API."""
+        """Routes real order to IBKR Client Portal API with conid resolution and confirmation."""
+        conid = self._resolve_conid(symbol)
+        if conid == 0 and not symbol.isdigit():
+            return {"stat": "Not_Ok", "emsg": f"Unable to resolve IBKR conid for symbol {symbol}"}
+
         payload = {
             "orders": [{
                 "acctId": self.creds.account_id,
-                "conid": int(symbol) if symbol.isdigit() else 0,
+                "conid": conid,
                 "orderType": order_type,
                 "price": float(price) if order_type != "MKT" else 0.0,
                 "side": action,
@@ -139,6 +169,16 @@ class InteractiveBrokersGateway(AbstractBrokerGateway):
             resp = requests.post(url, json=payload, verify=self.creds.ssl_verify, timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
+                # Check for interactive confirmation prompt
+                if isinstance(data, list) and data and "id" in data[0] and "message" in data[0]:
+                    reply_id = data[0]["id"]
+                    logger.info(f"Auto-replying confirmation to IBKR prompt {reply_id}: {data[0]['message']}")
+                    reply_url = f"{self.creds.base_url}/iserver/reply/{reply_id}"
+                    reply_resp = requests.post(
+                        reply_url, json={"confirmed": True}, verify=self.creds.ssl_verify, timeout=10
+                    )
+                    if reply_resp.status_code == 200:
+                        data = reply_resp.json()
                 order_id = str(data[0].get("order_id", "")) if isinstance(data, list) and data else clordid
                 res = {"stat": "Ok", "order_id": order_id, "details": data}
                 self.orders[order_id] = res

@@ -77,6 +77,8 @@ class AlpacaGateway(AbstractBrokerGateway):
             return {"stat": "Not_Ok", "emsg": "Quantity must be positive"}
         if action not in ("BUY", "SELL"):
             return {"stat": "Not_Ok", "emsg": f"Invalid action {action}"}
+        if order_type in ("limit", "lmt") and price <= Decimal("0.0"):
+            return {"stat": "Not_Ok", "emsg": "Price must be positive for limit orders"}
 
         if self.paper_trading or not self.creds.is_valid():
             return self._execute_paper_order(symbol, quantity, price, action, order_type, clordid)
@@ -86,6 +88,8 @@ class AlpacaGateway(AbstractBrokerGateway):
         self, symbol: str, quantity: Decimal, price: Decimal, action: str, order_type: str, clordid: str
     ) -> dict[str, Any]:
         """Executes simulated paper trade with cash balance tracking."""
+        if price <= Decimal("0.0"):
+            return {"stat": "Not_Ok", "emsg": "Execution price must be positive for paper fill"}
         trade_value = quantity * price
         if action == "BUY" and trade_value > self.balance_usd:
             return {"stat": "Not_Ok", "emsg": f"Insufficient USD cash {self.balance_usd} < {trade_value}"}
@@ -121,15 +125,17 @@ class AlpacaGateway(AbstractBrokerGateway):
         self, symbol: str, quantity: Decimal, price: Decimal, action: str, order_type: str, clordid: str
     ) -> dict[str, Any]:
         """Dispatches live order to Alpaca REST endpoint."""
+        order_type_mapped = "limit" if order_type.lower() in ("lmt", "limit") else "market"
         payload = {
             "symbol": symbol,
             "qty": str(quantity),
             "side": action.lower(),
-            "type": order_type,
+            "type": order_type_mapped,
             "time_in_force": "day",
+            "extended_hours": True,
             "client_order_id": clordid
         }
-        if order_type in ("limit", "lmt") and price > Decimal("0.0"):
+        if order_type_mapped == "limit" and price > Decimal("0.0"):
             payload["limit_price"] = str(price)
 
         try:

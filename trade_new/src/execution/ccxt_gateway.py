@@ -75,14 +75,28 @@ class CCXTGateway(AbstractBrokerGateway):
         self, symbol: str, quantity: Decimal, price: Decimal, action: str, clordid: str
     ) -> dict[str, Any]:
         """Simulates perpetual futures position update and margin accounting."""
+        if price <= Decimal("0.0"):
+            return {"stat": "Not_Ok", "emsg": "Execution price must be positive"}
+
         notional = quantity * price
         margin_required = notional * Decimal("0.10")  # 10x max leverage baseline
-        if action == "BUY" and margin_required > self.balance_usdt:
+        if margin_required > self.balance_usdt:
             return {"stat": "Not_Ok", "emsg": f"Insufficient USDT margin {self.balance_usdt} < {margin_required}"}
 
         order_id = f"PERP_SIM_{uuid.uuid4().hex[:8]}"
         pos = self.positions.get(symbol, {"size": Decimal("0.0"), "entry_price": Decimal("0.0")})
         current_size = pos["size"]
+        current_entry = pos["entry_price"]
+
+        realized_pnl = Decimal("0.0")
+        if current_size > Decimal("0.0") and action == "SELL":
+            close_qty = min(quantity, current_size)
+            realized_pnl = close_qty * (price - current_entry)
+        elif current_size < Decimal("0.0") and action == "BUY":
+            close_qty = min(quantity, abs(current_size))
+            realized_pnl = close_qty * (current_entry - price)
+
+        self.balance_usdt += realized_pnl
 
         if action == "BUY":
             new_size = current_size + quantity
@@ -92,9 +106,19 @@ class CCXTGateway(AbstractBrokerGateway):
         if new_size == Decimal("0.0"):
             self.positions.pop(symbol, None)
         else:
+            if current_size == Decimal("0.0"):
+                new_entry = price
+            elif (current_size > 0 and action == "BUY") or (current_size < 0 and action == "SELL"):
+                total_cost = (abs(current_size) * current_entry) + notional
+                new_entry = total_cost / abs(new_size)
+            elif (current_size > 0 and new_size < 0) or (current_size < 0 and new_size > 0):
+                new_entry = price
+            else:
+                new_entry = current_entry
+
             self.positions[symbol] = {
                 "size": new_size,
-                "entry_price": price,
+                "entry_price": round(new_entry, 4),
                 "currency": "USDT",
                 "symbol": symbol
             }
@@ -103,6 +127,7 @@ class CCXTGateway(AbstractBrokerGateway):
             "stat": "Ok", "order_id": order_id, "client_order_id": clordid,
             "symbol": symbol, "qty": float(quantity), "price": float(price),
             "action": action, "status": "FILLED", "currency": "USDT",
+            "realized_pnl": float(realized_pnl),
             "balance_after": float(self.balance_usdt)
         }
         self.orders[order_id] = record

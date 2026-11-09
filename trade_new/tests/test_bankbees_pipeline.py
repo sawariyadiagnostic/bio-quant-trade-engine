@@ -143,7 +143,8 @@ def test_paper_order_generation_and_tax_accounting():
     # Verify Pre-Open Auction routing with 15 bps slippage ceiling
     assert decision.pre_open_order is not None
     assert decision.pre_open_order["side"] == "BUY"
-    assert decision.pre_open_order["time_in_force"] == "PRE_OPEN_AUCTION"
+    assert decision.pre_open_order["time_in_force"] == "DAY"
+    assert decision.pre_open_order.get("session") == "PRE_OPEN"
     expected_limit = round(latest_close * (1.0 + 15.0 / 10000.0), 2)
     assert np.isclose(decision.pre_open_order["limit_price"], expected_limit, atol=1e-2)
 

@@ -26,21 +26,23 @@ class TokenBucketRateLimiter:
             self.last_update = now
 
     def try_acquire(self, tokens: float = 1.0) -> bool:
-        """Non-blocking token consumption. Returns True if tokens were consumed."""
+        """Non-blocking token consumption. Clamps oversized tokens to capacity to prevent starvation."""
+        effective_tokens = min(float(tokens), self.capacity)
         with self._lock:
             self._refill()
-            if self.tokens >= tokens:
-                self.tokens -= tokens
+            if self.tokens >= effective_tokens:
+                self.tokens -= effective_tokens
                 return True
             return False
 
     def acquire(self, tokens: float = 1.0) -> None:
         """Blocks until sufficient tokens are available, enforcing the rate ceiling."""
+        effective_tokens = min(float(tokens), self.capacity)
         while True:
             with self._lock:
                 self._refill()
-                if self.tokens >= tokens:
-                    self.tokens -= tokens
+                if self.tokens >= effective_tokens:
+                    self.tokens -= effective_tokens
                     return
-                sleep_time = (tokens - self.tokens) / self.rate
+                sleep_time = (effective_tokens - self.tokens) / self.rate
             time.sleep(max(0.001, sleep_time))

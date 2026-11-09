@@ -16,6 +16,7 @@ from loguru import logger
 import math
 import numpy as np
 import pyotp
+import re
 import requests
 import sqlite3
 import time
@@ -290,9 +291,14 @@ class ShoonyaGateway(AbstractBrokerGateway):
 
     @staticmethod
     def format_trading_symbol(symbol: str) -> str:
-        """Converts raw symbol to NSE trading symbol (e.g. NIFTYBEES -> NIFTYBEES-EQ). Preserves futures and series."""
+        """Converts raw symbol to NSE trading symbol (e.g. NIFTYBEES -> NIFTYBEES-EQ). Preserves futures, options, and series."""
         clean = symbol.replace(".NS", "").strip().upper()
-        if clean.endswith("FUT") or clean.endswith("-EQ") or clean.endswith("-BE") or clean.endswith("-BZ"):
+        is_option = bool(re.search(r"\d+(CE|PE)$", clean))
+        if (
+            clean.endswith("FUT")
+            or is_option
+            or clean.endswith(("-EQ", "-BE", "-BZ", "-SM"))
+        ):
             return clean
         return f"{clean}-EQ"
 
@@ -454,7 +460,8 @@ class ShoonyaGateway(AbstractBrokerGateway):
         )
         if ret is None or (isinstance(ret, dict) and ret.get("stat") != "Ok"):
             if isinstance(ret, dict) and self._is_session_expired(ret):
-                self.handle_session_expiry()
+                if self.handle_session_expiry():
+                    return self._send_live_order_api(tsym, quantity, price, action, product, order_type)
             emsg = ret.get("emsg", "Order rejected by broker") if isinstance(ret, dict) else "Order rejected"
             return {"stat": "Not_Ok", "emsg": emsg}
         return ret if isinstance(ret, dict) else {"stat": "Ok", "result": ret}
@@ -476,10 +483,23 @@ class ShoonyaGateway(AbstractBrokerGateway):
             "ret": "DAY"
         }
         headers = {"Authorization": f"Bearer {self.susertoken}", "Content-Type": "application/json"}
-        resp = requests.post(f"{self.BASE_URL}/PlaceOrder", data="jData=" + json.dumps(j_data), headers=headers, timeout=10)
-        res_dict = resp.json()
+        try:
+            resp = requests.post(f"{self.BASE_URL}/PlaceOrder", data="jData=" + json.dumps(j_data), headers=headers, timeout=10)
+            if resp.status_code != 200:
+                return {"stat": "Not_Ok", "emsg": f"HTTP {resp.status_code} proxy error"}
+            res_dict = resp.json()
+        except Exception as e:
+            return {"stat": "Not_Ok", "emsg": f"Reverse proxy or network error: {e}"}
+
         if self._is_session_expired(res_dict):
-            self.handle_session_expiry()
+            if self.handle_session_expiry():
+                headers["Authorization"] = f"Bearer {self.susertoken}"
+                try:
+                    resp = requests.post(f"{self.BASE_URL}/PlaceOrder", data="jData=" + json.dumps(j_data), headers=headers, timeout=10)
+                    if resp.status_code == 200:
+                        return resp.json()
+                except Exception:
+                    pass
         return res_dict
 
     def poll_order_confirmation(
@@ -496,14 +516,19 @@ class ShoonyaGateway(AbstractBrokerGateway):
                 latest = records[-1] if records else {}
                 last_info = latest
                 status = str(latest.get("status", "")).upper()
+                fill_qty = int(latest.get("fillshares", latest.get("qty", 0)) or 0)
                 if status == "COMPLETE":
                     fill_price = float(latest.get("avgprc", latest.get("prc", 0.0)) or 0.0)
-                    fill_qty = int(latest.get("fillshares", latest.get("qty", 0)) or 0)
                     logger.success(f"ShoonyaGateway: Order {orderno} confirmed COMPLETE ({fill_qty} @ ₹{fill_price:.2f})")
                     return {
                         "stat": "Ok", "status": "COMPLETE", "norenordno": orderno,
                         "fill_price": fill_price, "fill_qty": fill_qty, "details": latest
                     }
+                if status in ("PARTIALLY_FILLED", "OPEN") and fill_qty > 0:
+                    fill_price = float(latest.get("avgprc", latest.get("prc", 0.0)) or 0.0)
+                    logger.info(f"ShoonyaGateway: Order {orderno} PARTIALLY_FILLED ({fill_qty} shares @ ₹{fill_price:.2f})")
+                    last_info["fill_qty"] = fill_qty
+                    last_info["fill_price"] = fill_price
                 if status in ("REJECTED", "CANCELLED"):
                     rej_msg = latest.get("rejreason", latest.get("emsg", f"Order {status}"))
                     logger.warning(f"ShoonyaGateway: Order {orderno} {status}: {rej_msg}")
@@ -515,7 +540,10 @@ class ShoonyaGateway(AbstractBrokerGateway):
         logger.warning(f"ShoonyaGateway: Order {orderno} poll timeout. Latest: {last_info.get('status', 'OPEN')}")
         return {
             "stat": "Ok", "status": last_info.get("status", "OPEN"),
-            "norenordno": orderno, "pending": True, "details": last_info
+            "norenordno": orderno, "pending": True,
+            "fill_qty": last_info.get("fill_qty", 0),
+            "fill_price": last_info.get("fill_price", 0.0),
+            "details": last_info
         }
 
     def _get_single_order_history(self, orderno: str) -> Any:
@@ -546,7 +574,7 @@ class ShoonyaGateway(AbstractBrokerGateway):
                 res = self._send_live_order_rest(tsym, quantity, price, action, product, order_type)
 
             if isinstance(res, dict) and res.get("stat") == "Ok":
-                orderno = res.get("norenordno")
+                orderno = res.get("norenordno") or res.get("norenord")
                 if orderno:
                     return self.poll_order_confirmation(orderno)
             return res
@@ -555,19 +583,31 @@ class ShoonyaGateway(AbstractBrokerGateway):
             return {"stat": "Not_Ok", "emsg": str(e)}
 
     def cancel_order(self, order_id: str) -> bool:
-        """Cancels an active working order."""
+        """Cancels an active working order and verifies it did not execute concurrently."""
         if self.paper_trading:
             return True
         if not self.susertoken and not self.authenticate():
             return False
         try:
+            cancelled = False
             if self.api:
                 ret = self.api.cancel_order(orderno=order_id)
-                return isinstance(ret, dict) and ret.get("stat") == "Ok"
-            j_data = {"uid": self.creds.user_id, "norenordno": order_id}
-            headers = {"Authorization": f"Bearer {self.susertoken}", "Content-Type": "application/json"}
-            resp = requests.post(f"{self.BASE_URL}/CancelOrder", data="jData=" + json.dumps(j_data), headers=headers, timeout=10)
-            return bool(resp.status_code == 200 and resp.json().get("stat") == "Ok")
+                cancelled = isinstance(ret, dict) and ret.get("stat") == "Ok"
+            else:
+                j_data = {"uid": self.creds.user_id, "norenordno": order_id}
+                headers = {"Authorization": f"Bearer {self.susertoken}", "Content-Type": "application/json"}
+                resp = requests.post(f"{self.BASE_URL}/CancelOrder", data="jData=" + json.dumps(j_data), headers=headers, timeout=10)
+                cancelled = bool(resp.status_code == 200 and resp.json().get("stat") == "Ok")
+
+            # Verify no matching engine fill race condition
+            hist = self._get_single_order_history(order_id)
+            if hist:
+                latest = hist[-1] if isinstance(hist, list) else hist
+                status = str(latest.get("status", "")).upper()
+                if status == "COMPLETE":
+                    logger.warning(f"ShoonyaGateway: Cancel on {order_id} collided with match fill! Order is COMPLETE.")
+                    return False
+            return cancelled
         except Exception as e:
             logger.error(f"Failed to cancel order {order_id}: {e}")
             return False
