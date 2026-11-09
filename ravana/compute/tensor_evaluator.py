@@ -54,17 +54,19 @@ def ts_delay(x: torch.Tensor, period: int = 1) -> torch.Tensor:
 
 
 def ts_ema(x: torch.Tensor, span: int = 10) -> torch.Tensor:
-    """Exponential moving average via recursive filter matching pandas adjust=False."""
+    """Exponential moving average via 1D depthwise convolution with zero Python loops."""
     T = x.shape[-1]
     if T == 0:
         return x.clone()
     alpha = 2.0 / (span + 1.0)
-    decay = 1.0 - alpha
-    res = torch.empty_like(x)
-    res[..., 0] = x[..., 0]
-    for t in range(1, T):
-        res[..., t] = decay * res[..., t - 1] + alpha * x[..., t]
-    return torch.nan_to_num(res, nan=0.0)
+    w = min(T, max(span * 3, 20))
+    weights = torch.tensor([(1.0 - alpha) ** i for i in range(w - 1, -1, -1)], dtype=x.dtype, device=x.device)
+    weights = (weights / weights.sum()).view(1, 1, w)
+    orig_shape = x.shape
+    flat_x = x.reshape(-1, 1, T)
+    padded = F.pad(flat_x, (w - 1, 0), mode="replicate")
+    conv = F.conv1d(padded, weights)
+    return torch.nan_to_num(conv.reshape(orig_shape), nan=0.0)
 
 
 def ts_max(x: torch.Tensor, window: int = 10) -> torch.Tensor:
