@@ -236,7 +236,6 @@ class RiskSentry:
                 price = float(pos.get("avg_price", 100.0))
                 if qty != 0:
                     positions_to_close.append({"symbol": sym, "quantity": qty, "price": price})
-            self.gateway.paper_positions.clear()
         elif hasattr(self.gateway, "api") and self.gateway.api:
             loop = asyncio.get_running_loop()
             pos_raw = await loop.run_in_executor(self._executor, self.gateway.api.get_positions)

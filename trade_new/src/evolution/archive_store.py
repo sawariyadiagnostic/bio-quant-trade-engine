@@ -4,11 +4,12 @@ Institutional SQLite Write-Ahead Logging (WAL) Archive Store.
 Supports concurrent readers from FastAPI without WinError 32 file lock contention.
 Protects against power-loss and abort corruption with ACID single-transaction batch commits.
 """
+from contextlib import contextmanager
 import json
 import math
 import sqlite3
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 from loguru import logger
 from src.evolution.archive_migrator import init_archive_database
 
@@ -20,14 +21,23 @@ class ArchiveStore:
         self.db_path = db_path
         init_archive_database(self.db_path)
 
-    def _get_connection(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=5.0)
+    @contextmanager
+    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+        conn = sqlite3.connect(self.db_path, timeout=10.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode = WAL;")
         conn.execute("PRAGMA synchronous = NORMAL;")
         conn.execute("PRAGMA busy_timeout = 5000;")
         conn.execute("PRAGMA temp_store = MEMORY;")
-        return conn
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    def checkpoint(self) -> None:
+        """Forces an explicit SQLite WAL checkpoint to truncate WAL files."""
+        with self._get_connection() as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
 
     def batch_upsert_elites(self, ticker: str, lookback: str, elites: List[Dict[str, Any]]) -> None:
         """Atomic batch commit of discovered elites in a single ACID transaction (<1ms)."""

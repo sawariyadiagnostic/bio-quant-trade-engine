@@ -77,15 +77,17 @@ def interactive_setup() -> None:
 
     print("\n✅ Successfully updated .env with your Shoonya credentials!\n")
 
-def test_totp_display(creds: ShoonyaCredentials) -> str:
-    """Calculates and displays current live 6-digit TOTP with remaining valid seconds."""
+def test_totp_display(creds: ShoonyaCredentials, offset_seconds: float = 0.0) -> str:
+    """Calculates and displays current live 6-digit TOTP with remaining valid seconds and offset compensation."""
     import pyotp
+    from datetime import datetime
     clean_key = creds.totp_key.replace(" ", "").upper()
     totp = pyotp.TOTP(clean_key)
-    now = time.time()
+    now = time.time() + offset_seconds
     remaining = 30 - int(now % 30)
-    current_code = totp.now()
-    print(f"🔑 Live Dynamic TOTP: {current_code}  (Valid for {remaining}s)")
+    current_code = totp.at(datetime.fromtimestamp(now)) if offset_seconds != 0.0 else totp.now()
+    offset_msg = f" [Skew: {offset_seconds:+.1f}s]" if offset_seconds != 0.0 else ""
+    print(f"🔑 Live Dynamic TOTP: {current_code}  (Valid for {remaining}s){offset_msg}")
     return current_code
 
 def stream_totp(creds: ShoonyaCredentials) -> None:

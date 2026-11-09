@@ -8,7 +8,9 @@ Continuously orchestrates overnight trading windows on NSE trading days:
 import argparse
 from datetime import datetime, time as dtime
 import os
+import signal
 import sys
+import threading
 import time
 from typing import Any, Dict, List, Optional, Union
 from zoneinfo import ZoneInfo
@@ -93,17 +95,39 @@ def check_and_execute_exit(gateway: ShoonyaGateway, dry_run: bool = True) -> Dic
     """Pre-open check at 09:00 IST and trailing stop monitoring between 09:15 and 09:30 IST."""
     logger.info(f"[Daemon] Checking morning exit conditions (09:00 Pre-Open / 09:15 Trailing Stop, Dry-Run: {dry_run})...")
     open_positions: List[Dict[str, Any]] = []
-    if hasattr(gateway, "positions") and isinstance(gateway.positions, dict):
+    if dry_run or getattr(gateway, "paper_trading", False):
+        pos_dict = getattr(gateway, "paper_positions", {})
         open_positions = [
-            {"symbol": sym, **data}
-            for sym, data in gateway.positions.items()
-            if data.get("qty", 0) > 0 or data.get("netqty", 0) > 0
+            {"symbol": sym, "qty": data.get("quantity", 0), "price": data.get("avg_price", 0.0), **data}
+            for sym, data in pos_dict.items()
+            if data.get("quantity", 0) > 0 or data.get("qty", 0) > 0
         ]
+    elif hasattr(gateway, "get_positions"):
+        try:
+            live_pos = gateway.get_positions()
+            open_positions = [
+                p for p in live_pos
+                if p.get("quantity", 0) > 0 or p.get("qty", 0) > 0 or p.get("netqty", 0) > 0
+            ]
+        except Exception as e:
+            logger.error(f"[Daemon] Error fetching live positions: {e}")
+
     logger.info(f"[Daemon] Open overnight positions detected: {len(open_positions)}")
+    exit_results = []
+    if not dry_run:
+        for pos in open_positions:
+            sym = pos.get("symbol", "")
+            qty = int(pos.get("quantity", pos.get("qty", 0)))
+            if qty > 0 and sym:
+                order = {"symbol": sym, "quantity": qty, "price": 0.0, "action": "SELL", "order_type": "MKT"}
+                res = gateway.place_order(order)
+                exit_results.append({"symbol": sym, "result": res})
+
     return {
         "status": "ok",
         "open_positions_count": len(open_positions),
         "positions": open_positions,
+        "exit_results": exit_results,
         "pre_open_auction_checked": True,
         "trailing_stop_active": True,
         "dry_run": dry_run,
@@ -133,15 +157,37 @@ def run_daemon_loop(
         logger.info(f"[Daemon] Single cycle complete. Exit check: {exit_res['status']} | Entry mode: {entry_res['mode']}")
         return
 
+    shutdown_event = threading.Event()
+
+    def _sig_handler(signum, frame):
+        logger.warning(f"[Daemon] Caught shutdown signal ({signum}). Setting termination event...")
+        shutdown_event.set()
+
+    try:
+        signal.signal(signal.SIGINT, _sig_handler)
+        if hasattr(signal, "SIGTERM"):
+            signal.signal(signal.SIGTERM, _sig_handler)
+    except Exception as e:
+        logger.debug(f"[Daemon] Signal setup notice: {e}")
+
     last_exit_date: Optional[str] = None
     last_entry_date: Optional[str] = None
     tz = ZoneInfo("Asia/Kolkata")
+    last_loop_ts = time.time()
 
-    logger.info("[Daemon] Entering continuous loop. Press Ctrl+C to terminate.")
+    logger.info("[Daemon] Entering continuous loop. Press Ctrl+C or send SIGTERM to terminate.")
     try:
-        while True:
+        while not shutdown_event.is_set():
             now = datetime.now(tz)
             today_str = now.strftime("%Y-%m-%d")
+
+            # ACPI S3 sleep blackout detection
+            loop_elapsed = time.time() - last_loop_ts
+            if loop_elapsed > check_interval_s * 3.0:
+                logger.warning(
+                    f"[Daemon] Time anomaly / OS sleep blackout detected: elapsed {loop_elapsed:.1f}s vs expected {check_interval_s}s"
+                )
+            last_loop_ts = time.time()
 
             if not is_trading_day(now):
                 logger.info(f"[Daemon] Heartbeat {now.strftime('%Y-%m-%d %H:%M:%S')} IST - Market closed (Weekend/Holiday). Sleeping...")
@@ -164,6 +210,9 @@ def run_daemon_loop(
                     last_entry_date = today_str
                 else:
                     logger.debug(f"[Daemon] MOC entry already executed for {today_str}.")
+            elif cur_time > dtime(15, 25) and last_entry_date != today_str:
+                logger.warning(f"[Daemon] Passed 15:25 MOC window boundary! Blocking execution to prevent AMO/overnight risk.")
+                last_entry_date = today_str
             else:
                 logger.info(f"[Daemon] Heartbeat {now.strftime('%H:%M:%S')} IST - Standing by for market windows (09:00 exit / 15:20 entry)")
 

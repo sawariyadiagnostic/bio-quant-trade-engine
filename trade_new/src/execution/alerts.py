@@ -2,9 +2,17 @@
 from __future__ import annotations
 import json
 import os
+import threading
 from typing import Any, Dict, Optional
 from loguru import logger
 import requests
+
+
+def escape_telegram_markdown(text: str) -> str:
+    """Escapes markdown formatting characters that cause Telegram parse errors."""
+    for ch in ("_", "*", "[", "]", "`"):
+        text = text.replace(ch, f"\\{ch}")
+    return text
 
 
 def send_discord_alert(webhook_url: str, message: str, level: str = "CRITICAL") -> bool:
@@ -21,7 +29,7 @@ def send_discord_alert(webhook_url: str, message: str, level: str = "CRITICAL") 
         }],
     }
     try:
-        resp = requests.post(webhook_url, json=payload, timeout=5.0)
+        resp = requests.post(webhook_url, json=payload, timeout=3.0)
         return resp.status_code in (200, 204)
     except Exception as exc:
         logger.error(f"[Alert] Discord dispatch error: {exc}")
@@ -36,7 +44,7 @@ def send_slack_alert(webhook_url: str, message: str, level: str = "CRITICAL") ->
         "text": f":warning: *[{level}] Bio-Quant SRE Alert*\n{message}",
     }
     try:
-        resp = requests.post(webhook_url, json=payload, timeout=5.0)
+        resp = requests.post(webhook_url, json=payload, timeout=3.0)
         return resp.status_code == 200
     except Exception as exc:
         logger.error(f"[Alert] Slack dispatch error: {exc}")
@@ -44,15 +52,20 @@ def send_slack_alert(webhook_url: str, message: str, level: str = "CRITICAL") ->
 
 
 def send_telegram_alert(bot_token: str, chat_id: str, message: str, level: str = "CRITICAL") -> bool:
-    """Dispatches markdown alert message to Telegram bot chat."""
+    """Dispatches alert message to Telegram bot chat with Markdown safety and auto-fallback."""
     if not (bot_token and chat_id):
         return False
-    text = f"⚠️ *[{level}] Bio-Quant SRE Alert*\n\n{message}"
+    clean_message = escape_telegram_markdown(message)
+    text = f"⚠️ *[{level}] Bio-Quant SRE Alert*\n\n{clean_message}"
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
     try:
-        resp = requests.post(url, json=payload, timeout=5.0)
-        return resp.status_code == 200
+        resp = requests.post(url, json=payload, timeout=3.0)
+        if resp.status_code == 200:
+            return True
+        plain_text = f"⚠️ [{level}] Bio-Quant SRE Alert\n\n{message}"
+        plain_resp = requests.post(url, json={"chat_id": chat_id, "text": plain_text}, timeout=3.0)
+        return plain_resp.status_code == 200
     except Exception as exc:
         logger.error(f"[Alert] Telegram dispatch error: {exc}")
         return False
@@ -62,8 +75,18 @@ def send_critical_alert(
     message: str,
     level: str = "CRITICAL",
     channel: str = "all",
+    async_dispatch: bool = False,
 ) -> Dict[str, bool]:
     """Unified alert dispatcher routing critical events to configured webhooks."""
+    if async_dispatch:
+        t = threading.Thread(
+            target=send_critical_alert,
+            args=(message, level, channel, False),
+            daemon=True
+        )
+        t.start()
+        return {"discord": True, "slack": True, "telegram": True}
+
     results = {"discord": False, "slack": False, "telegram": False}
 
     discord_url = os.getenv("DISCORD_WEBHOOK_URL", "").strip()

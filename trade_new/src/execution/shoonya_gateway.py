@@ -125,12 +125,33 @@ class ShoonyaGateway(AbstractBrokerGateway):
             "active_positions_count": len(self.paper_positions) if self.paper_trading else "LIVE"
         }
 
-    def generate_totp(self) -> str:
-        """Generates real-time 6-digit TOTP token using pyotp."""
+    def check_clock_skew(self) -> float:
+        """Estimates NTP clock skew in seconds relative to broker HTTP Date header."""
+        try:
+            import email.utils
+            resp = requests.head("https://api.shoonya.com", timeout=3.0)
+            if "Date" in resp.headers:
+                remote_dt = email.utils.parsedate_to_datetime(resp.headers["Date"])
+                remote_ts = remote_dt.timestamp()
+                local_ts = time.time()
+                skew = remote_ts - local_ts
+                if abs(skew) > 2.0:
+                    logger.warning(f"ShoonyaGateway: Detected clock skew of {skew:+.2f}s relative to broker.")
+                return skew
+        except Exception as e:
+            logger.debug(f"Clock skew check skipped: {e}")
+        return 0.0
+
+    def generate_totp(self, time_offset_seconds: float = 0.0) -> str:
+        """Generates real-time 6-digit TOTP token using pyotp with clock offset compensation."""
         if not self.creds.totp_key:
             raise ValueError("Shoonya TOTP key is not configured.")
         clean_key = self.creds.totp_key.replace(" ", "").upper()
-        return pyotp.TOTP(clean_key).now()
+        totp = pyotp.TOTP(clean_key)
+        if time_offset_seconds != 0.0:
+            target_dt = datetime.fromtimestamp(time.time() + time_offset_seconds)
+            return totp.at(target_dt)
+        return totp.now()
 
     def get_oauth_url(self) -> str:
         """Returns the official Finvasia OAuth Authorize URL for this client."""
@@ -285,8 +306,8 @@ class ShoonyaGateway(AbstractBrokerGateway):
         logger.warning("ShoonyaGateway: Broker session token expired. Clearing token and refreshing auth...")
         self.susertoken = None
         if self.creds.access_token:
-            # Token from env expired, cannot magically refresh without fresh auth_code or credentials
-            pass
+            logger.info("ShoonyaGateway: Invalidating expired access_token to prevent retry death-loop; falling back to QuickAuth...")
+            self.creds.access_token = ""
         return self.authenticate()
 
     @staticmethod
