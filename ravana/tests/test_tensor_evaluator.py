@@ -205,6 +205,39 @@ class TestTensorASTEvaluator(unittest.TestCase):
         self.assertEqual(out.shape, (2, self.T))
         self.assertTrue(torch.all(torch.isfinite(out)))
 
+    def test_new_alpha_primitives_torch_parity(self):
+        """Verify numerical parity for SIGNED_POWER, TS_STD_20, TS_MEDIAN_10, TS_ARGMAX_10, TS_ARGMIN_10."""
+        ops = ["SIGNED_POWER", "TS_STD_20", "TS_MEDIAN_10", "TS_ARGMAX_10", "TS_ARGMIN_10"]
+        for op in ops:
+            ast = ASTNode(op, children=[ASTNode("FEATURE", "Close")])
+            res_numpy = ASTEvaluator.eval_node(ast, self.df)
+            res_torch = TensorASTEvaluator.eval_node(ast, self.X_2d, self.feature_map).cpu().numpy()
+
+            self.assertTrue(np.all(np.isfinite(res_torch)), f"Torch produced non-finite on {op}")
+            self.assertTrue(np.all(np.isfinite(res_numpy)), f"NumPy produced non-finite on {op}")
+
+            # Verify parity on suffix
+            np.testing.assert_allclose(
+                res_numpy[25:], res_torch[25:],
+                rtol=0.05, atol=0.05,
+                err_msg=f"Parity mismatch on operator {op}"
+            )
+
+    def test_batch_chunking(self):
+        """Verify evaluate_batch with chunking yields exact identical tensor output."""
+        formulas = [
+            ASTNode("TS_DELAY_1", children=[ASTNode("FEATURE", "Close")]),
+            ASTNode("TS_STD_20", children=[ASTNode("FEATURE", "Close")]),
+            ASTNode("SIGNED_POWER", children=[ASTNode("FEATURE", "Spread")]),
+            ASTNode("TS_MAX_10", children=[ASTNode("FEATURE", "High")]),
+        ]
+        res_full = TensorASTEvaluator.evaluate_batch(formulas, self.X_2d, self.feature_map, chunk_size=100)
+        res_chunked = TensorASTEvaluator.evaluate_batch(formulas, self.X_2d, self.feature_map, chunk_size=2)
+
+        self.assertEqual(res_full.shape, (4, self.T))
+        self.assertEqual(res_chunked.shape, (4, self.T))
+        self.assertTrue(torch.allclose(res_full, res_chunked))
+
 
 if __name__ == "__main__":
     unittest.main()

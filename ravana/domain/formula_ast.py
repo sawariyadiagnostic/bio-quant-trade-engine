@@ -22,11 +22,12 @@ OPERATORS_BINARY_ROLLING: Tuple[str, ...] = ("TS_CORR_20",)
 OPERATORS_BINARY: Tuple[str, ...] = OPERATORS_BINARY_ARITHMETIC + OPERATORS_BINARY_ROLLING
 
 OPERATORS_UNARY: Tuple[str, ...] = (
-    "SIGN", "ABS", "LOG_ABS", "SIGMOID", "TANH", "RELU", "EXP_SAFE", "LOG_SAFE", "NEG", "SQRT_ABS"
+    "SIGN", "ABS", "LOG_ABS", "SIGMOID", "TANH", "RELU", "EXP_SAFE", "LOG_SAFE", "NEG", "SQRT_ABS",
+    "SIGNED_POWER"
 )
 OPERATORS_ROLLING_UNARY: Tuple[str, ...] = (
     "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20", "TS_ZSCORE_20", "TS_DECAY_LINEAR_10",
-    "TS_DELAY_1", "TS_DELAY_5"
+    "TS_DELAY_1", "TS_DELAY_5", "TS_STD_20", "TS_MEDIAN_10", "TS_ARGMAX_10", "TS_ARGMIN_10"
 )
 OPERATORS_TERNARY: Tuple[str, ...] = ("BLEND",)
 
@@ -153,6 +154,86 @@ class ASTNode:
             val=data.get("val", ""),
             children=[cls.from_dict(c) for c in data.get("children", [])]
         )
+
+    def simplify(self) -> ASTNode:
+        """Recursively simplifies algebraic expressions, prunes introns, and folds constants."""
+        self.children = [c.simplify() for c in self.children]
+        if self.op in OPERATORS_UNARY or self.op in OPERATORS_ROLLING_UNARY:
+            return self._simplify_unary()
+        if self.op in OPERATORS_BINARY_ARITHMETIC:
+            return self._simplify_binary()
+        if self.op == "BLEND" and len(self.children) == 3:
+            if self.children[1].canonical_hash() == self.children[2].canonical_hash():
+                return self.children[1]
+        return self
+
+    def _simplify_unary(self) -> ASTNode:
+        """Prunes constant rolling operations and unary involutions."""
+        if not self.children:
+            return self
+        child = self.children[0]
+        if child.op == "CONST":
+            try:
+                cv = float(child.val)
+                if self.op in ("DELTA_5", "TS_ZSCORE_20", "TS_STD_20"):
+                    return ASTNode("CONST", val="0.0")
+                if self.op in ("TS_RANK_20", "TS_ARGMAX_10", "TS_ARGMIN_10"):
+                    return ASTNode("CONST", val="0.5")
+                if self.op in ("TS_DELAY_1", "TS_DELAY_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_MEDIAN_10", "TS_DECAY_LINEAR_10"):
+                    return ASTNode("CONST", val=f"{cv:.4g}")
+                if self.op == "SIGN": res = 1.0 if cv > 0 else (-1.0 if cv < 0 else 0.0)
+                elif self.op == "ABS": res = abs(cv)
+                elif self.op == "NEG": res = -cv
+                elif self.op == "RELU": res = max(0.0, cv)
+                elif self.op == "SQRT_ABS": res = np.sign(cv) * np.sqrt(abs(cv))
+                elif self.op == "SIGNED_POWER": res = np.sign(cv) * (abs(cv) ** 2.0)
+                elif self.op == "EXP_SAFE": res = np.exp(np.clip(cv, -20.0, 20.0))
+                elif self.op == "LOG_SAFE": res = np.log(max(abs(cv), 1e-8))
+                elif self.op == "SIGMOID": res = 1.0 / (1.0 + np.exp(-np.clip(cv, -10.0, 10.0)))
+                elif self.op == "TANH": res = np.tanh(np.clip(cv, -10.0, 10.0))
+                else: res = cv
+                return ASTNode("CONST", val=f"{res:.4g}")
+            except Exception:
+                pass
+        if self.op == "NEG" and child.op == "NEG" and child.children:
+            return child.children[0]
+        if self.op in ("ABS", "SIGN", "RELU") and child.op == self.op:
+            return child
+        return self
+
+    def _simplify_binary(self) -> ASTNode:
+        """Folds constants and simplifies identities for binary arithmetic."""
+        if len(self.children) < 2:
+            return self
+        l, r = self.children[0], self.children[1]
+        if l.op == "CONST" and r.op == "CONST":
+            try:
+                lv, rv = float(l.val), float(r.val)
+                if self.op == "ADD": res = lv + rv
+                elif self.op == "SUB": res = lv - rv
+                elif self.op == "MUL": res = lv * rv
+                elif self.op == "DIV_SAFE": res = lv / rv if abs(rv) > 1e-8 else 0.0
+                else: res = 0.0
+                return ASTNode("CONST", val=f"{res:.4g}")
+            except Exception:
+                pass
+        if self.op == "SUB" and l.canonical_hash() == r.canonical_hash():
+            return ASTNode("CONST", val="0.0")
+        if self.op == "DIV_SAFE" and l.canonical_hash() == r.canonical_hash():
+            return ASTNode("CONST", val="1.0")
+        if self.op == "ADD":
+            if l.op == "CONST" and float(l.val or 0) == 0.0: return r
+            if r.op == "CONST" and float(r.val or 0) == 0.0: return l
+        if self.op == "SUB" and r.op == "CONST" and float(r.val or 0) == 0.0:
+            return l
+        if self.op == "MUL":
+            if (l.op == "CONST" and float(l.val or 0) == 0.0) or (r.op == "CONST" and float(r.val or 0) == 0.0):
+                return ASTNode("CONST", val="0.0")
+            if l.op == "CONST" and float(l.val or 0) == 1.0: return r
+            if r.op == "CONST" and float(r.val or 0) == 1.0: return l
+        if self.op == "DIV_SAFE" and r.op == "CONST" and float(r.val or 0) == 1.0:
+            return l
+        return self
 
 
 # --- Vectorized Fast Math Primitives ---
@@ -312,6 +393,7 @@ class ASTEvaluator:
         elif node.op == "LOG_SAFE": res = np.log(np.maximum(1e-8, np.abs(child)))
         elif node.op == "NEG": res = -child
         elif node.op == "SQRT_ABS": res = np.sign(child) * np.sqrt(np.abs(child))
+        elif node.op == "SIGNED_POWER": res = np.sign(child) * (np.abs(child) ** 2.0)
         else: res = np.zeros(n)
         res = np.clip(res, -1e4, 1e4)
         return np.nan_to_num(res, nan=0.0, posinf=1e4, neginf=-1e4)
@@ -338,6 +420,14 @@ class ASTEvaluator:
             res = s.rolling(10, min_periods=1).max().to_numpy()
         elif node.op == "TS_MIN_10":
             res = s.rolling(10, min_periods=1).min().to_numpy()
+        elif node.op == "TS_STD_20":
+            res = s.rolling(20, min_periods=1).std(ddof=1).fillna(0.0).to_numpy()
+        elif node.op == "TS_MEDIAN_10":
+            res = s.rolling(10, min_periods=1).median().to_numpy()
+        elif node.op == "TS_ARGMAX_10":
+            res = s.rolling(10, min_periods=1).apply(lambda w: float(np.argmax(w)) / max(len(w) - 1, 1), raw=True).fillna(0.5).to_numpy()
+        elif node.op == "TS_ARGMIN_10":
+            res = s.rolling(10, min_periods=1).apply(lambda w: float(np.argmin(w)) / max(len(w) - 1, 1), raw=True).fillna(0.5).to_numpy()
         else:
             res = np.zeros(n)
         return np.nan_to_num(res, nan=0.0)
@@ -353,7 +443,10 @@ class TreeGenerator:
             return FeatureDimension.DIMENSIONLESS
         if node.op == "FEATURE":
             return FEATURE_DIMENSIONS.get(node.val, FeatureDimension.DIMENSIONLESS)
-        if node.op in ("DIV_SAFE", "TS_CORR_20", "TS_RANK_20", "TS_ZSCORE_20", "SIGMOID", "TANH", "SIGN"):
+        if node.op in (
+            "DIV_SAFE", "TS_CORR_20", "TS_RANK_20", "TS_ZSCORE_20",
+            "SIGMOID", "TANH", "SIGN", "TS_ARGMAX_10", "TS_ARGMIN_10"
+        ):
             return FeatureDimension.DIMENSIONLESS
         if node.op in ("ADD", "SUB") and node.children:
             return TreeGenerator.infer_dimension(node.children[0])
@@ -389,7 +482,7 @@ class TreeGenerator:
             )
             op = random.choice(op_choices)
         else:
-            op = random.choice(("ADD", "SUB", "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10"))
+            op = random.choice(("ADD", "SUB", "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_STD_20", "TS_MEDIAN_10"))
 
         if op == "BLEND":
             cond = TreeGenerator.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
@@ -415,13 +508,13 @@ class TreeGenerator:
                 return ASTNode(op, children=[left, right])
 
         # Unary operations
-        child_dim = FeatureDimension.DIMENSIONLESS if op in ("TS_ZSCORE_20", "SIGMOID", "TANH") else target_dimension
+        child_dim = FeatureDimension.DIMENSIONLESS if op in ("TS_ZSCORE_20", "SIGMOID", "TANH", "TS_ARGMAX_10", "TS_ARGMIN_10") else target_dimension
         child = TreeGenerator.generate(max_depth - 1, child_dim, method)
         return ASTNode(op, children=[child])
 
 
 class GeneticMutator:
-    """Applies point and subtree mutations respecting dimensional soundess."""
+    """Applies point and subtree mutations respecting dimensional soundness."""
 
     @staticmethod
     def mutate_subtree(tree: ASTNode, max_depth: int = 3) -> ASTNode:
@@ -431,7 +524,7 @@ class GeneticMutator:
         target_dim = TreeGenerator.infer_dimension(target)
         sub = TreeGenerator.generate(max_depth, target_dim)
         target.op, target.val, target.children = sub.op, sub.val, sub.children
-        return cloned
+        return cloned.simplify()
 
     @staticmethod
     def mutate_point(tree: ASTNode) -> ASTNode:
@@ -451,16 +544,25 @@ class GeneticMutator:
             target.op = random.choice(OPERATORS_UNARY)
         elif target.op in OPERATORS_ROLLING_UNARY:
             target.op = random.choice(OPERATORS_ROLLING_UNARY)
-        return cloned
+        return cloned.simplify()
 
 
 class GeneticCrossover:
-    """Performs genetic crossover with strict arity hardening."""
+    """Performs genetic crossover with strict dimensional integrity and arity hardening."""
 
     @staticmethod
     def crossover(parent1: ASTNode, parent2: ASTNode) -> Tuple[ASTNode, ASTNode]:
         c1, c2 = parent1.clone(), parent2.clone()
-        t1, t2 = random.choice(c1.get_all_subnodes()), random.choice(c2.get_all_subnodes())
+        nodes1 = c1.get_all_subnodes()
+        nodes2 = c2.get_all_subnodes()
+
+        t1 = random.choice(nodes1)
+        dim1 = TreeGenerator.infer_dimension(t1)
+
+        # Match dimensional candidates in parent 2 to prevent dimensional drift
+        matching_t2 = [n for n in nodes2 if TreeGenerator.infer_dimension(n) == dim1]
+        t2 = random.choice(matching_t2) if matching_t2 else random.choice(nodes2)
+
         t1.op, t2.op = t2.op, t1.op
         t1.val, t2.val = t2.val, t1.val
         t1.children, t2.children = [c.clone() for c in t2.children], [c.clone() for c in t1.children]
@@ -484,4 +586,4 @@ class GeneticCrossover:
                     node.children = node.children[:1]
             elif node.op in ("FEATURE", "CONST"):
                 node.children = []
-        return c1, c2
+        return c1.simplify(), c2.simplify()

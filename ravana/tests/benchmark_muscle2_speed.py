@@ -25,8 +25,32 @@ from ravana.compute.tensor_evaluator import TensorASTEvaluator
 
 
 def load_real_data_tensor():
-    print("Loading 4,497 real 5-minute bars of BANKBEES...")
-    raw = yf.download("BANKBEES.NS", interval="5m", period="60d", progress=False)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Loading 5-minute bars of BANKBEES (Target compute device: {device})...")
+    raw = None
+    try:
+        raw = yf.download("BANKBEES.NS", interval="5m", period="60d", progress=False)
+        if raw is None or raw.empty:
+            raise ValueError("Empty yfinance download")
+    except Exception as e:
+        print(f"[NOTE] Live download unavailable ({e}). Falling back to local lake or synthetic cache...")
+        local_p = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../data/lake/Indices/BANKBEES.parquet"))
+        if os.path.exists(local_p):
+            raw = pd.read_parquet(local_p)
+            print(f"[OK] Loaded {len(raw)} bars from local parquet lake.")
+        else:
+            n_syn = 4500
+            np.random.seed(42)
+            c = 500.0 * np.exp(np.cumsum(np.random.randn(n_syn) * 0.001))
+            raw = pd.DataFrame({
+                "Open": c * (1 + np.random.uniform(-0.002, 0.002, n_syn)),
+                "High": c * (1 + np.random.uniform(0.0, 0.005, n_syn)),
+                "Low": c * (1 - np.random.uniform(0.0, 0.005, n_syn)),
+                "Close": c,
+                "Volume": np.random.uniform(1e5, 1e6, n_syn),
+            })
+            print(f"[OK] Generated {n_syn} synthetic 5m market bars.")
+
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
 
@@ -82,9 +106,9 @@ def load_real_data_tensor():
     df["ADR_Ret"] = df["SP500_Ret"]
     df["Global_Confluence"] = np.sign(df["SP500_Ret"])
 
-    # Build PyTorch tensor
+    # Build PyTorch tensor and move to target hardware device
     feature_matrix = np.column_stack([df[col].to_numpy(dtype=np.float32) for col in STANDARD_FEATURES])
-    X_tensor = torch.from_numpy(feature_matrix)
+    X_tensor = torch.from_numpy(feature_matrix).to(device)
     f_map = {name: i for i, name in enumerate(STANDARD_FEATURES)}
 
     return df, X_tensor, f_map
@@ -141,6 +165,20 @@ def run_benchmark():
     print(f"   * Time Elapsed   : {t_numpy:.3f} seconds")
     print(f"   * Formula Speed  : {numpy_fps:,.1f} formulas / second")
     print(f"   * NaN/Inf Errors : {numpy_nan}")
+
+    print("-" * 70)
+
+    # 3. Benchmark PyTorch Chunked Batch Evaluation
+    print(f"3. Evaluating in chunked batch mode (chunk_size=512) on {X_tensor.device}...")
+    t0 = time.perf_counter()
+    batch_tensor = TensorASTEvaluator.evaluate_batch(population, X_tensor, f_map, chunk_size=512)
+    t_batch = time.perf_counter() - t0
+    batch_fps = n_formulas / t_batch
+    batch_pps = (n_formulas * n_bars) / t_batch
+    print(f"   * Time Elapsed   : {t_batch:.3f} seconds")
+    print(f"   * Formula Speed  : {batch_fps:,.1f} formulas / second")
+    print(f"   * Point Speed    : {batch_pps:,.0f} points / second")
+    print(f"   * Output Shape   : {tuple(batch_tensor.shape)}")
 
     print("-" * 70)
     speedup = t_numpy / t_torch

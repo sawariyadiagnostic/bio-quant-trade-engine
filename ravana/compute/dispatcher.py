@@ -32,15 +32,11 @@ class EvaluationContext:
             self.device = torch.device(device)
 
         self.is_3d = isinstance(data, (torch.Tensor, np.ndarray)) and data.ndim == 3
-        num_cols = (
-            data.shape[-1]
-            if hasattr(data, "shape")
-            else (len(data.columns) if isinstance(data, pd.DataFrame) else 0)
-        )
-        self.feature_names = ComputeDispatcher._extract_feature_cols(feature_names, num_cols)
-        self.f_map = {name: i for i, name in enumerate(self.feature_names)}
-
         if isinstance(data, pd.DataFrame):
+            cols = list(data.columns)
+            actual_feature_names = feature_names if feature_names is not None else cols
+            self.feature_names = ComputeDispatcher._extract_feature_cols(actual_feature_names, len(cols))
+            self.f_map = {name: i for i, name in enumerate(self.feature_names)}
             self.df = data
             mat = np.column_stack([data[c].to_numpy(dtype=np.float32) for c in self.feature_names if c in data])
             self.tensor = torch.tensor(mat, dtype=dtype, device=self.device)
@@ -49,31 +45,35 @@ class EvaluationContext:
                 for c in self.feature_names
                 if c in data
             }
-        elif isinstance(data, torch.Tensor):
-            self.tensor = data.to(dtype=dtype, device=self.device)
-            if not self.is_3d:
-                mat = self.tensor.cpu().numpy()
-                self.cpu_arrays = {
-                    c: mat[:, i].astype(np.float64)
-                    for i, c in enumerate(self.feature_names)
-                    if i < mat.shape[1]
-                }
-                self.df = pd.DataFrame(self.cpu_arrays)
-            else:
-                self.cpu_arrays = {}
-                self.df = None
-        else:  # np.ndarray
-            self.tensor = torch.tensor(data, dtype=dtype, device=self.device)
-            if not self.is_3d:
-                self.cpu_arrays = {
-                    c: data[:, i].astype(np.float64)
-                    for i, c in enumerate(self.feature_names)
-                    if i < data.shape[1]
-                }
-                self.df = pd.DataFrame(self.cpu_arrays)
-            else:
-                self.cpu_arrays = {}
-                self.df = None
+        else:
+            num_cols = data.shape[-1] if hasattr(data, "shape") else 0
+            self.feature_names = ComputeDispatcher._extract_feature_cols(feature_names, num_cols)
+            self.f_map = {name: i for i, name in enumerate(self.feature_names)}
+            if isinstance(data, torch.Tensor):
+                self.tensor = data.to(dtype=dtype, device=self.device)
+                if not self.is_3d:
+                    mat = self.tensor.cpu().numpy()
+                    self.cpu_arrays = {
+                        c: mat[:, i].astype(np.float64)
+                        for i, c in enumerate(self.feature_names)
+                        if i < mat.shape[1]
+                    }
+                    self.df = pd.DataFrame(self.cpu_arrays)
+                else:
+                    self.cpu_arrays = {}
+                    self.df = None
+            else:  # np.ndarray
+                self.tensor = torch.tensor(data, dtype=dtype, device=self.device)
+                if not self.is_3d:
+                    self.cpu_arrays = {
+                        c: data[:, i].astype(np.float64)
+                        for i, c in enumerate(self.feature_names)
+                        if i < data.shape[1]
+                    }
+                    self.df = pd.DataFrame(self.cpu_arrays)
+                else:
+                    self.cpu_arrays = {}
+                    self.df = None
 
 
 class ComputeDispatcher:
@@ -154,9 +154,12 @@ class ComputeDispatcher:
         if isinstance(data, torch.Tensor):
             X_tensor = data.to(target_device)
         elif isinstance(data, pd.DataFrame):
-            f_cols = cls._extract_feature_cols(feature_names, len(data.columns))
-            mat = np.column_stack([data[c].to_numpy(dtype=np.float32) for c in f_cols if c in data])
+            cols = list(data.columns)
+            actual_features = cols if feature_names is None else cls._extract_feature_cols(feature_names, len(cols))
+            mat = np.column_stack([data[c].to_numpy(dtype=np.float32) for c in actual_features if c in data])
             X_tensor = torch.tensor(mat, dtype=torch.float32, device=target_device)
+            f_map = {c: i for i, c in enumerate(actual_features)}
+            return TensorASTEvaluator.eval_node(node, X_tensor, f_map)
         else:
             X_tensor = torch.tensor(data, dtype=torch.float32, device=target_device)
 

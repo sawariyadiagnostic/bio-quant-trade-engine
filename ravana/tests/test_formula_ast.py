@@ -133,6 +133,70 @@ class TestInstitutionalFormulaAST(unittest.TestCase):
         div_res = ASTEvaluator.eval_node(div_node, df)
         self.assertTrue(np.all(np.isfinite(div_res)))
 
+    def test_ast_simplification_and_intron_pruning(self):
+        """Verify algebraic simplifications, identity reductions, and constant folding."""
+        # 1. Constant folding: 2 + 3 -> 5
+        add_node = ASTNode("ADD", children=[ASTNode("CONST", "2.0"), ASTNode("CONST", "3.0")])
+        s_add = add_node.simplify()
+        self.assertEqual(s_add.op, "CONST")
+        self.assertEqual(float(s_add.val), 5.0)
+
+        # 2. X - X -> 0.0
+        x_node = ASTNode("FEATURE", "Close")
+        sub_node = ASTNode("SUB", children=[x_node, x_node])
+        s_sub = sub_node.simplify()
+        self.assertEqual(s_sub.op, "CONST")
+        self.assertEqual(float(s_sub.val), 0.0)
+
+        # 3. X / X -> 1.0
+        div_node = ASTNode("DIV_SAFE", children=[x_node, x_node])
+        s_div = div_node.simplify()
+        self.assertEqual(s_div.op, "CONST")
+        self.assertEqual(float(s_div.val), 1.0)
+
+        # 4. Involutions: ABS(ABS(X)) -> ABS(X)
+        abs_abs = ASTNode("ABS", children=[ASTNode("ABS", children=[x_node])])
+        s_abs = abs_abs.simplify()
+        self.assertEqual(s_abs.op, "ABS")
+        self.assertEqual(s_abs.children[0].op, "FEATURE")
+
+        # 5. Constant rolling operator: TS_MAX_10(5.0) -> 5.0, DELTA_5(5.0) -> 0.0
+        max_const = ASTNode("TS_MAX_10", children=[ASTNode("CONST", "5.0")])
+        self.assertEqual(max_const.simplify().op, "CONST")
+        self.assertEqual(float(max_const.simplify().val), 5.0)
+
+        delta_const = ASTNode("DELTA_5", children=[ASTNode("CONST", "5.0")])
+        self.assertEqual(delta_const.simplify().op, "CONST")
+        self.assertEqual(float(delta_const.simplify().val), 0.0)
+
+    def test_new_alpha_primitives_numpy(self):
+        """Verify evaluation of SIGNED_POWER, TS_STD_20, TS_MEDIAN_10, TS_ARGMAX_10, TS_ARGMIN_10."""
+        n = 50
+        df = pd.DataFrame({
+            "Close": np.linspace(10.0, 60.0, n),
+            "Signal": np.full(n, -3.0)
+        })
+        # SIGNED_POWER(-3) = sign(-3) * 3^2 = -9
+        sp_node = ASTNode("SIGNED_POWER", children=[ASTNode("FEATURE", "Signal")])
+        sp_res = ASTEvaluator.eval_node(sp_node, df)
+        self.assertTrue(np.allclose(sp_res, -9.0))
+
+        # TS_STD_20
+        std_node = ASTNode("TS_STD_20", children=[ASTNode("FEATURE", "Close")])
+        std_res = ASTEvaluator.eval_node(std_node, df)
+        self.assertTrue(np.all(np.isfinite(std_res)))
+        self.assertTrue(std_res[-1] > 0.0)
+
+        # TS_ARGMAX_10 on monotonically increasing series should be 1.0
+        am_node = ASTNode("TS_ARGMAX_10", children=[ASTNode("FEATURE", "Close")])
+        am_res = ASTEvaluator.eval_node(am_node, df)
+        self.assertTrue(np.allclose(am_res[10:], 1.0))
+
+        # TS_ARGMIN_10 on monotonically increasing series should be 0.0
+        an_node = ASTNode("TS_ARGMIN_10", children=[ASTNode("FEATURE", "Close")])
+        an_res = ASTEvaluator.eval_node(an_node, df)
+        self.assertTrue(np.allclose(an_res[10:], 0.0))
+
 
 if __name__ == "__main__":
     unittest.main()

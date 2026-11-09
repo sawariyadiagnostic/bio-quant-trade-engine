@@ -271,6 +271,74 @@ def ts_corr_20(x: torch.Tensor, y: torch.Tensor, window: int = 20) -> torch.Tens
     return res
 
 
+def ts_std(x: torch.Tensor, window: int = 20) -> torch.Tensor:
+    """Vectorized rolling standard deviation via unfold."""
+    clean_x = torch.nan_to_num(torch.clamp(x, min=-1e12, max=1e12), nan=0.0, posinf=1e12, neginf=-1e12)
+    flat, T, orig_shape, ndim = _flatten_for_conv(clean_x)
+    if T <= 1:
+        return torch.zeros_like(clean_x)
+    w = min(T, window)
+    s = flat.squeeze(1)
+    prefix = s[:, :1].repeat(1, w - 1)
+    padded = torch.cat([prefix, s], dim=-1)
+    unfolded = padded.unfold(dimension=-1, size=w, step=1)
+    std = unfolded.std(dim=-1, unbiased=True)
+    res = _restore_from_conv(std.unsqueeze(1), orig_shape, ndim)
+    return torch.nan_to_num(torch.clamp(res, min=-1e4, max=1e4), nan=0.0)
+
+
+def ts_median(x: torch.Tensor, window: int = 10) -> torch.Tensor:
+    """Vectorized rolling median via unfold."""
+    clean_x = torch.nan_to_num(torch.clamp(x, min=-1e12, max=1e12), nan=0.0, posinf=1e12, neginf=-1e12)
+    flat, T, orig_shape, ndim = _flatten_for_conv(clean_x)
+    if T == 0:
+        return clean_x.clone()
+    w = min(T, window)
+    s = flat.squeeze(1)
+    prefix = s[:, :1].repeat(1, w - 1)
+    padded = torch.cat([prefix, s], dim=-1)
+    unfolded = padded.unfold(dimension=-1, size=w, step=1)
+    med = unfolded.median(dim=-1).values
+    res = _restore_from_conv(med.unsqueeze(1), orig_shape, ndim)
+    return torch.nan_to_num(torch.clamp(res, min=-1e4, max=1e4), nan=0.0)
+
+
+def ts_argmax(x: torch.Tensor, window: int = 10) -> torch.Tensor:
+    """Normalized index of rolling maximum in [0.0, 1.0]."""
+    clean_x = torch.nan_to_num(torch.clamp(x, min=-1e12, max=1e12), nan=0.0, posinf=1e12, neginf=-1e12)
+    flat, T, orig_shape, ndim = _flatten_for_conv(clean_x)
+    if T == 0:
+        return torch.zeros_like(clean_x)
+    w = min(T, window)
+    if w <= 1:
+        return torch.full_like(clean_x, 0.5)
+    s = flat.squeeze(1)
+    prefix = s[:, :1].repeat(1, w - 1)
+    padded = torch.cat([prefix, s], dim=-1)
+    unfolded = padded.unfold(dimension=-1, size=w, step=1)
+    am = unfolded.argmax(dim=-1).to(dtype=flat.dtype) / float(w - 1)
+    res = _restore_from_conv(am.unsqueeze(1), orig_shape, ndim)
+    return torch.nan_to_num(torch.clamp(res, min=0.0, max=1.0), nan=0.5)
+
+
+def ts_argmin(x: torch.Tensor, window: int = 10) -> torch.Tensor:
+    """Normalized index of rolling minimum in [0.0, 1.0]."""
+    clean_x = torch.nan_to_num(torch.clamp(x, min=-1e12, max=1e12), nan=0.0, posinf=1e12, neginf=-1e12)
+    flat, T, orig_shape, ndim = _flatten_for_conv(clean_x)
+    if T == 0:
+        return torch.zeros_like(clean_x)
+    w = min(T, window)
+    if w <= 1:
+        return torch.full_like(clean_x, 0.5)
+    s = flat.squeeze(1)
+    prefix = s[:, :1].repeat(1, w - 1)
+    padded = torch.cat([prefix, s], dim=-1)
+    unfolded = padded.unfold(dimension=-1, size=w, step=1)
+    am = unfolded.argmin(dim=-1).to(dtype=flat.dtype) / float(w - 1)
+    res = _restore_from_conv(am.unsqueeze(1), orig_shape, ndim)
+    return torch.nan_to_num(torch.clamp(res, min=0.0, max=1.0), nan=0.5)
+
+
 class TensorASTEvaluator:
     """Evaluates symbolic formula AST nodes directly on 2D or 3D PyTorch tensors."""
 
@@ -311,13 +379,20 @@ class TensorASTEvaluator:
         nodes: List[ASTNode],
         X: torch.Tensor,
         feature_names: Optional[Union[List[str], Dict[str, int]]] = None,
+        chunk_size: int = 512,
     ) -> torch.Tensor:
         """Evaluates a batch of ASTNode expression trees, returning [N_formulas, ...]."""
         if not nodes:
             is_3d = X.ndim == 3
             empty_shape = (0, X.shape[0], X.shape[1]) if is_3d else (0, X.shape[0])
             return torch.zeros(empty_shape, dtype=X.dtype, device=X.device)
-        return torch.stack([cls.eval_node(node, X, feature_names) for node in nodes], dim=0)
+        if len(nodes) <= chunk_size:
+            return torch.stack([cls.eval_node(node, X, feature_names) for node in nodes], dim=0)
+        chunks: List[torch.Tensor] = []
+        for i in range(0, len(nodes), chunk_size):
+            batch = nodes[i : i + chunk_size]
+            chunks.append(torch.stack([cls.eval_node(n, X, feature_names) for n in batch], dim=0))
+        return torch.cat(chunks, dim=0)
 
     @staticmethod
     def _build_feature_map(
@@ -406,6 +481,7 @@ class TensorASTEvaluator:
         elif node.op == "LOG_SAFE": res = torch.log(torch.clamp(torch.abs(child), min=1e-8))
         elif node.op == "NEG": res = -child
         elif node.op == "SQRT_ABS": res = torch.sign(child) * torch.sqrt(torch.abs(child))
+        elif node.op == "SIGNED_POWER": res = torch.sign(child) * (torch.abs(child) ** 2.0)
         else: res = torch.zeros_like(child)
         return torch.nan_to_num(torch.clamp(res, min=-1e4, max=1e4), nan=0.0, posinf=1e4, neginf=-1e4)
 
@@ -421,6 +497,10 @@ class TensorASTEvaluator:
         if node.op == "TS_RANK_20": return ts_rank_20(child, window=20)
         if node.op == "TS_ZSCORE_20": return ts_zscore_20(child, window=20)
         if node.op == "TS_DECAY_LINEAR_10": return ts_decay_linear(child, window=10)
+        if node.op == "TS_STD_20": return ts_std(child, window=20)
+        if node.op == "TS_MEDIAN_10": return ts_median(child, window=10)
+        if node.op == "TS_ARGMAX_10": return ts_argmax(child, window=10)
+        if node.op == "TS_ARGMIN_10": return ts_argmin(child, window=10)
         return torch.zeros_like(child)
 
     def evaluate(

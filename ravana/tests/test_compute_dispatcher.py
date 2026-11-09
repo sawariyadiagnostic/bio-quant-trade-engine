@@ -96,6 +96,26 @@ class TestComputeDispatcher(unittest.TestCase):
 
         np.testing.assert_allclose(batch_numpy[:, 25:], batch_torch[:, 25:].cpu().numpy(), rtol=1e-3, atol=1e-3)
 
+    def test_evaluation_context_column_alignment(self):
+        """Verify custom/subset DataFrame columns (e.g. OHLCV without Close_Adj) map correctly."""
+        raw_df = pd.DataFrame({
+            "Open": [10.0, 20.0, 30.0],
+            "High": [15.0, 25.0, 35.0],
+            "Low": [5.0, 15.0, 25.0],
+            "Close": [12.0, 22.0, 32.0],
+            "Volume": [1000.0, 2000.0, 3000.0],
+        })
+        ctx = EvaluationContext(raw_df)
+        self.assertIn("Volume", ctx.f_map)
+        self.assertEqual(ctx.f_map["Volume"], 4)
+
+        node_vol = ASTNode("FEATURE", val="Volume")
+        res_torch = ComputeDispatcher.evaluate(node_vol, ctx, backend="torch")
+        np.testing.assert_allclose(res_torch.cpu().numpy(), [1000.0, 2000.0, 3000.0])
+
+        res_numpy = ComputeDispatcher.evaluate(node_vol, ctx, backend="numpy")
+        np.testing.assert_allclose(res_numpy, [1000.0, 2000.0, 3000.0])
+
 
 if __name__ == "__main__":
     unittest.main()
