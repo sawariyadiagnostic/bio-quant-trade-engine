@@ -39,7 +39,11 @@ def adjust_corporate_splits(
             o = o * k
             h = h * k
             l = l * k
-            v = v / np.maximum(k, 1e-8)
+            # Disentangle stock splits from cash dividend adjustments:
+            # Only scale volume for genuine structural split/bonus ratios
+            split_ratios = np.array([0.1, 0.2, 0.25, 0.5, 2.0, 4.0, 5.0, 10.0])
+            is_split = np.any(np.isclose(k[:, None], split_ratios, atol=1e-3), axis=1)
+            v = np.where(is_split & (k > 0), v / np.maximum(k, 1e-8), v)
         c = c_adj
     elif has_adj:
         c = df["Close_Adj"].to_numpy(dtype=np.float64)

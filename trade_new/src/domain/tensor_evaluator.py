@@ -4,6 +4,8 @@ Replaces the Pandas Series bottleneck with pure vectorized PyTorch operations,
 supporting feature tensors of shape [T, F] (single-asset) and [B, T, F] (multi-asset batch).
 """
 from typing import Dict, List, Optional, Union
+import numpy as np
+import scipy.stats as stats
 import torch
 import torch.nn.functional as F
 
@@ -66,68 +68,75 @@ def ts_ema(x: torch.Tensor, span: int = 10) -> torch.Tensor:
 
 
 def ts_max(x: torch.Tensor, window: int = 10) -> torch.Tensor:
-    """Rolling maximum via 1D max pooling with -inf padding."""
+    """Rolling maximum via 1D max pooling with -inf masking preventing negative zero inversion."""
     T = x.shape[-1]
     if T == 0:
         return x.clone()
-    clean_x = torch.nan_to_num(x, nan=0.0)
+    clean_x = torch.where(torch.isnan(x) | ~torch.isfinite(x), torch.full_like(x, -float("inf")), x)
     flat_x = clean_x.reshape(-1, 1, T)
     padded = F.pad(flat_x, (window - 1, 0), mode="constant", value=-float("inf"))
     pooled = F.max_pool1d(padded, kernel_size=window, stride=1)
     res = pooled.reshape(clean_x.shape)
-    return torch.nan_to_num(res, nan=0.0)
+    return torch.where(torch.isinf(res) & (res < 0), torch.zeros_like(res), res)
 
 
 def ts_min(x: torch.Tensor, window: int = 10) -> torch.Tensor:
-    """Rolling minimum via negated 1D max pooling with -inf padding."""
+    """Rolling minimum via negated 1D max pooling with +inf masking preventing false zero minima."""
     T = x.shape[-1]
     if T == 0:
         return x.clone()
-    clean_x = torch.nan_to_num(x, nan=0.0)
+    clean_x = torch.where(torch.isnan(x) | ~torch.isfinite(x), torch.full_like(x, float("inf")), x)
     flat_x = -clean_x.reshape(-1, 1, T)
     padded = F.pad(flat_x, (window - 1, 0), mode="constant", value=-float("inf"))
     pooled = -F.max_pool1d(padded, kernel_size=window, stride=1)
     res = pooled.reshape(clean_x.shape)
-    return torch.nan_to_num(res, nan=0.0)
+    return torch.where(torch.isinf(res) & (res > 0), torch.zeros_like(res), res)
 
 
 def ts_rank_20(x: torch.Tensor, window: int = 20) -> torch.Tensor:
-    """Sliding-window percentile rank over 20 periods via PyTorch unfold."""
+    """Sliding-window percentile rank over 20 periods with dynamic valid observation counting."""
     T = x.shape[-1]
     if T == 0:
         return x.clone()
-    res = torch.empty_like(x)
+    res = torch.full_like(x, 0.5)
     prefix_len = min(T, window)
     for i in range(prefix_len):
         hist = x[..., : i + 1]
         target = x[..., i : i + 1]
-        less = (hist < target).sum(dim=-1, keepdim=True).to(x.dtype)
-        eq = (hist == target).sum(dim=-1, keepdim=True).to(x.dtype)
-        res[..., i : i + 1] = (less + 0.5 * eq) / float(i + 1)
+        valid_hist = torch.isfinite(hist)
+        valid_tgt = torch.isfinite(target)
+        k = valid_hist.sum(dim=-1, keepdim=True).to(x.dtype)
+        less = ((hist < target) & valid_hist).sum(dim=-1, keepdim=True).to(x.dtype)
+        eq = ((hist == target) & valid_hist).sum(dim=-1, keepdim=True).to(x.dtype)
+        rank_val = (less + 0.5 * eq) / torch.clamp(k, min=1.0)
+        res[..., i : i + 1] = torch.where(valid_tgt & (k > 0), rank_val, torch.full_like(rank_val, 0.5))
     if T > window:
         windows = x.unfold(dimension=-1, size=window, step=1)
         target = x[..., window - 1 :].unsqueeze(-1)
-        less = (windows < target).sum(dim=-1).to(x.dtype)
-        eq = (windows == target).sum(dim=-1).to(x.dtype)
-        res[..., window - 1 :] = (less + 0.5 * eq) / float(window)
-    return torch.nan_to_num(res, nan=0.0)
+        valid_win = torch.isfinite(windows)
+        valid_tgt = torch.isfinite(target)
+        k = valid_win.sum(dim=-1).to(x.dtype)
+        less = ((windows < target) & valid_win).sum(dim=-1).to(x.dtype)
+        eq = ((windows == target) & valid_win).sum(dim=-1).to(x.dtype)
+        rank_val = (less + 0.5 * eq) / torch.clamp(k, min=1.0)
+        res[..., window - 1 :] = torch.where(valid_tgt.squeeze(-1) & (k > 0), rank_val, torch.full_like(rank_val, 0.5))
+    return torch.nan_to_num(res, nan=0.5)
 
 
 def cs_rank_tensor(x: torch.Tensor) -> torch.Tensor:
-    """Cross-sectional rank across asset axis (dim=0) with fractional tie-breaking and NaN masking."""
+    """Cross-sectional rank across asset axis (dim=0) in O(B log B * T) with zero 3D intermediate allocation."""
     if x.ndim <= 1 or x.shape[0] <= 1:
         return torch.full_like(x, 0.5)
-    valid = ~torch.isnan(x) & torch.isfinite(x)
-    k = valid.sum(dim=0, keepdim=True).to(x.dtype)
-    x0 = x.unsqueeze(1)
-    x1 = x.unsqueeze(0)
-    valid_mask = valid.unsqueeze(1) & valid.unsqueeze(0)
-    c_less = ((x0 > x1) & valid_mask).sum(dim=1).to(x.dtype)
-    c_eq = ((x0 == x1) & valid_mask).sum(dim=1).to(x.dtype)
-    ranks = c_less + 0.5 * (c_eq + 1.0)
-    norm_ranks = (ranks - 0.5) / torch.clamp(k, min=1.0)
-    res = torch.where(valid & (k > 1), norm_ranks, torch.full_like(x, 0.5))
-    return torch.nan_to_num(res, nan=0.5)
+    device = x.device
+    dtype = x.dtype
+    np_x = x.detach().cpu().numpy()
+    valid = np.isfinite(np_x)
+    k = np.sum(valid, axis=0, keepdims=True)
+    ranks = stats.rankdata(np_x, axis=0, nan_policy="omit")
+    norm_ranks = (ranks - 0.5) / np.maximum(k, 1)
+    res = np.where(valid & (k > 1), norm_ranks, 0.5)
+    clean_res = np.nan_to_num(res, nan=0.5).astype(np.float32)
+    return torch.from_numpy(clean_res).to(device=device, dtype=dtype)
 
 
 def cs_demean_tensor(x: torch.Tensor) -> torch.Tensor:
@@ -262,7 +271,13 @@ class TensorASTEvaluator:
             return torch.zeros(shape, dtype=X.dtype, device=X.device)
 
         f_map = _build_feature_map(feature_names)
-        if node.op == "FEATURE":
+        if node.op in ("FEATURE", "CONST"):
+            if node.op == "CONST":
+                try:
+                    c_val = float(node.val)
+                    return torch.full(shape, c_val, dtype=X.dtype, device=X.device)
+                except (ValueError, TypeError):
+                    return torch.zeros(shape, dtype=X.dtype, device=X.device)
             return _extract_feature(node.val, X, f_map)
 
         if node.op == "MEGA_SWITCH":

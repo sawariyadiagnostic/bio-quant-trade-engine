@@ -64,11 +64,12 @@ class CircuitDamper:
     def calculate_bands(current_price: float, prev_close: float, band_pct: float = 0.10) -> CircuitBands:
         import numpy as np
         if not np.isfinite(current_price) or not np.isfinite(prev_close) or prev_close <= 0 or current_price <= 0:
-            return CircuitBands(0.0, 0.0, 0.0, 0.0)
+            return CircuitBands(0.0, 0.0, 1.0, 1.0)
         lower = round(prev_close * (1.0 - band_pct), 2)
         upper = round(prev_close * (1.0 + band_pct), 2)
-        dist_l = max(0.0, (current_price - lower) / lower) if lower > 0 else 1.0
-        dist_u = max(0.0, (upper - current_price) / current_price) if current_price > 0 else 1.0
+        # Symmetric percentage distance denominator relative to prev_close
+        dist_l = max(0.0, (current_price - lower) / prev_close)
+        dist_u = max(0.0, (upper - current_price) / prev_close)
         return CircuitBands(lower, upper, dist_l, dist_u)
 
 
@@ -106,8 +107,9 @@ class InstrumentType(str, Enum):
 
 def quantize_nse_tick(price: float, tick_size: Optional[float] = None) -> float:
     """Enforces NSE tick quantization: 5-paise (0.05) for securities >= 250, 1-paisa (0.01) for < 250."""
-    if not isinstance(price, (int, float)) or price <= 0:
-        return price
+    import math
+    if not isinstance(price, (int, float)) or math.isnan(price) or not math.isfinite(price) or price <= 0:
+        return 0.0
     if tick_size is None:
         tick_size = 0.05 if price >= 250.0 else 0.01
     return round(round(price / tick_size) * tick_size, 2)

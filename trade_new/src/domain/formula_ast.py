@@ -4,6 +4,7 @@ import hashlib
 import random
 import numpy as np
 import pandas as pd
+import scipy.stats as stats
 from numpy.lib.stride_tricks import sliding_window_view
 
 OPERATORS_BINARY = ("ADD", "SUB", "MUL", "DIV_SAFE")
@@ -13,18 +14,13 @@ OPERATORS_CROSS_SECTIONAL = ("CS_RANK", "CS_DEMEAN")
 
 
 def cs_rank(matrix: np.ndarray) -> np.ndarray:
-    """Cross-sectional rank across asset axis (axis=0) with fractional tie-breaking and NaN masking."""
+    """Cross-sectional rank across asset axis (axis=0) in O(B log B * T) with zero 3D intermediate allocation."""
     arr = np.asarray(matrix, dtype=np.float64)
     if arr.ndim == 1 or arr.shape[0] <= 1:
         return np.full_like(arr, 0.5)
     valid = np.isfinite(arr)
     k = np.sum(valid, axis=0, keepdims=True)
-    arr0 = arr[:, np.newaxis, ...]
-    arr1 = arr[np.newaxis, :, ...]
-    valid_mask = valid[:, np.newaxis, ...] & valid[np.newaxis, :, ...]
-    c_less = np.sum((arr0 > arr1) & valid_mask, axis=1, dtype=np.float64)
-    c_eq = np.sum((arr0 == arr1) & valid_mask, axis=1, dtype=np.float64)
-    ranks = c_less + 0.5 * (c_eq + 1.0)
+    ranks = stats.rankdata(arr, axis=0, nan_policy="omit")
     norm_ranks = (ranks - 0.5) / np.maximum(k, 1)
     res = np.where(valid & (k > 1), norm_ranks, 0.5)
     return np.nan_to_num(res, nan=0.5)
@@ -78,8 +74,8 @@ class ASTNode:
     def canonical_hash(self) -> str:
         """Returns deterministic 16-character hex hash invariant to commutative child ordering."""
         regimes_tag = "@R:" + ",".join(str(r) for r in sorted(self.active_regimes))
-        if self.op == "FEATURE":
-            raw = f"F:{self.val}{regimes_tag}"
+        if self.op in ("FEATURE", "CONST"):
+            raw = f"{self.op}:{self.val}{regimes_tag}"
         elif self.op in ("ADD", "MUL") and len(self.children) == 2:
             h0 = self.children[0].canonical_hash()
             h1 = self.children[1].canonical_hash()
@@ -91,7 +87,7 @@ class ASTNode:
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def to_formula_str(self) -> str:
-        if self.op == "FEATURE":
+        if self.op in ("FEATURE", "CONST"):
             return self.val
         if self.op == "MEGA_SWITCH":
             c = self.children[0].to_formula_str() if len(self.children) > 0 else "0"
@@ -107,22 +103,32 @@ class ASTNode:
 
 
 def _fast_ts_rank_20(arr: np.ndarray) -> np.ndarray:
-    """Vectorized SIMD sliding-window percentile rank over 20 periods."""
+    """Vectorized sliding-window percentile rank over 20 periods with dynamic valid counting."""
     n = len(arr)
     if n == 0:
         return np.zeros(0, dtype=np.float64)
-    res = np.empty(n, dtype=np.float64)
+    res = np.full(n, 0.5, dtype=np.float64)
     w = 20
     for i in range(min(n, w)):
         prefix = arr[:i + 1]
-        res[i] = (np.count_nonzero(prefix < arr[i]) + 0.5 * np.count_nonzero(prefix == arr[i])) / (i + 1)
+        target = arr[i]
+        valid_prefix = np.isfinite(prefix)
+        k = np.sum(valid_prefix)
+        if np.isfinite(target) and k > 0:
+            less = np.count_nonzero((prefix < target) & valid_prefix)
+            eq = np.count_nonzero((prefix == target) & valid_prefix)
+            res[i] = (less + 0.5 * eq) / float(max(k, 1))
     if n > w:
         windows = sliding_window_view(arr, window_shape=w)
         target = arr[w - 1:]
-        less = np.count_nonzero(windows < target[:, None], axis=1)
-        eq = np.count_nonzero(windows == target[:, None], axis=1)
-        res[w - 1:] = (less + 0.5 * eq) / float(w)
-    return res
+        valid_win = np.isfinite(windows)
+        valid_tgt = np.isfinite(target)
+        k = np.sum(valid_win, axis=1)
+        less = np.count_nonzero((windows < target[:, None]) & valid_win, axis=1)
+        eq = np.count_nonzero((windows == target[:, None]) & valid_win, axis=1)
+        calc_rank = (less + 0.5 * eq) / np.maximum(k, 1).astype(np.float64)
+        res[w - 1:] = np.where(valid_tgt & (k > 0), calc_rank, 0.5)
+    return np.nan_to_num(res, nan=0.5)
 
 
 class ASTEvaluator:
@@ -167,7 +173,12 @@ class ASTEvaluator:
             if node.op == "ADD": res = l + r
             elif node.op == "SUB": res = l - r
             elif node.op == "MUL": res = l * r
-            elif node.op == "DIV_SAFE": res = np.where(np.abs(r) > 1e-6, l / (r + 1e-8), 0.0)
+            elif node.op == "DIV_SAFE":
+                r_abs = np.abs(r)
+                denom_sign = np.where(r >= 0.0, 1.0, -1.0)
+                safe_denom = denom_sign * np.maximum(r_abs, 1e-6)
+                res = np.where(r_abs > 1e-6, l / safe_denom, 0.0)
+                res = np.clip(res, -1e4, 1e4)
             else: res = np.zeros(n)
             return np.nan_to_num(res, nan=0.0, posinf=1e4, neginf=-1e4)
 

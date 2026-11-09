@@ -14,8 +14,13 @@ def compute_sharpe_and_dsr(
     B = net_rets.shape[0]
     T = max(1, total_bars)
     activity_ratio = np.clip(n_active / float(T), 1e-4, 1.0)
-    mean_r = np.mean(net_rets, axis=1)
-    vol_r = np.maximum(0.002, np.std(net_rets, axis=1, ddof=1))
+    # Compute returns conditioned on active trading observations to prevent double-penalizing cash
+    mean_r = np.sum(net_rets, axis=1) / np.maximum(1.0, n_active)
+    active_mask = net_rets != 0.0
+    diff = np.where(active_mask, net_rets - mean_r[:, np.newaxis], 0.0)
+    var = np.maximum(1e-8, np.sum(diff ** 2, axis=1) / np.maximum(1.0, n_active))
+    vol_r = np.maximum(0.002, np.sqrt(var))
+
     # Annualized Sharpe ratio scaled by active trading ratio
     sharpe = (mean_r / vol_r) * np.sqrt(252.0 * activity_ratio)
 
@@ -23,11 +28,10 @@ def compute_sharpe_and_dsr(
         dsr = np.full(B, 0.5, dtype=np.float32)
         return sharpe.astype(np.float32), dsr
 
-    # Statistical moments: skewness and kurtosis for non-normality correction
-    diff = net_rets - mean_r[:, np.newaxis]
-    var = np.maximum(1e-8, np.mean(diff ** 2, axis=1))
-    skew = np.mean(diff ** 3, axis=1) / (var ** 1.5)
-    kurt = np.mean(diff ** 4, axis=1) / (var ** 2)
+    # Statistical moments: skewness and kurtosis computed over active trading observations
+    skew = np.sum(diff ** 3, axis=1) / (np.maximum(1.0, n_active) * (var ** 1.5))
+    kurt = np.sum(diff ** 4, axis=1) / (np.maximum(1.0, n_active) * (var ** 2))
+    kurt = np.clip(kurt, 1.0, 10.0)
 
     # Per-period SR and variance under non-normality
     sr_daily = mean_r / vol_r
@@ -93,15 +97,22 @@ class MatrixSimulator:
             else:
                 raise ValueError(f"returns must be 1D [T] or 2D [N, T], got shape {rets_arr.shape}")
 
+            # L1 Gross leverage normalization across asset dimension: sum(|w|) <= 1.0
+            l1_weights = np.sum(np.abs(positions), axis=1, keepdims=True)
+            norm_positions = np.where(
+                l1_weights > 1.0,
+                positions / np.maximum(l1_weights, 1e-8),
+                positions,
+            )
             zero_col = np.zeros((B, N, 1), dtype=positions.dtype)
-            flips = np.abs(np.diff(positions, axis=2, prepend=zero_col))
+            flips = np.abs(np.diff(norm_positions, axis=2, prepend=zero_col))
             if friction_arr.ndim == 1:
                 turnover_loss = np.sum(flips * friction_arr[np.newaxis, :, np.newaxis], axis=1)
             else:
                 turnover_loss = np.sum(flips, axis=1) * float(friction_arr)
-            gross_port_rets = np.sum(positions * rets_2d[np.newaxis, :, :], axis=1)
+            gross_port_rets = np.sum(norm_positions * rets_2d[np.newaxis, :, :], axis=1)
             net_rets = gross_port_rets - turnover_loss
-            active_mask = (np.sum(np.abs(positions) > 0.0, axis=1) > 0.0) | (turnover_loss > 0.0)
+            active_mask = (np.sum(np.abs(norm_positions) > 0.0, axis=1) > 0.0) | (turnover_loss > 0.0)
 
         else:
             raise ValueError(f"positions must be 2D [B, T] or 3D [B, N, T], got shape {positions.shape}")
