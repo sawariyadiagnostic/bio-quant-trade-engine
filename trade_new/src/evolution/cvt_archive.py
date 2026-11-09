@@ -5,15 +5,15 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 # Standard 4D behavioral manifold boundaries:
-# 1. Realized Volatility: [0.05, 0.60]
-# 2. Portfolio Turnover: [2.0, 150.0]
-# 3. Downside Beta to Market: [-0.5, 1.5]
-# 4. Lag-1 Autocorrelation: [-0.5, 0.5]
+# 1. Realized Volatility: [0.01, 0.80] (supports low-vol cash-preservation up to 80% momentum)
+# 2. Portfolio Turnover: [0.05, 250.0] (supports patient swing macro up to 250x intraday churn)
+# 3. Downside Beta to Market: [-1.5, 2.5] (supports inverse hedging up to 2.5x high-beta)
+# 4. Lag-1 Autocorrelation: [-0.8, 0.8] (supports mean-reversion and momentum persistence)
 BOUNDS_4D = np.array([
-    [0.05, 0.60],
-    [2.0, 150.0],
-    [-0.5, 1.5],
-    [-0.5, 0.5]
+    [0.01, 0.80],
+    [0.05, 250.0],
+    [-1.5, 2.5],
+    [-0.8, 0.8]
 ], dtype=np.float64)
 
 
@@ -60,8 +60,24 @@ class CVTArchiveEngine:
         span = np.maximum(self.bounds[:, 1] - low, 1e-8)
         return np.clip((c - low) / span, 0.0, 1.0)
 
+    def update_bounds_dynamically(self, coords: np.ndarray, margin: float = 0.1) -> bool:
+        """Dynamically expands Voronoi hypercube bounds if new behavioral coordinates exceed limits."""
+        c = np.asarray(coords, dtype=np.float64).flatten()
+        expanded = False
+        for i in range(self.dims):
+            if c[i] < self.bounds[i, 0]:
+                self.bounds[i, 0] = c[i] - margin * max(abs(c[i]), 1e-4)
+                expanded = True
+            elif c[i] > self.bounds[i, 1]:
+                self.bounds[i, 1] = c[i] + margin * max(abs(c[i]), 1e-4)
+                expanded = True
+        if expanded:
+            self._init_centroids()
+        return expanded
+
     def find_cell(self, behavior_coords: np.ndarray) -> int:
         """Finds the index of the nearest Voronoi centroid in continuous manifold space in O(log K)."""
+        self.update_bounds_dynamically(behavior_coords)
         norm_b = self.normalize_coords(behavior_coords)
         _, cell_idx = self.kdtree.query(norm_b)
         return int(cell_idx)

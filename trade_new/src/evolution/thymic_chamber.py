@@ -131,8 +131,10 @@ class ThymicStressChamber:
         """
         Calculates maximum peak-to-trough drawdown across all historical stress profiles.
         Supports continuous and short/hedging signals (e.g. range [-1.0, 1.0]).
+        Rejects dead/silenced formulas producing zero active positions across profiles.
         """
         max_dd = 0.0
+        total_active_bars = 0
         for profile in self.stress_profiles:
             try:
                 sig = ASTEvaluator.eval_node(formula, profile, current_regime=active_regime)
@@ -140,7 +142,9 @@ class ThymicStressChamber:
                     return 1.0
                 # Support continuous long/short positions clipped to [-1.0, 1.0]
                 pos = np.clip(sig, -1.0, 1.0)
-                if np.sum(np.abs(pos)) < 1e-4:
+                active_bars = int(np.sum(np.abs(pos) > 1e-4))
+                total_active_bars += active_bars
+                if active_bars == 0:
                     continue
                 c = profile.get("Close_Adj", profile.get("Close", profile.get("Close_Raw")))
                 strat_rets = pos[:-1] * c.pct_change().fillna(0.0).to_numpy()[1:]
@@ -153,6 +157,10 @@ class ThymicStressChamber:
                         max_dd = dd_val
             except Exception:
                 return 1.0
+
+        # Reject zero-signal passes: dead or silenced formulas fail quarantine
+        if total_active_bars == 0:
+            return 1.0
         return max_dd
 
     def test_formula_safety(self, formula: ASTNode, active_regime: int = 0, max_dd_tolerance: float = 0.06) -> bool:

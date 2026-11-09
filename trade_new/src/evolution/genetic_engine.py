@@ -28,6 +28,8 @@ from .cvt_archive import CVTArchiveEngine
 from .map_elites import MapElitesArchive, EliteIndividual
 from .thymic_chamber import ThymicStressChamber
 from .archive_store import ArchiveStore
+from .nursery import EvolutionaryNursery
+from .symbiosis import SymbioticBreeder
 
 
 class GeneticEvolutionEngine:
@@ -65,6 +67,8 @@ class GeneticEvolutionEngine:
         self.archive = MapElitesArchive(cells=cells, dims=dims)
         self.thymic_chamber = ThymicStressChamber()
         self.archive_store = ArchiveStore(db_path=db_path) if db_path else None
+        self.nursery = EvolutionaryNursery()
+        self.p_symbiosis: float = 0.15
         self.population: List[ASTNode] = []
         self.generation: int = 0
 
@@ -104,7 +108,14 @@ class GeneticEvolutionEngine:
             p1 = random.choice(pool)
             p2 = random.choice(pool)
 
-            c1, c2 = GeneticCrossover.crossover(p1, p2) if random.random() < self.p_crossover else (p1.clone(), p2.clone())
+            # ADHD-33: Symbiotic chimerism when appropriate
+            if random.random() < self.p_symbiosis:
+                c1 = SymbioticBreeder.fuse(p1, p2, mode="multiplicative_gate")
+                c2 = p2.clone()
+            elif random.random() < self.p_crossover:
+                c1, c2 = GeneticCrossover.crossover(p1, p2)
+            else:
+                c1, c2 = p1.clone(), p2.clone()
 
             if random.random() < self.p_mutation:
                 c1 = GeneticMutator.mutate_subtree(c1, max_depth=self.max_depth)
@@ -140,6 +151,10 @@ class GeneticEvolutionEngine:
                 continue
             passed_thymic += 1
 
+            # ADHD-33: Register surviving candidate with EvolutionaryNursery
+            cand_id = FormulaParser.to_string(candidate)
+            self.nursery.register_individual(cand_id, novelty_score=0.5, birth_gen=self.generation)
+
             if self.archive.evaluate_and_insert(
                 candidate, df, current_regime=current_regime,
                 instrument=self.instrument, target_mode=target_mode
@@ -150,10 +165,12 @@ class GeneticEvolutionEngine:
 
         return passed_thymic, inserted_elites, promoted
 
-    def _stream_to_sqlite(self) -> None:
+    def _stream_to_sqlite(self, dirty_only: bool = True) -> None:
         """Streams newly discovered resident elites directly to SQLite WAL database."""
         if self.archive_store:
-            records = self.archive.to_archive_records(ticker=self.ticker, lookback=self.lookback)
+            records = self.archive.to_archive_records(
+                ticker=self.ticker, lookback=self.lookback, dirty_only=dirty_only
+            )
             if records:
                 self.archive_store.batch_upsert_elites(self.ticker, self.lookback, records)
 
@@ -166,7 +183,13 @@ class GeneticEvolutionEngine:
     ) -> Dict[str, Any]:
         """Executes a single generational step via micro-batch streaming with thermal pacing."""
         self.generation += 1
-        pool = list(self.population) + [e.formula for e in self.archive.get_resident_elites()[:15]]
+
+        # ADHD-32: Uniform sampling across ALL occupied Voronoi cells instead of static first 15
+        all_elites = self.archive.get_resident_elites()
+        sampled_elites = [
+            e.formula for e in (random.sample(all_elites, k=min(len(all_elites), 30)) if all_elites else [])
+        ]
+        pool = list(self.population) + sampled_elites
         if not pool:
             self.initialize_population()
             pool = list(self.population)
@@ -175,15 +198,19 @@ class GeneticEvolutionEngine:
         offspring = self._generate_offspring(pool, chunk_target)
         thymic_pass, new_elites, promoted = self._evaluate_microbatch(offspring, df, current_regime, target_mode)
 
-        # Refresh population pool
+        # Refresh population pool with promoted or inject fresh Pareto immigrants (ADHD-32)
         if promoted:
             self.population = (promoted + self.population)[:min(self.pop_size, 200)]
-        elif not self.population:
-            self.initialize_population()
+        else:
+            immigrants = [
+                TreeGenerator.generate(max_depth=random.randint(2, self.max_depth))
+                for _ in range(min(15, max(4, self.pop_size // 4)))
+            ]
+            self.population = (immigrants + self.population)[:min(self.pop_size, 200)]
 
-        # Stream directly to SQLite WAL
+        # Stream directly to SQLite WAL using dirty-cell delta tracking (ADHD-37)
         if new_elites > 0:
-            self._stream_to_sqlite()
+            self._stream_to_sqlite(dirty_only=True)
 
         # Thermal pacing pause and mandatory GC to preserve O(1) memory
         del offspring
@@ -224,5 +251,5 @@ class GeneticEvolutionEngine:
                 except Exception as exc:
                     logger.warning(f"Evolution callback exception: {exc}")
 
-        self._stream_to_sqlite()
+        self._stream_to_sqlite(dirty_only=False)
         return history

@@ -82,6 +82,14 @@ class ArchiveStore:
                 return default
 
         for e in elites:
+            sig_raw = e.get("behavior_signature", b"")
+            if hasattr(sig_raw, "tobytes"):
+                sig_bytes = sig_raw.tobytes()
+            elif isinstance(sig_raw, (bytes, bytearray)):
+                sig_bytes = bytes(sig_raw)
+            else:
+                sig_bytes = str(sig_raw).encode("utf-8")
+
             rows.append({
                 "ticker": ticker,
                 "lookback": lookback,
@@ -99,7 +107,7 @@ class ArchiveStore:
                 "trades_count": int(e.get("trades_count", 0)),
                 "formula_str": str(e.get("formula_str", "")),
                 "active_regimes": json.dumps(e.get("active_regimes", [])),
-                "behavior_signature": bytes(str(e.get("behavior_signature", "")).encode("utf-8")),
+                "behavior_signature": sig_bytes,
                 "updated_at": now
             })
 
@@ -294,16 +302,21 @@ class ArchiveStore:
                     (base_t, ns_t)
                 ).fetchall()
 
-        z = [[None for _ in range(20)] for _ in range(20)]
-        hover_text = [["Empty Niche (Fog of War)" for _ in range(20)] for _ in range(20)]
-        formulas = [["" for _ in range(20)] for _ in range(20)]
-        seen_fit = [[-999999.0 for _ in range(20)] for _ in range(20)]
+        max_r = max((int(r_data["niche_row"]) for r_data in rows), default=19)
+        max_c = max((int(r_data["niche_col"]) for r_data in rows), default=19)
+        n_rows = max(20, max_r + 1)
+        n_cols = max(20, max_c + 1)
+
+        z = [[None for _ in range(n_cols)] for _ in range(n_rows)]
+        hover_text = [["Empty Niche (Fog of War)" for _ in range(n_cols)] for _ in range(n_rows)]
+        formulas = [["" for _ in range(n_cols)] for _ in range(n_rows)]
+        seen_fit = [[-999999.0 for _ in range(n_cols)] for _ in range(n_rows)]
         occupied_count = 0
 
         for r_data in rows:
             r = int(r_data["niche_row"])
             c = int(r_data["niche_col"])
-            if 0 <= r < 20 and 0 <= c < 20:
+            if 0 <= r < n_rows and 0 <= c < n_cols:
                 fit_val = float(r_data["fitness"])
                 if z[r][c] is not None and fit_val <= seen_fit[r][c]:
                     continue
@@ -330,7 +343,8 @@ class ArchiveStore:
                 )
                 formulas[r][c] = str(r_data["formula_str"])
 
-        occupancy_pct = (occupied_count / 400.0) * 100.0
+        total_niches = n_rows * n_cols
+        occupancy_pct = (occupied_count / max(1, total_niches)) * 100.0
         return {
             "status": "ok",
             "ticker": ticker,
@@ -338,9 +352,11 @@ class ArchiveStore:
             "metric": safe_metric,
             "occupied_count": occupied_count,
             "occupancy_pct": round(occupancy_pct, 1),
+            "grid_rows": n_rows,
+            "grid_cols": n_cols,
             "z": z,
             "hover_text": hover_text,
             "formulas": formulas,
-            "x_bins": [f"Tau {c}" for c in range(20)],
-            "y_bins": [f"Sigma {r}" for r in range(20)]
+            "x_bins": [f"Tau {c}" for c in range(n_cols)],
+            "y_bins": [f"Sigma {r}" for r in range(n_rows)]
         }

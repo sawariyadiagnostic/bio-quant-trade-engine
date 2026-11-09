@@ -68,6 +68,9 @@ class ASTNode:
     def size(self) -> int:
         return 1 + sum(c.size() for c in self.children)
 
+    def count_nodes(self) -> int:
+        return self.size()
+
     def get_all_subnodes(self) -> list['ASTNode']:
         return [self] + [sub for c in self.children for sub in c.get_all_subnodes()]
 
@@ -252,6 +255,21 @@ class GeneticCrossover:
         t1.val, t2.val = t2.val, t1.val
         t1.active_regimes, t2.active_regimes = set(t2.active_regimes), set(t1.active_regimes)
         t1.children, t2.children = [c.clone() for c in t2.children], [c.clone() for c in t1.children]
+
+        # Arity hardening to prevent deformed AST structures during chimeric swaps
+        for node in (t1, t2):
+            if node.op in OPERATORS_BINARY:
+                while len(node.children) < 2:
+                    node.children.append(ASTNode("CONST", val="1.0", active_regimes=set(node.active_regimes)))
+                if len(node.children) > 2:
+                    node.children = node.children[:2]
+            elif node.op in OPERATORS_UNARY or node.op in OPERATORS_ROLLING or node.op in OPERATORS_CROSS_SECTIONAL:
+                if len(node.children) == 0:
+                    node.children.append(ASTNode("CONST", val="1.0", active_regimes=set(node.active_regimes)))
+                elif len(node.children) > 1:
+                    node.children = node.children[:1]
+            elif node.op in ("FEATURE", "CONST"):
+                node.children = []
         return c1, c2
 
 
@@ -260,4 +278,12 @@ class MegaEvolutionNode(ASTNode):
     def __init__(self, condition: ASTNode, base: ASTNode, mega: ASTNode, active_regimes: set[int] = None):
         regimes = active_regimes if active_regimes is not None else set(range(10))
         super().__init__(op="MEGA_SWITCH", val="", active_regimes=regimes, children=[condition, base, mega])
+
+    def clone(self) -> 'MegaEvolutionNode':
+        return MegaEvolutionNode(
+            condition=self.children[0].clone(),
+            base=self.children[1].clone(),
+            mega=self.children[2].clone(),
+            active_regimes=set(self.active_regimes)
+        )
 

@@ -66,6 +66,7 @@ class MapElitesArchive:
         self.tax_schedule = tax_schedule or TaxSchedule()
         self.cvt = CVTArchiveEngine(cells=self.cells, dims=self.dims)
         self.elites: Dict[int, EliteIndividual] = {}
+        self.dirty_cells: set[int] = set()
 
     def _get_friction(self, instrument: InstrumentType) -> float:
         """Returns statutory friction rate for instrument."""
@@ -99,11 +100,20 @@ class MapElitesArchive:
         net = (trade_pos * gross) - (pos_flips * friction)
         return net, trade_pos, pos_flips
 
-    def _compute_downside_beta(self, net_returns: np.ndarray, close_p: np.ndarray) -> float:
-        """Calculates downside beta against underlying benchmark returns."""
+    def _compute_downside_beta(
+        self,
+        net_returns: np.ndarray,
+        open_p: np.ndarray,
+        close_p: np.ndarray,
+        target_mode: str
+    ) -> float:
+        """Calculates downside beta against underlying benchmark returns matching target mode."""
         if len(close_p) <= 2:
             return 0.0
-        bench_rets = (close_p[1:] - close_p[:-1]) / (close_p[:-1] + 1e-8)
+        if target_mode == "overnight":
+            bench_rets = (open_p[1:] - close_p[:-1]) / (close_p[:-1] + 1e-8)
+        else:
+            bench_rets = (close_p - open_p) / (open_p + 1e-8)
         min_len = min(len(net_returns), len(bench_rets))
         r_strat = net_returns[:min_len]
         r_bench = bench_rets[:min_len]
@@ -142,7 +152,7 @@ class MapElitesArchive:
 
         ann_vol = float(np.std(net) * np.sqrt(252))
         turnover = float(np.mean(flips) * 252)
-        downside_beta = self._compute_downside_beta(net, close_p)
+        downside_beta = self._compute_downside_beta(net, open_p, close_p, target_mode)
         autocorr_lag1 = self._compute_lag1_autocorr(trade_pos)
 
         cum = np.cumprod(1.0 + net)
@@ -217,29 +227,42 @@ class MapElitesArchive:
         b_coords = metrics["behavior_coords"]
         cell_idx = self.cvt.find_cell(b_coords)
         incumbent = self.elites.get(cell_idx)
-        fitness = metrics["institutional_fitness"]
+        raw_fitness = metrics["institutional_fitness"]
+
+        # ADHD-36: Parsimony pressure penalizing bloated trees
+        formula_size = formula.count_nodes() if hasattr(formula, "count_nodes") else formula.size()
+        complexity_penalty = 0.005 * max(0, formula_size - 5)
+        fitness = max(0.01, raw_fitness - complexity_penalty)
 
         if incumbent is not None and self._is_redundant_bloat(metrics["sig"], incumbent, fitness):
             return False
 
-        if incumbent is None or fitness > incumbent.fitness:
-            row = cell_idx // 40
-            col = cell_idx % 40
-            elite = EliteIndividual(
-                formula=formula, fitness=round(fitness, 2),
-                volatility=round(metrics["annual_vol"], 4), turnover=round(metrics["turnover"], 2),
-                downside_beta=round(metrics["downside_beta"], 4), autocorr_lag1=round(metrics["autocorr_lag1"], 4),
-                win_rate=round(metrics["win_rate"], 2), net_return_pct=round(metrics["total_net_ret"] * 100.0, 2),
-                behavior_signature=metrics["sig"], behavior_coords=b_coords,
-                cell_idx=cell_idx, niche_row=row, niche_col=col,
-                sortino=round(metrics["sortino"], 2), profit_factor=round(min(metrics["profit_factor"], 99.0), 2),
-                trades_count=metrics["n_trades"], max_drawdown=round(metrics["max_drawdown"], 2),
-                cagr_pct=round(metrics["cagr_pct"], 2)
-            )
-            self.elites[cell_idx] = elite
-            self.cvt.insert(FormulaParser.to_string(formula), fitness, b_coords, metadata={"cell_idx": cell_idx})
-            return True
-        return False
+        # If incumbent exists, require meaningful improvement (delta >= 0.02) if challenger is more complex
+        if incumbent is not None:
+            incumbent_size = incumbent.formula.count_nodes() if hasattr(incumbent.formula, "count_nodes") else incumbent.formula.size()
+            if formula_size > incumbent_size and fitness < incumbent.fitness + 0.02:
+                return False
+            if fitness <= incumbent.fitness:
+                return False
+
+        row = cell_idx // 40
+        col = cell_idx % 40
+        elite = EliteIndividual(
+            formula=formula, fitness=round(fitness, 2),
+            volatility=round(metrics["annual_vol"], 4), turnover=round(metrics["turnover"], 2),
+            downside_beta=round(metrics["downside_beta"], 4), autocorr_lag1=round(metrics["autocorr_lag1"], 4),
+            win_rate=round(metrics["win_rate"], 2), net_return_pct=round(metrics["total_net_ret"] * 100.0, 2),
+            behavior_signature=metrics["sig"].astype(np.float32) if isinstance(metrics["sig"], np.ndarray) else np.zeros(60, dtype=np.float32),
+            behavior_coords=b_coords,
+            cell_idx=cell_idx, niche_row=row, niche_col=col,
+            sortino=round(metrics["sortino"], 2), profit_factor=round(min(metrics["profit_factor"], 99.0), 2),
+            trades_count=metrics["n_trades"], max_drawdown=round(metrics["max_drawdown"], 2),
+            cagr_pct=round(metrics["cagr_pct"], 2)
+        )
+        self.elites[cell_idx] = elite
+        self.dirty_cells.add(cell_idx)
+        self.cvt.insert(FormulaParser.to_string(formula), fitness, b_coords, metadata={"cell_idx": cell_idx})
+        return True
 
     def insert(
         self,
@@ -273,6 +296,7 @@ class MapElitesArchive:
             cagr_pct=round(float(m.get("cagr_pct", 0.0)), 2)
         )
         self.elites[cell_idx] = elite
+        self.dirty_cells.add(cell_idx)
         return True
 
     def get_resident_elites(self) -> List[EliteIndividual]:
@@ -299,10 +323,16 @@ class MapElitesArchive:
         """Returns archive niche occupancy fraction [0.0, 1.0]."""
         return len(self.elites) / max(1, self.cells)
 
-    def to_archive_records(self, ticker: str, lookback: str = "1y") -> List[Dict[str, Any]]:
+    def to_archive_records(
+        self, ticker: str, lookback: str = "1y", dirty_only: bool = False
+    ) -> List[Dict[str, Any]]:
         """Converts elites to dictionaries ready for SQLite WAL ArchiveStore batch upsert."""
         records = []
-        for e in self.elites.values():
+        source_elites = (
+            [self.elites[idx] for idx in list(self.dirty_cells) if idx in self.elites]
+            if dirty_only else list(self.elites.values())
+        )
+        for e in source_elites:
             records.append({
                 "ticker": ticker, "lookback": lookback,
                 "row": e.niche_row, "col": e.niche_col,
@@ -314,4 +344,6 @@ class MapElitesArchive:
                 "formula_str": FormulaParser.to_string(e.formula),
                 "active_regimes": [0], "behavior_signature": e.behavior_signature.tobytes().hex()
             })
+        if dirty_only:
+            self.dirty_cells.clear()
         return records

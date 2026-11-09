@@ -61,12 +61,17 @@ class SymbioticBreeder:
         s_clone = sensor.clone()
         a_clone = actuator.clone()
 
+        shared_regimes = set(sensor.active_regimes) & set(actuator.active_regimes)
+        effective_regimes = shared_regimes if len(shared_regimes) > 0 else (set(sensor.active_regimes) | set(actuator.active_regimes))
+        s_clone.active_regimes = set(effective_regimes)
+        a_clone.active_regimes = set(effective_regimes)
+
         if mode == "safe_ratio_gate":
-            return ASTNode(op="DIV_SAFE", children=[a_clone, s_clone])
+            return ASTNode(op="DIV_SAFE", active_regimes=effective_regimes, children=[a_clone, s_clone])
         elif mode == "additive_blend":
-            return ASTNode(op="ADD", children=[a_clone, s_clone])
+            return ASTNode(op="ADD", active_regimes=effective_regimes, children=[a_clone, s_clone])
         # Default: Multiplicative gating (Signal modulated by risk filter)
-        return ASTNode(op="MUL", children=[s_clone, a_clone])
+        return ASTNode(op="MUL", active_regimes=effective_regimes, children=[s_clone, a_clone])
 
     @staticmethod
     def fuse_mega(
@@ -75,8 +80,11 @@ class SymbioticBreeder:
         mega_actuator: ASTNode
     ) -> ASTNode:
         """Fuses formulas into a dual-state Mega Evolution chimera."""
+        shared_regimes = set(sensor_condition.active_regimes) & (set(base_actuator.active_regimes) | set(mega_actuator.active_regimes))
+        effective_regimes = shared_regimes if len(shared_regimes) > 0 else (set(sensor_condition.active_regimes) | set(base_actuator.active_regimes) | set(mega_actuator.active_regimes))
         return MegaEvolutionNode(
             condition=sensor_condition.clone(),
             base=base_actuator.clone(),
-            mega=mega_actuator.clone()
+            mega=mega_actuator.clone(),
+            active_regimes=effective_regimes
         )
