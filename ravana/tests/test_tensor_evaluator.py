@@ -165,6 +165,46 @@ class TestTensorASTEvaluator(unittest.TestCase):
             res_cpu.numpy(), res_dev.cpu().numpy(), rtol=1e-4, atol=1e-4
         )
 
+    def test_small_t_windows(self):
+        """Verify T < window (T=1, 5, 19 with window=20) evaluates without crash and yields finite values."""
+        for t_len in [1, 5, 19]:
+            x_small = torch.randn(2, t_len, self.F)
+            ast = ASTNode("TS_ZSCORE_20", children=[ASTNode("FEATURE", "Close")])
+            out = TensorASTEvaluator.eval_node(ast, x_small, self.feature_map)
+            self.assertEqual(out.shape, (2, t_len))
+            self.assertTrue(torch.all(torch.isfinite(out)))
+
+    def test_constant_array_zero_variance(self):
+        """Verify constant inputs with zero variance yield 0.0 without NaNs."""
+        x_const = torch.full((2, 50, self.F), 42.0, dtype=torch.float32)
+        ast_zscore = ASTNode("TS_ZSCORE_20", children=[ASTNode("FEATURE", "Close")])
+        out_z = TensorASTEvaluator.eval_node(ast_zscore, x_const, self.feature_map)
+        self.assertTrue(torch.all(out_z == 0.0))
+
+        ast_corr = ASTNode("TS_CORR_20", children=[ASTNode("FEATURE", "Close"), ASTNode("FEATURE", "Volume")])
+        out_c = TensorASTEvaluator.eval_node(ast_corr, x_const, self.feature_map)
+        self.assertTrue(torch.all(out_c == 0.0))
+
+    def test_nan_inf_feature_propagation(self):
+        """Verify raw feature slices with NaNs and Infs produce strictly finite bounded results."""
+        x_bad = torch.randn(20, self.F)
+        x_bad[0:5, :] = float("nan")
+        x_bad[5:10, :] = float("inf")
+        x_bad[10:15, :] = float("-inf")
+
+        for op in ("FEATURE", "DELTA_5", "TS_DELAY_1", "TS_DELAY_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_DECAY_LINEAR_10"):
+            ast = ASTNode(op, children=[ASTNode("FEATURE", "Close")]) if op != "FEATURE" else ASTNode("FEATURE", "Close")
+            out = TensorASTEvaluator.eval_node(ast, x_bad, self.feature_map)
+            self.assertTrue(torch.all(torch.isfinite(out)), f"Operator {op} produced non-finite values on bad data")
+
+    def test_dispatcher_3d_routing(self):
+        """Verify ComputeDispatcher routes 3D tensors on CPU seamlessly without ValueError."""
+        from ravana.compute.dispatcher import ComputeDispatcher
+        ast = ASTNode("FEATURE", "Close")
+        out = ComputeDispatcher.evaluate(ast, self.X_3d, self.feature_map, backend="auto", device="cpu")
+        self.assertEqual(out.shape, (2, self.T))
+        self.assertTrue(torch.all(torch.isfinite(out)))
+
 
 if __name__ == "__main__":
     unittest.main()

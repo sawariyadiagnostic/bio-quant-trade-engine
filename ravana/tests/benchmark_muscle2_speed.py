@@ -3,6 +3,10 @@
 Runs both evaluators on 4,497 real 5-minute bars of BANKBEES across 1,000 candidate formulas
 (4,497,000 real data points) and measures speedup, memory, and parity.
 """
+import os
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 import time
 import numpy as np
 import pandas as pd

@@ -6,7 +6,7 @@ import torch
 
 from ravana.domain.formula_ast import ASTNode, STANDARD_FEATURES
 from ravana.domain.formula_parser import FormulaParser
-from ravana.compute.dispatcher import ComputeDispatcher
+from ravana.compute.dispatcher import ComputeDispatcher, EvaluationContext
 
 
 class TestComputeDispatcher(unittest.TestCase):
@@ -61,6 +61,40 @@ class TestComputeDispatcher(unittest.TestCase):
         res_torch = ComputeDispatcher.evaluate(ast, self.df, backend="torch").cpu().numpy()
 
         np.testing.assert_allclose(res_numpy[25:], res_torch[25:], rtol=1e-3, atol=1e-3)
+
+    def test_evaluation_context(self):
+        ctx = EvaluationContext(self.df)
+        self.assertIsNotNone(ctx.tensor)
+        self.assertIsNotNone(ctx.cpu_arrays)
+        self.assertEqual(len(ctx.cpu_arrays), len(STANDARD_FEATURES))
+
+        ast = FormulaParser.parse("TS_DELAY_1(Close) + TS_DELAY_5(Close)")
+        res_torch = ComputeDispatcher.evaluate(ast, ctx, backend="torch")
+        res_numpy = ComputeDispatcher.evaluate(ast, ctx, backend="numpy")
+        np.testing.assert_allclose(res_numpy[10:], res_torch.cpu().numpy()[10:], rtol=1e-4, atol=1e-4)
+
+    def test_batch_evaluation_shapes(self):
+        ctx = EvaluationContext(self.df)
+        formulas = [
+            FormulaParser.parse("TS_DELAY_1(Close)"),
+            FormulaParser.parse("TS_DELAY_5(Close)"),
+            FormulaParser.parse("EMA_10(Close)"),
+            FormulaParser.parse("TS_MAX_10(High)"),
+            FormulaParser.parse("TS_MIN_10(Low)"),
+        ]
+        # Batch Torch
+        batch_torch = ComputeDispatcher.evaluate_batch(formulas, ctx, backend="torch")
+        self.assertIsInstance(batch_torch, torch.Tensor)
+        self.assertEqual(batch_torch.shape, (5, self.T))
+        self.assertTrue(torch.all(torch.isfinite(batch_torch)))
+
+        # Batch NumPy
+        batch_numpy = ComputeDispatcher.evaluate_batch(formulas, ctx, backend="numpy")
+        self.assertIsInstance(batch_numpy, np.ndarray)
+        self.assertEqual(batch_numpy.shape, (5, self.T))
+        self.assertTrue(np.all(np.isfinite(batch_numpy)))
+
+        np.testing.assert_allclose(batch_numpy[:, 25:], batch_torch[:, 25:].cpu().numpy(), rtol=1e-3, atol=1e-3)
 
 
 if __name__ == "__main__":
