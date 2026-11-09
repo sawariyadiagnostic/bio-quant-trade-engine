@@ -1,19 +1,20 @@
 """Mathematical Formula String Parser & AST Compiler for RAVANA.
 
 Parses formula strings (including infix arithmetic, function calls, scientific notation,
-unary negation, redundant parentheses, and MEGA_SWITCH) into typed ASTNode hierarchies.
+unary negation, redundant parentheses, BLEND, and rolling correlation) into typed ASTNode hierarchies.
 """
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .formula_ast import (
     ASTNode,
-    OPERATORS_BINARY,
+    OPERATORS_BINARY_ARITHMETIC,
+    OPERATORS_BINARY_ROLLING,
     OPERATORS_UNARY,
-    OPERATORS_ROLLING,
-    OPERATORS_CROSS_SECTIONAL,
+    OPERATORS_ROLLING_UNARY,
+    OPERATORS_TERNARY,
 )
 
 OP_MAP: Dict[str, str] = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV_SAFE"}
@@ -51,16 +52,11 @@ class FormulaParser:
         return s[left: right + 1].strip()
 
     @staticmethod
-    def parse(
-        formula_str: str,
-        active_regimes: Optional[Set[int]] = None,
-        _depth: int = 0
-    ) -> ASTNode:
+    def parse(formula_str: str, _depth: int = 0) -> ASTNode:
         """Recursively parses a mathematical formula string into an ASTNode."""
-        regimes = active_regimes if active_regimes is not None else set(range(10))
         s = formula_str.strip()
         if not s or _depth > 40:
-            return ASTNode(op="FEATURE", val="0.0", active_regimes=set(regimes))
+            return ASTNode(op="CONST", val="0.0")
 
         if _depth == 0 and not FormulaParser._is_balanced(s):
             raise ValueError(f"Unbalanced parentheses in formula: {s}")
@@ -72,10 +68,9 @@ class FormulaParser:
             op_sym, left, right = split
             return ASTNode(
                 op=OP_MAP.get(op_sym, op_sym),
-                active_regimes=set(regimes),
                 children=[
-                    FormulaParser.parse(left, regimes, _depth + 1),
-                    FormulaParser.parse(right, regimes, _depth + 1)
+                    FormulaParser.parse(left, _depth + 1),
+                    FormulaParser.parse(right, _depth + 1)
                 ]
             )
 
@@ -85,51 +80,47 @@ class FormulaParser:
             except ValueError:
                 return ASTNode(
                     op="NEG",
-                    active_regimes=set(regimes),
-                    children=[FormulaParser.parse(s[1:].strip(), regimes, _depth + 1)],
+                    children=[FormulaParser.parse(s[1:].strip(), _depth + 1)],
                 )
 
         if s.startswith("+"):
             try:
                 float(s)
             except ValueError:
-                return FormulaParser.parse(s[1:].strip(), regimes, _depth + 1)
+                return FormulaParser.parse(s[1:].strip(), _depth + 1)
 
         m = re.match(r"^([A-Za-z0-9_]+)\s*\((.*)\)$", s)
         if m:
             op_name = m.group(1).upper()
-            if op_name == "MEGA_SWITCH":
+            if op_name in ("BLEND", "MEGA_SWITCH"):
                 sub_args = FormulaParser._split_top_level_args(m.group(2))
                 return ASTNode(
-                    op="MEGA_SWITCH",
-                    active_regimes=set(regimes),
-                    children=[FormulaParser.parse(a, regimes, _depth + 1) for a in sub_args]
+                    op="BLEND",
+                    children=[FormulaParser.parse(a, _depth + 1) for a in sub_args]
                 )
-            if op_name in ("ADD", "SUB", "MUL", "DIV", "DIV_SAFE"):
+            if op_name in ("ADD", "SUB", "MUL", "DIV", "DIV_SAFE", "TS_CORR_20"):
                 sub_args = FormulaParser._split_top_level_args(m.group(2))
                 if len(sub_args) == 2:
                     op_clean = "DIV_SAFE" if op_name == "DIV" else op_name
                     return ASTNode(
                         op=op_clean,
-                        active_regimes=set(regimes),
                         children=[
-                            FormulaParser.parse(sub_args[0], regimes, _depth + 1),
-                            FormulaParser.parse(sub_args[1], regimes, _depth + 1)
+                            FormulaParser.parse(sub_args[0], _depth + 1),
+                            FormulaParser.parse(sub_args[1], _depth + 1)
                         ]
                     )
-            if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING + OPERATORS_CROSS_SECTIONAL):
+            if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY):
                 return ASTNode(
                     op=op_name,
-                    active_regimes=set(regimes),
-                    children=[FormulaParser.parse(m.group(2), regimes, _depth + 1)]
+                    children=[FormulaParser.parse(m.group(2), _depth + 1)]
                 )
 
         # Check if numerical constant
         try:
             float(s)
-            return ASTNode(op="CONST", val=s.replace(" ", ""), active_regimes=set(regimes))
+            return ASTNode(op="CONST", val=s.replace(" ", ""))
         except ValueError:
-            return ASTNode(op="FEATURE", val=s.replace(" ", ""), active_regimes=set(regimes))
+            return ASTNode(op="FEATURE", val=s.replace(" ", ""))
 
     @staticmethod
     def _split_top_level_args(s: str) -> List[str]:

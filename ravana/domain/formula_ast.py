@@ -1,66 +1,67 @@
-"""Comprehensive Symbolic AST Grammar, Bounded Math Operators, and Genetic Engine for RAVANA.
+"""Institutional Quantitative AST Grammar & Bounded Math Operators for RAVANA.
 
-Includes:
-- Bounded zero-crash math operators (DIV_SAFE, EXP_SAFE, LOG_SAFE, TANH, SIGMOID).
-- Cross-sectional operators (CS_RANK, CS_DEMEAN) with finite masking.
-- MegaEvolutionNode (dual-state conditional regime switcher).
-- Arity-hardened genetic crossover and point/subtree/methylation mutation.
-- Deterministic canonical hashing invariant to commutative symmetry and active regimes.
+Pruned of biological analogies (methylation, fake regimes) and single-asset degeneracies (CS_RANK).
+Enriched with essential quantitative primitives (TS_ZSCORE, TS_CORR, TS_DECAY_LINEAR, SIGNED_POWER, BLEND)
+and dimensional consistency rules preventing dimensional nonsense (e.g. Price + Volume).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import enum
 import hashlib
 import random
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
-import scipy.stats as stats
 from numpy.lib.stride_tricks import sliding_window_view
 
-OPERATORS_BINARY: Tuple[str, ...] = ("ADD", "SUB", "MUL", "DIV_SAFE")
+# Operator classifications
+OPERATORS_BINARY_ARITHMETIC: Tuple[str, ...] = ("ADD", "SUB", "MUL", "DIV_SAFE")
+OPERATORS_BINARY_ROLLING: Tuple[str, ...] = ("TS_CORR_20",)
+OPERATORS_BINARY: Tuple[str, ...] = OPERATORS_BINARY_ARITHMETIC + OPERATORS_BINARY_ROLLING
+
 OPERATORS_UNARY: Tuple[str, ...] = (
-    "SIGN", "ABS", "LOG_ABS", "SIGMOID", "TANH", "RELU", "EXP_SAFE", "LOG_SAFE", "NEG"
+    "SIGN", "ABS", "LOG_ABS", "SIGMOID", "TANH", "RELU", "EXP_SAFE", "LOG_SAFE", "NEG", "SQRT_ABS"
 )
-OPERATORS_ROLLING: Tuple[str, ...] = ("DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20")
-OPERATORS_CROSS_SECTIONAL: Tuple[str, ...] = ("CS_RANK", "CS_DEMEAN")
-
-STANDARD_FEATURES: List[str] = [
-    "Close_Adj", "Open", "High", "Low", "Close", "Volume", "Spread", "Vol_ZScore", "Vol_Price_Flow",
-    "True_Range", "TR_Expansion", "EMA_Slope", "Dist_EMA20", "Dist_VWAP", "Downside_Vol_Ratio",
-    "RSI_14", "Parkinson_Vol", "Garman_Klass_Vol", "SP500_Ret", "ADR_Ret", "Global_Confluence"
-]
+OPERATORS_ROLLING_UNARY: Tuple[str, ...] = (
+    "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20", "TS_ZSCORE_20", "TS_DECAY_LINEAR_10"
+)
+OPERATORS_TERNARY: Tuple[str, ...] = ("BLEND",)
 
 
-def cs_rank(matrix: np.ndarray) -> np.ndarray:
-    """Cross-sectional rank across asset axis (axis=0) normalized to [0, 1] with finite masking."""
-    arr = np.asarray(matrix, dtype=np.float64)
-    if arr.ndim == 1 or arr.shape[0] <= 1:
-        return np.full_like(arr, 0.5)
-    valid = np.isfinite(arr)
-    k = np.sum(valid, axis=0, keepdims=True)
-    ranks = stats.rankdata(arr, axis=0, nan_policy="omit")
-    norm_ranks = (ranks - 0.5) / np.maximum(k, 1)
-    res = np.where(valid & (k > 1), norm_ranks, 0.5)
-    return np.nan_to_num(res, nan=0.5)
+class FeatureDimension(enum.Enum):
+    """Physical dimensions for financial time-series to enforce dimensional integrity."""
+    PRICE = "PRICE"              # In Rupees (Open, High, Low, Close)
+    VOLUME = "VOLUME"            # In Shares (Volume)
+    DIMENSIONLESS = "DIMENSIONLESS"  # Returns, Ratios, Z-scores, RSI, Indicators
 
 
-def cs_demean(matrix: np.ndarray) -> np.ndarray:
-    """Cross-sectional de-meaning across asset axis (axis=0) ensuring sum(alpha)=0."""
-    arr = np.asarray(matrix, dtype=np.float64)
-    if arr.ndim == 1 or arr.shape[0] <= 1:
-        return np.zeros_like(arr)
-    valid = np.isfinite(arr)
-    k = np.sum(valid, axis=0, keepdims=True)
-    clean_arr = np.where(valid, arr, 0.0)
-    mean_val = np.where(
-        k > 0,
-        np.sum(clean_arr, axis=0, keepdims=True) / np.maximum(k, 1),
-        0.0,
-    )
-    res = np.where(valid & (k > 1), arr - mean_val, 0.0)
-    return np.nan_to_num(res, nan=0.0)
+FEATURE_DIMENSIONS: Dict[str, FeatureDimension] = {
+    "Open": FeatureDimension.PRICE,
+    "High": FeatureDimension.PRICE,
+    "Low": FeatureDimension.PRICE,
+    "Close": FeatureDimension.PRICE,
+    "Close_Adj": FeatureDimension.PRICE,
+    "Volume": FeatureDimension.VOLUME,
+    "Spread": FeatureDimension.DIMENSIONLESS,
+    "Vol_ZScore": FeatureDimension.DIMENSIONLESS,
+    "Vol_Price_Flow": FeatureDimension.DIMENSIONLESS,
+    "True_Range": FeatureDimension.PRICE,
+    "TR_Expansion": FeatureDimension.DIMENSIONLESS,
+    "EMA_Slope": FeatureDimension.DIMENSIONLESS,
+    "Dist_EMA20": FeatureDimension.DIMENSIONLESS,
+    "Dist_VWAP": FeatureDimension.DIMENSIONLESS,
+    "Downside_Vol_Ratio": FeatureDimension.DIMENSIONLESS,
+    "RSI_14": FeatureDimension.DIMENSIONLESS,
+    "Parkinson_Vol": FeatureDimension.DIMENSIONLESS,
+    "Garman_Klass_Vol": FeatureDimension.DIMENSIONLESS,
+    "SP500_Ret": FeatureDimension.DIMENSIONLESS,
+    "ADR_Ret": FeatureDimension.DIMENSIONLESS,
+    "Global_Confluence": FeatureDimension.DIMENSIONLESS,
+}
+
+STANDARD_FEATURES: List[str] = list(FEATURE_DIMENSIONS.keys())
 
 
 @dataclass
@@ -68,26 +69,19 @@ class ASTNode:
     """Core node of a symbolic trading formula AST.
     
     Attributes:
-        op: Operator name ('ADD', 'DIV_SAFE', 'FEATURE', 'CONST', 'MEGA_SWITCH', etc.).
+        op: Operator name ('ADD', 'DIV_SAFE', 'FEATURE', 'CONST', 'BLEND', 'TS_CORR_20', etc.).
         val: Literal value for features (e.g. 'Close') or constants (e.g. '1.5').
-        active_regimes: Set of regime IDs where this node produces signal.
-        children: Subnodes for binary, unary, rolling, or switch operations.
+        children: Subnodes for binary, unary, rolling, or ternary operations.
     """
     op: str
     val: str = ""
-    active_regimes: Set[int] = field(default_factory=lambda: set(range(10)))
     children: List[ASTNode] = field(default_factory=list)
-
-    def is_silenced(self, regime: int) -> bool:
-        """Checks if this node is muted under the current market regime."""
-        return regime == -1 or regime not in self.active_regimes
 
     def clone(self) -> ASTNode:
         """Deep copies the node and all of its descendants."""
         return ASTNode(
             op=self.op,
             val=self.val,
-            active_regimes=set(self.active_regimes),
             children=[c.clone() for c in self.children]
         )
 
@@ -109,29 +103,32 @@ class ASTNode:
 
     def canonical_hash(self) -> str:
         """Deterministic 16-character hex hash invariant to commutative child ordering."""
-        regimes_tag = "@R:" + ",".join(str(r) for r in sorted(self.active_regimes))
         if self.op in ("FEATURE", "CONST"):
-            raw = f"{self.op}:{self.val}{regimes_tag}"
+            raw = f"{self.op}:{self.val}"
         elif self.op in ("ADD", "MUL") and len(self.children) == 2:
             h0 = self.children[0].canonical_hash()
             h1 = self.children[1].canonical_hash()
             ordered = sorted([h0, h1])
-            raw = f"{self.op}({ordered[0]},{ordered[1]}){regimes_tag}"
+            raw = f"{self.op}({ordered[0]},{ordered[1]})"
         else:
             child_hashes = [c.canonical_hash() for c in self.children]
-            raw = f"{self.op}(" + ",".join(child_hashes) + f"){regimes_tag}"
+            raw = f"{self.op}(" + ",".join(child_hashes) + ")"
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def to_formula_str(self) -> str:
         """Converts AST into human-readable mathematical notation."""
         if self.op in ("FEATURE", "CONST"):
             return self.val
-        if self.op == "MEGA_SWITCH":
-            c = self.children[0].to_formula_str() if len(self.children) > 0 else "0"
-            b = self.children[1].to_formula_str() if len(self.children) > 1 else "0"
-            m = self.children[2].to_formula_str() if len(self.children) > 2 else "0"
-            return f"MEGA_SWITCH({c}, {b}, {m})"
-        if self.op in (OPERATORS_ROLLING + OPERATORS_UNARY + OPERATORS_CROSS_SECTIONAL):
+        if self.op == "BLEND" and len(self.children) >= 3:
+            c = self.children[0].to_formula_str()
+            a = self.children[1].to_formula_str()
+            b = self.children[2].to_formula_str()
+            return f"BLEND({c}, {a}, {b})"
+        if self.op in OPERATORS_BINARY_ROLLING and len(self.children) >= 2:
+            a = self.children[0].to_formula_str()
+            b = self.children[1].to_formula_str()
+            return f"{self.op}({a}, {b})"
+        if self.op in (OPERATORS_ROLLING_UNARY + OPERATORS_UNARY):
             arg = self.children[0].to_formula_str() if self.children else "X"
             return f"{self.op}({arg})"
         sym = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV_SAFE": "/"}.get(self.op, self.op)
@@ -144,7 +141,6 @@ class ASTNode:
         return {
             "op": self.op,
             "val": self.val,
-            "active_regimes": sorted(list(self.active_regimes)),
             "children": [c.to_dict() for c in self.children]
         }
 
@@ -154,25 +150,11 @@ class ASTNode:
         return cls(
             op=data["op"],
             val=data.get("val", ""),
-            active_regimes=set(data.get("active_regimes", range(10))),
             children=[cls.from_dict(c) for c in data.get("children", [])]
         )
 
 
-class MegaEvolutionNode(ASTNode):
-    """Dual-state AST node that dynamically transitions between base and mega forms."""
-    def __init__(self, condition: ASTNode, base: ASTNode, mega: ASTNode, active_regimes: Optional[Set[int]] = None):
-        regimes = active_regimes if active_regimes is not None else set(range(10))
-        super().__init__(op="MEGA_SWITCH", val="", active_regimes=regimes, children=[condition, base, mega])
-
-    def clone(self) -> MegaEvolutionNode:
-        return MegaEvolutionNode(
-            condition=self.children[0].clone(),
-            base=self.children[1].clone(),
-            mega=self.children[2].clone(),
-            active_regimes=set(self.active_regimes)
-        )
-
+# --- Vectorized Fast Math Primitives ---
 
 def _fast_ts_rank_20(arr: np.ndarray) -> np.ndarray:
     """Sliding-window percentile rank over 20 periods with finite masking."""
@@ -203,29 +185,52 @@ def _fast_ts_rank_20(arr: np.ndarray) -> np.ndarray:
     return np.nan_to_num(res, nan=0.5)
 
 
+def _fast_ts_zscore(arr: np.ndarray, w: int = 20) -> np.ndarray:
+    """Computes rolling z-score (X - mean) / (std + 1e-6) clamped to [-4.0, 4.0]."""
+    s = pd.Series(arr)
+    mean = s.rolling(w, min_periods=2).mean()
+    std = s.rolling(w, min_periods=2).std(ddof=1)
+    z = (s - mean) / (std + 1e-6)
+    return np.nan_to_num(np.clip(z.fillna(0.0).to_numpy(), -4.0, 4.0), nan=0.0)
+
+
+def _fast_ts_decay_linear(arr: np.ndarray, w: int = 10) -> np.ndarray:
+    """Linear time-decay weighted moving average (recent bars weighted higher)."""
+    weights = np.arange(1, w + 1, dtype=np.float64)
+    weights /= weights.sum()
+    s = pd.Series(arr)
+    res = s.rolling(w, min_periods=1).apply(lambda x: np.dot(x[-len(weights):], weights[-len(x):]) / weights[-len(x):].sum(), raw=True)
+    return np.nan_to_num(res.fillna(0.0).to_numpy(), nan=0.0)
+
+
+def _fast_ts_corr(x: np.ndarray, y: np.ndarray, w: int = 20) -> np.ndarray:
+    """Rolling Pearson correlation clamped to [-1.0, 1.0]."""
+    sx = pd.Series(x)
+    sy = pd.Series(y)
+    corr = sx.rolling(w, min_periods=3).corr(sy)
+    return np.nan_to_num(np.clip(corr.fillna(0.0).to_numpy(), -1.0, 1.0), nan=0.0)
+
+
 class ASTEvaluator:
     """Evaluates an ASTNode hierarchy against a feature DataFrame safely."""
 
     @staticmethod
-    def eval_node(node: ASTNode, df: pd.DataFrame, current_regime: int = 0) -> np.ndarray:
+    def eval_node(node: ASTNode, df: pd.DataFrame) -> np.ndarray:
         n = len(df)
-        if node.is_silenced(current_regime):
-            return np.zeros(n, dtype=np.float64)
-
         if node.op == "CONST":
             return ASTEvaluator._eval_const(node, n)
         if node.op == "FEATURE":
             return ASTEvaluator._eval_feature(node, df, n)
-        if node.op == "MEGA_SWITCH":
-            return ASTEvaluator._eval_mega_switch(node, df, current_regime, n)
-        if node.op in OPERATORS_BINARY:
-            return ASTEvaluator._eval_binary(node, df, current_regime, n)
+        if node.op == "BLEND":
+            return ASTEvaluator._eval_blend(node, df, n)
+        if node.op in OPERATORS_BINARY_ROLLING:
+            return ASTEvaluator._eval_binary_rolling(node, df, n)
+        if node.op in OPERATORS_BINARY_ARITHMETIC:
+            return ASTEvaluator._eval_binary(node, df, n)
         if node.op in OPERATORS_UNARY:
-            return ASTEvaluator._eval_unary(node, df, current_regime, n)
-        if node.op in OPERATORS_ROLLING:
-            return ASTEvaluator._eval_rolling(node, df, current_regime, n)
-        if node.op in OPERATORS_CROSS_SECTIONAL:
-            return ASTEvaluator._eval_cross_sectional(node, df, current_regime, n)
+            return ASTEvaluator._eval_unary(node, df, n)
+        if node.op in OPERATORS_ROLLING_UNARY:
+            return ASTEvaluator._eval_rolling(node, df, n)
         return np.zeros(n, dtype=np.float64)
 
     @staticmethod
@@ -257,16 +262,18 @@ class ASTEvaluator:
             return np.zeros(n, dtype=np.float64)
 
     @staticmethod
-    def _eval_mega_switch(node: ASTNode, df: pd.DataFrame, regime: int, n: int) -> np.ndarray:
-        cond = ASTEvaluator.eval_node(node.children[0], df, regime) if len(node.children) > 0 else np.zeros(n)
-        base = ASTEvaluator.eval_node(node.children[1], df, regime) if len(node.children) > 1 else np.zeros(n)
-        mega = ASTEvaluator.eval_node(node.children[2], df, regime) if len(node.children) > 2 else np.zeros(n)
-        return np.nan_to_num(np.where(cond > 0.0, mega, base), nan=0.0)
+    def _eval_blend(node: ASTNode, df: pd.DataFrame, n: int) -> np.ndarray:
+        cond = ASTEvaluator.eval_node(node.children[0], df) if len(node.children) > 0 else np.zeros(n)
+        a = ASTEvaluator.eval_node(node.children[1], df) if len(node.children) > 1 else np.zeros(n)
+        b = ASTEvaluator.eval_node(node.children[2], df) if len(node.children) > 2 else np.zeros(n)
+        weight = 1.0 / (1.0 + np.exp(-np.clip(cond, -10.0, 10.0)))
+        res = weight * a + (1.0 - weight) * b
+        return np.nan_to_num(np.clip(res, -1e4, 1e4), nan=0.0)
 
     @staticmethod
-    def _eval_binary(node: ASTNode, df: pd.DataFrame, regime: int, n: int) -> np.ndarray:
-        l = ASTEvaluator.eval_node(node.children[0], df, regime) if node.children else np.zeros(n)
-        r = ASTEvaluator.eval_node(node.children[1], df, regime) if len(node.children) > 1 else np.zeros(n)
+    def _eval_binary(node: ASTNode, df: pd.DataFrame, n: int) -> np.ndarray:
+        l = ASTEvaluator.eval_node(node.children[0], df) if node.children else np.zeros(n)
+        r = ASTEvaluator.eval_node(node.children[1], df) if len(node.children) > 1 else np.zeros(n)
         if node.op == "ADD":
             res = l + r
         elif node.op == "SUB":
@@ -284,8 +291,16 @@ class ASTEvaluator:
         return np.nan_to_num(res, nan=0.0, posinf=1e4, neginf=-1e4)
 
     @staticmethod
-    def _eval_unary(node: ASTNode, df: pd.DataFrame, regime: int, n: int) -> np.ndarray:
-        child = ASTEvaluator.eval_node(node.children[0], df, regime) if node.children else np.zeros(n)
+    def _eval_binary_rolling(node: ASTNode, df: pd.DataFrame, n: int) -> np.ndarray:
+        l = ASTEvaluator.eval_node(node.children[0], df) if node.children else np.zeros(n)
+        r = ASTEvaluator.eval_node(node.children[1], df) if len(node.children) > 1 else np.zeros(n)
+        if node.op == "TS_CORR_20":
+            return _fast_ts_corr(l, r, w=20)
+        return np.zeros(n, dtype=np.float64)
+
+    @staticmethod
+    def _eval_unary(node: ASTNode, df: pd.DataFrame, n: int) -> np.ndarray:
+        child = ASTEvaluator.eval_node(node.children[0], df) if node.children else np.zeros(n)
         if node.op == "SIGN": res = np.sign(child)
         elif node.op == "ABS": res = np.abs(child)
         elif node.op == "LOG_ABS": res = np.log1p(np.abs(child))
@@ -295,15 +310,20 @@ class ASTEvaluator:
         elif node.op == "EXP_SAFE": res = np.exp(np.clip(child, -20.0, 20.0))
         elif node.op == "LOG_SAFE": res = np.log(np.maximum(1e-8, np.abs(child)))
         elif node.op == "NEG": res = -child
+        elif node.op == "SQRT_ABS": res = np.sign(child) * np.sqrt(np.abs(child))
         else: res = np.zeros(n)
         res = np.clip(res, -1e4, 1e4)
         return np.nan_to_num(res, nan=0.0, posinf=1e4, neginf=-1e4)
 
     @staticmethod
-    def _eval_rolling(node: ASTNode, df: pd.DataFrame, regime: int, n: int) -> np.ndarray:
-        child = ASTEvaluator.eval_node(node.children[0], df, regime) if node.children else np.zeros(n)
+    def _eval_rolling(node: ASTNode, df: pd.DataFrame, n: int) -> np.ndarray:
+        child = ASTEvaluator.eval_node(node.children[0], df) if node.children else np.zeros(n)
         if node.op == "TS_RANK_20":
             return _fast_ts_rank_20(child)
+        if node.op == "TS_ZSCORE_20":
+            return _fast_ts_zscore(child, w=20)
+        if node.op == "TS_DECAY_LINEAR_10":
+            return _fast_ts_decay_linear(child, w=10)
         s = pd.Series(child)
         if node.op == "DELTA_5":
             res = s.diff(5).fillna(0.0).to_numpy()
@@ -317,95 +337,120 @@ class ASTEvaluator:
             res = np.zeros(n)
         return np.nan_to_num(res, nan=0.0)
 
-    @staticmethod
-    def _eval_cross_sectional(node: ASTNode, df: pd.DataFrame, regime: int, n: int) -> np.ndarray:
-        child = ASTEvaluator.eval_node(node.children[0], df, regime) if node.children else np.zeros(n)
-        if node.op == "CS_RANK":
-            return cs_rank(child)
-        elif node.op == "CS_DEMEAN":
-            return cs_demean(child)
-        return np.nan_to_num(child, nan=0.0)
-
 
 class TreeGenerator:
-    """Randomly generates AST expression trees with bounded depth."""
+    """Randomly generates dimensionally sound AST expression trees with bounded depth."""
+
+    @staticmethod
+    def infer_dimension(node: ASTNode) -> FeatureDimension:
+        """Infers the physical dimension of an AST node subtree."""
+        if node.op == "CONST":
+            return FeatureDimension.DIMENSIONLESS
+        if node.op == "FEATURE":
+            return FEATURE_DIMENSIONS.get(node.val, FeatureDimension.DIMENSIONLESS)
+        if node.op in ("DIV_SAFE", "TS_CORR_20", "TS_RANK_20", "TS_ZSCORE_20", "SIGMOID", "TANH", "SIGN"):
+            return FeatureDimension.DIMENSIONLESS
+        if node.op in ("ADD", "SUB") and node.children:
+            return TreeGenerator.infer_dimension(node.children[0])
+        if node.children:
+            return TreeGenerator.infer_dimension(node.children[0])
+        return FeatureDimension.DIMENSIONLESS
 
     @staticmethod
     def generate(
         max_depth: int = 4,
-        features: Optional[List[str]] = None,
-        active_regimes: Optional[Set[int]] = None,
+        target_dimension: FeatureDimension = FeatureDimension.DIMENSIONLESS,
         method: str = "grow"
     ) -> ASTNode:
-        feat_list = features if features is not None else STANDARD_FEATURES
-        regimes = active_regimes if active_regimes is not None else set(range(10))
+        """Generates an AST tree guaranteed to conform to target dimension."""
         if max_depth <= 1 or (method == "grow" and random.random() < 0.35):
-            if random.random() < 0.15:
+            # Pick a feature matching target dimension or a constant
+            matching_feats = [
+                f for f, dim in FEATURE_DIMENSIONS.items()
+                if dim == target_dimension
+            ]
+            if target_dimension == FeatureDimension.DIMENSIONLESS and random.random() < 0.25:
                 const_val = str(round(random.uniform(-2.0, 2.0), 2))
-                return ASTNode("CONST", const_val, regimes)
-            return ASTNode("FEATURE", random.choice(feat_list), regimes)
+                return ASTNode("CONST", const_val)
+            if matching_feats:
+                return ASTNode("FEATURE", random.choice(matching_feats))
+            return ASTNode("CONST", "1.0")
 
-        op = random.choice(OPERATORS_BINARY + OPERATORS_UNARY + OPERATORS_ROLLING)
-        num_children = 2 if op in OPERATORS_BINARY else 1
-        children = [
-            TreeGenerator.generate(max_depth - 1, feat_list, regimes, method)
-            for _ in range(num_children)
-        ]
-        return ASTNode(op, active_regimes=regimes, children=children)
+        # Select compatible operator
+        if target_dimension == FeatureDimension.DIMENSIONLESS:
+            op_choices = (
+                OPERATORS_BINARY_ARITHMETIC + OPERATORS_BINARY_ROLLING +
+                OPERATORS_UNARY + OPERATORS_ROLLING_UNARY + OPERATORS_TERNARY
+            )
+            op = random.choice(op_choices)
+        else:
+            op = random.choice(("ADD", "SUB", "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10"))
+
+        if op == "BLEND":
+            cond = TreeGenerator.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
+            a = TreeGenerator.generate(max_depth - 1, target_dimension, method)
+            b = TreeGenerator.generate(max_depth - 1, target_dimension, method)
+            return ASTNode("BLEND", children=[cond, a, b])
+
+        if op in OPERATORS_BINARY_ROLLING:
+            a = TreeGenerator.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
+            b = TreeGenerator.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
+            return ASTNode(op, children=[a, b])
+
+        if op in OPERATORS_BINARY_ARITHMETIC:
+            if op == "DIV_SAFE":
+                # Price / Price or Dim / Dim -> Dimensionless
+                dim_choice = random.choice([FeatureDimension.PRICE, FeatureDimension.DIMENSIONLESS])
+                left = TreeGenerator.generate(max_depth - 1, dim_choice, method)
+                right = TreeGenerator.generate(max_depth - 1, dim_choice, method)
+                return ASTNode("DIV_SAFE", children=[left, right])
+            else:
+                left = TreeGenerator.generate(max_depth - 1, target_dimension, method)
+                right = TreeGenerator.generate(max_depth - 1, target_dimension, method)
+                return ASTNode(op, children=[left, right])
+
+        # Unary operations
+        child_dim = FeatureDimension.DIMENSIONLESS if op in ("TS_ZSCORE_20", "SIGMOID", "TANH") else target_dimension
+        child = TreeGenerator.generate(max_depth - 1, child_dim, method)
+        return ASTNode(op, children=[child])
 
 
 class GeneticMutator:
-    """Applies point, subtree, and epigenetic methylation mutations to an AST tree."""
+    """Applies point and subtree mutations respecting dimensional soundess."""
 
     @staticmethod
-    def mutate_subtree(
-        tree: ASTNode,
-        max_depth: int = 3,
-        features: Optional[List[str]] = None
-    ) -> ASTNode:
+    def mutate_subtree(tree: ASTNode, max_depth: int = 3) -> ASTNode:
         cloned = tree.clone()
         all_nodes = cloned.get_all_subnodes()
         target = random.choice(all_nodes)
-        sub = TreeGenerator.generate(max_depth, features, target.active_regimes)
+        target_dim = TreeGenerator.infer_dimension(target)
+        sub = TreeGenerator.generate(max_depth, target_dim)
         target.op, target.val, target.children = sub.op, sub.val, sub.children
         return cloned
 
     @staticmethod
-    def mutate_point(
-        tree: ASTNode,
-        features: Optional[List[str]] = None
-    ) -> ASTNode:
-        """Mutates a single node operator or feature without replacing subtree."""
+    def mutate_point(tree: ASTNode) -> ASTNode:
+        """Mutates a single node operator or feature without breaking arity."""
         cloned = tree.clone()
-        feat_list = features if features is not None else STANDARD_FEATURES
         target = random.choice(cloned.get_all_subnodes())
         if target.op == "FEATURE":
-            target.val = random.choice(feat_list)
+            current_dim = FEATURE_DIMENSIONS.get(target.val, FeatureDimension.DIMENSIONLESS)
+            candidates = [f for f, d in FEATURE_DIMENSIONS.items() if d == current_dim]
+            if candidates:
+                target.val = random.choice(candidates)
         elif target.op == "CONST":
             target.val = str(round(random.uniform(-2.0, 2.0), 2))
-        elif target.op in OPERATORS_BINARY:
-            target.op = random.choice(OPERATORS_BINARY)
+        elif target.op in OPERATORS_BINARY_ARITHMETIC:
+            target.op = random.choice(OPERATORS_BINARY_ARITHMETIC)
         elif target.op in OPERATORS_UNARY:
             target.op = random.choice(OPERATORS_UNARY)
-        elif target.op in OPERATORS_ROLLING:
-            target.op = random.choice(OPERATORS_ROLLING)
-        return cloned
-
-    @staticmethod
-    def mutate_methylation(tree: ASTNode, num_regimes: int = 10) -> ASTNode:
-        """Epigenetic mutation toggling regime activation on a random subnode."""
-        cloned = tree.clone()
-        target = random.choice(cloned.get_all_subnodes())
-        r = random.randint(0, num_regimes - 1)
-        if r in target.active_regimes and len(target.active_regimes) > 1:
-            target.active_regimes.remove(r)
-        else:
-            target.active_regimes.add(r)
+        elif target.op in OPERATORS_ROLLING_UNARY:
+            target.op = random.choice(OPERATORS_ROLLING_UNARY)
         return cloned
 
 
 class GeneticCrossover:
-    """Performs genetic crossover with arity hardening to guarantee valid child ASTs."""
+    """Performs genetic crossover with strict arity hardening."""
 
     @staticmethod
     def crossover(parent1: ASTNode, parent2: ASTNode) -> Tuple[ASTNode, ASTNode]:
@@ -413,19 +458,23 @@ class GeneticCrossover:
         t1, t2 = random.choice(c1.get_all_subnodes()), random.choice(c2.get_all_subnodes())
         t1.op, t2.op = t2.op, t1.op
         t1.val, t2.val = t2.val, t1.val
-        t1.active_regimes, t2.active_regimes = set(t2.active_regimes), set(t1.active_regimes)
         t1.children, t2.children = [c.clone() for c in t2.children], [c.clone() for c in t1.children]
 
-        # Arity hardening to prevent deformed AST structures during chimeric swaps
+        # Arity hardening to prevent child count mismatches
         for node in (t1, t2):
-            if node.op in OPERATORS_BINARY:
+            if node.op == "BLEND":
+                while len(node.children) < 3:
+                    node.children.append(ASTNode("CONST", val="1.0"))
+                if len(node.children) > 3:
+                    node.children = node.children[:3]
+            elif node.op in OPERATORS_BINARY:
                 while len(node.children) < 2:
-                    node.children.append(ASTNode("CONST", val="1.0", active_regimes=set(node.active_regimes)))
+                    node.children.append(ASTNode("CONST", val="1.0"))
                 if len(node.children) > 2:
                     node.children = node.children[:2]
-            elif node.op in (OPERATORS_UNARY + OPERATORS_ROLLING + OPERATORS_CROSS_SECTIONAL):
+            elif node.op in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY):
                 if len(node.children) == 0:
-                    node.children.append(ASTNode("CONST", val="1.0", active_regimes=set(node.active_regimes)))
+                    node.children.append(ASTNode("CONST", val="1.0"))
                 elif len(node.children) > 1:
                     node.children = node.children[:1]
             elif node.op in ("FEATURE", "CONST"):
