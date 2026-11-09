@@ -846,3 +846,14 @@ class NoCacheStaticFiles(StaticFiles):
 static_dir = os.path.join(os.path.dirname(__file__), "static")
 if os.path.exists(static_dir):
     app.mount("/", NoCacheStaticFiles(directory=static_dir, html=True), name="static")
+
+
+def main() -> None:
+    """Launches the institutional FastAPI server on port 7860."""
+    import uvicorn
+    logger.info("[Cockpit] Starting Bio-Quant Alpha Cockpit on http://127.0.0.1:7860 ...")
+    uvicorn.run("src.ui.server:app", host="127.0.0.1", port=7860, reload=False)
+
+
+if __name__ == "__main__":
+    main()
