@@ -25,12 +25,16 @@
             --ag-header-foreground-color: #94a3b8;
             --ag-foreground-color: #e2e8f0;
         }
+        @media (max-width: 1440px) {
+            header.avionics-header { flex-wrap: wrap; gap: 8px; }
+            .telemetry-ribbon { overflow-x: auto; max-width: 100%; }
+        }
     </style>
 </head>
 <body x-data="cockpitApp()" class="min-h-screen flex flex-col overflow-hidden">
 
     <!-- Top Avionics HUD Ribbon -->
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between text-xs tracking-wider z-50">
+    <header class="avionics-header bg-slate-900 border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between text-xs tracking-wider z-50 gap-2">
         <div class="flex items-center space-x-3">
             <span class="text-blue-400 font-bold flex items-center gap-1.5 text-sm">
                 <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -50,7 +54,7 @@
         </div>
 
         <!-- Microsecond Telemetry Counters -->
-        <div class="flex items-center space-x-6 text-slate-300">
+        <div class="telemetry-ribbon flex items-center space-x-6 text-slate-300">
             <div>
                 <span class="text-slate-500">ASSET:</span>
                 <span class="font-bold text-blue-400" x-text="instrument">NIFTYBEES</span>
@@ -73,23 +77,37 @@
             </div>
         </div>
 
-        <!-- Controls: Sound & Emergency Action Buttons -->
+        <!-- Controls: Sound & Emergency Action Buttons (ADHD-40, ADHD-44, ADHD-46) -->
         <div class="flex items-center space-x-2">
+            <!-- Audio Subsystem & Arming Gate Indicator (ADHD-40) -->
+            <span id="audio-armed-pill"
+                  @click="window.cockpitAudio.armAudio()"
+                  class="text-[11px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 cursor-pointer animate-pulse"
+                  title="Click to arm Web Audio synthesizer">
+                🔈 CLICK TO ARM
+            </span>
             <button @click="toggleMute()"
                     class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
                     :title="isMuted ? 'Unmute Sound' : 'Mute Sound'">
                 <span x-text="isMuted ? '🔇 MUTED' : '🔊 AUDIO ON'"></span>
             </button>
-            <button @click="emergencyFreeze()"
-                    class="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-black font-bold border border-amber-400 transition"
-                    title="Stage 1: In-process atomic freeze (<0.5ms)">
-                ❄ FREEZE
-            </button>
-            <button @click="emergencyPanic()"
-                    class="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold border border-red-400 transition animate-pulse"
-                    title="Stage 2: Parallel async socket dispatch to 100% cash">
-                🚨 PANIC (100% CASH)
-            </button>
+
+            <!-- Visual Separation Barrier Protecting Against Misclick (ADHD-44) -->
+            <span class="h-5 w-[1px] bg-slate-700 mx-1"></span>
+
+            <!-- Segregated Emergency Intervention Zone (ADHD-44) -->
+            <div class="flex items-center space-x-1.5 p-1 rounded bg-red-950/40 border border-red-900/60">
+                <button @click="emergencyFreeze()"
+                        class="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-black font-bold border border-amber-400 transition"
+                        title="Stage 1: In-process atomic freeze (<0.5ms)">
+                    ❄ FREEZE
+                </button>
+                <button @click="emergencyPanic()"
+                        class="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold border border-red-400 transition"
+                        title="Stage 2: Parallel liquidation to 100% cash (Requires Confirmation)">
+                    🚨 PANIC (100% CASH)
+                </button>
+            </div>
         </div>
     </header>
 

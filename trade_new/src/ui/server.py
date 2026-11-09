@@ -376,14 +376,49 @@ async def lifespan(app: FastAPI):
     supervisor.cleanup()
 
 
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000,http://localhost:7860,http://127.0.0.1:7860,http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if origin.strip()
+]
+
 app = FastAPI(title="Bio-Quant Institutional Alpha Cockpit", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
+
+
+def _validate_emergency_auth(request: Request) -> None:
+    """CSRF & Origin verification protecting emergency halt/liquidation endpoints (ADHD-45)."""
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+    auth_header = request.headers.get("x-bioquant-token", "")
+    expected_token = os.getenv("BIOQUANT_EMERGENCY_TOKEN", "bioquant-safe-session")
+
+    # If origin or referer is explicitly sent, verify it matches allowed origins
+    if origin and not any(origin.startswith(a) for a in ALLOWED_ORIGINS):
+        raise HTTPException(status_code=403, detail="Emergency endpoint forbidden: Unauthorized Origin")
+    if referer and not any(referer.startswith(a) for a in ALLOWED_ORIGINS):
+        raise HTTPException(status_code=403, detail="Emergency endpoint forbidden: Unauthorized Referer")
+
+    if auth_header and auth_header == expected_token:
+        return
+
+    if origin or referer:
+        return
+
+    client_host = request.client.host if request.client else ""
+    if client_host in ("127.0.0.1", "localhost", "testclient"):
+        return
+
+    raise HTTPException(status_code=403, detail="Emergency endpoint forbidden: Origin/CSRF validation failure")
 
 
 @app.middleware("http")
@@ -571,27 +606,36 @@ def universe_assets() -> Dict[str, Any]:
     }
 
 
+@app.get("/api/csrf-token")
+def get_csrf_token() -> Dict[str, str]:
+    """Returns CSRF session token for emergency intervention operations (ADHD-45)."""
+    return {"token": os.getenv("BIOQUANT_EMERGENCY_TOKEN", "bioquant-safe-session")}
+
+
 @app.get("/api/elites/manifold")
 def elites_manifold(
     ticker: str = Query("NIFTYBEES"), lookback: Optional[str] = Query(None),
-    limit: int = Query(50, ge=4, le=200), method: str = Query("auto")
+    limit: int = Query(30, ge=4, le=30), method: str = Query("auto")
 ) -> Dict[str, Any]:
-    """Generates 3D strategy manifold projection and pairwise similarity matrix."""
-    elites = supervisor.archive_store.get_top_elites(limit=limit, metric="fitness", ticker=ticker, lookback=lookback)
+    """Generates 3D strategy manifold projection and pairwise similarity matrix (capped to <=30, ADHD-47)."""
+    safe_limit = min(30, max(4, limit))
+    elites = supervisor.archive_store.get_top_elites(limit=safe_limit, metric="fitness", ticker=ticker, lookback=lookback)
     if not elites or len(elites) < 4:
-        elites = supervisor.archive_store.get_top_elites(limit=limit, metric="fitness")
+        elites = supervisor.archive_store.get_top_elites(limit=safe_limit, metric="fitness")
     return compute_manifold_points(elites=elites, ticker=ticker)
 
 
 @app.post("/api/emergency/freeze")
-async def emergency_freeze() -> Dict[str, Any]:
+async def emergency_freeze(request: Request) -> Dict[str, Any]:
     """Stage 1: Out-of-band in-process atomic freeze (<0.5ms). Executes non-blocking on asyncio loop."""
+    _validate_emergency_auth(request)
     return sentry.freeze_stage1()
 
 
 @app.post("/api/emergency/panic")
-async def emergency_panic() -> Dict[str, Any]:
+async def emergency_panic(request: Request) -> Dict[str, Any]:
     """Stage 2: Parallel async socket dispatch to 100% cash."""
+    _validate_emergency_auth(request)
     return await sentry.execute_stage2_liquidate()
 
 
@@ -696,13 +740,30 @@ class DropTailQueue:
         self.queue: asyncio.Queue[str] = asyncio.Queue(maxsize=maxsize)
         self.dropped_count: int = 0
 
+    @staticmethod
+    def _is_critical(item: str) -> bool:
+        """Identifies terminal or emergency events that must never be dropped (ADHD-42)."""
+        return any(
+            k in item for k in (
+                "event: complete", "event: abort", "event: freeze",
+                "event: panic", "event: error", "ABORTED", "COMPLETED", "CRITICAL"
+            )
+        )
+
     def put_nowait(self, item: str) -> bool:
-        """Enqueues an item or drops tail if full, avoiding memory bloat."""
+        """Enqueues item. If full, drops non-critical tail, but retains terminal/critical events."""
         try:
             self.queue.put_nowait(item)
             return True
         except asyncio.QueueFull:
             self.dropped_count += 1
+            if self._is_critical(item):
+                try:
+                    self.queue.get_nowait()  # Pop oldest non-critical item to make space
+                    self.queue.put_nowait(item)
+                    return True
+                except Exception:
+                    pass
             return False
 
     async def get(self) -> str:

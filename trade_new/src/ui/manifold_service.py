@@ -102,6 +102,10 @@ def compute_manifold_points(elites: List[Dict[str, Any]], ticker: str) -> Dict[s
     if not elites or len(elites) < 2:
         return empty_res
 
+    # ADHD-47: Cap to top 30 champions to prevent browser UI freeze and quadratic matrix overhead
+    if len(elites) > 30:
+        elites = sorted(elites, key=lambda e: float(e.get("fitness", 0.0)), reverse=True)[:30]
+
     nodes, valids = parse_manifold_nodes(elites)
     n = len(valids)
     if n < 2:

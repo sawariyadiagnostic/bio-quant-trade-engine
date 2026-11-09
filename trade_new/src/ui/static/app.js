@@ -21,6 +21,7 @@ function cockpitApp() {
         populationSize: 100,
         randomSeed: null,
         isMuted: false,
+        csrfToken: 'bioquant-safe-session',
         activeTab: 'strategy', // 'strategy' | 'tactical' | 'manifold' | 'cosine' | 'leaderboard' | 'telemetry'
         deadManDisconnected: false,
         lastHeartbeat: Date.now(),
@@ -71,12 +72,21 @@ function cockpitApp() {
 
         init() {
             this.log("Avionics HUD initialized. Connecting telemetry bus...");
+            this.fetchCsrfToken();
             this.initGrid();
             this.connectSSE();
             this.startDeadManWatchdog();
             this.fetchUniverseAssets();
             this.fetchGridMatrix();
             this.fetchLeaderboard();
+        },
+
+        async fetchCsrfToken() {
+            try {
+                const res = await fetch('/api/csrf-token');
+                const data = await res.json();
+                if (data && data.token) this.csrfToken = data.token;
+            } catch (e) {}
         },
 
         log(msg, type = 'info') {
@@ -191,9 +201,22 @@ function cockpitApp() {
                 this.log(`New Elite Champion discovered: ${elite.formula_str || 'Alpha'} (Sharpe: ${elite.fitness?.toFixed(2)})`, 'success');
                 window.cockpitAudio.playEliteSound();
 
-                // Delta upsert to AG Grid virtualized table
+                // Delta upsert to AG Grid virtualized table (ADHD-43)
                 if (this.gridApi) {
-                    this.gridApi.applyTransactionAsync({ update: [elite] });
+                    const rowTicker = elite.ticker || this.instrument || 'ASSET';
+                    const rowR = elite.niche_row !== undefined ? elite.niche_row : (elite.row !== undefined ? elite.row : 0);
+                    const rowC = elite.niche_col !== undefined ? elite.niche_col : (elite.col !== undefined ? elite.col : 0);
+                    elite.ticker = rowTicker;
+                    elite.niche_row = rowR;
+                    elite.niche_col = rowC;
+                    const rowId = `${rowTicker}_${rowR}_${rowC}`;
+
+                    const existingNode = this.gridApi.getRowNode ? this.gridApi.getRowNode(rowId) : null;
+                    if (existingNode) {
+                        this.gridApi.applyTransactionAsync({ update: [elite] });
+                    } else {
+                        this.gridApi.applyTransactionAsync({ add: [elite] });
+                    }
                 }
 
                 // Incrementally paint cell in 20x20 Heatmap
@@ -662,7 +685,10 @@ function cockpitApp() {
             window.cockpitAudio.playPanicSound();
             this.log("EMERGENCY STAGE 1: Freezing all local outbounds (<0.5ms)...", 'error');
             try {
-                const res = await fetch('/api/emergency/freeze', { method: 'POST' });
+                const res = await fetch('/api/emergency/freeze', {
+                    method: 'POST',
+                    headers: { 'X-BioQuant-Token': this.csrfToken || 'bioquant-safe-session' }
+                });
                 const data = await res.json();
                 this.status = 'FROZEN';
                 this.log(`STAGE 1 FROZEN in ${data.elapsed_us?.toFixed(1)}us. SHM signaled: ${data.shm_signaled}`, 'error');
@@ -672,10 +698,18 @@ function cockpitApp() {
         },
 
         async emergencyPanic() {
+            // ADHD-44: Two-step confirmation latch protecting against catastrophic misclick
+            if (!confirm("⚠️ CONFIRM EMERGENCY PANIC LIQUIDATION?\n\nThis will trigger immediate atomic liquidation across all connected brokers to 100% cash.")) {
+                this.log("Panic liquidation aborted by operator.", "info");
+                return;
+            }
             window.cockpitAudio.playPanicSound();
             this.log("EMERGENCY STAGE 2: Dispatched parallel liquidation to 100% cash...", 'error');
             try {
-                const res = await fetch('/api/emergency/panic', { method: 'POST' });
+                const res = await fetch('/api/emergency/panic', {
+                    method: 'POST',
+                    headers: { 'X-BioQuant-Token': this.csrfToken || 'bioquant-safe-session' }
+                });
                 const data = await res.json();
                 this.status = 'PANICKED';
                 this.log(`STAGE 2 COMPLETE in ${data.elapsed_ms?.toFixed(2)}ms. Orders cancelled: ${data.orders_cancelled_count}, Positions closed: ${data.positions_liquidated_count}`, 'error');
