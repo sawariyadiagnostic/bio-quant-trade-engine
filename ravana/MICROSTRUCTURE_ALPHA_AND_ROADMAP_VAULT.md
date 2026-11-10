@@ -165,6 +165,103 @@ What drives the overnight price gap of Indian ETFs while the NSE is closed?
 
 ---
 
+## 2.5 "How a Quant Thinks": The 16 Models, Where They Break & How RAVANA Validates Them
+
+Every statistical, econometric, machine learning, and execution model has structural blind spots. Before deploying any formula or sub-engine in RAVANA, it must be audited against its known breakdown point:
+
+| # | Category | Model | Core Mathematical Formulation | Where It Breaks (Failure Modes) | Institutional Validation Protocol in RAVANA |
+|:--|:---|:---|:---|:---|:---|
+| **01** | Forecast | **OLS / Factor Regression** | $r_t = \alpha + \beta^T F_t + \epsilon_t$ | Outliers, collinear factors, and sudden macro regime shifts break static betas. | Out-of-Sample $R^2$, Newey-West robust standard errors, rolling adaptive beta stability tests. |
+| **02** | Forecast | **Elastic Net Regularization** | $\min \left( \|y - X\beta\|^2 + \lambda_1 \|\beta\|_1 + \lambda_2 \|\beta\|_2^2 \right)$ | Regularization bias; tuning $\lambda_1, \lambda_2$ across the full sample leaks future distribution info. | Nested, strictly purged walk-forward cross-validation for hyperparameter tuning. |
+| **03** | Forecast | **GARCH(1,1) Volatility** | $\sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2$ | Slow adaptation after sudden volatility jumps; symmetric shocks miss asymmetric leverage effects. | Ljung-Box test on standardized residuals, QLIKE loss function, Kupiec VaR exceedance tests. |
+| **04** | Forecast | **Kalman Filter State Estimator** | $x_t = F x_{t-1} + w_t \;;\; y_t = H x_t + v_t$ | Assumes Gaussian innovations; sensitive to arbitrary tuning of covariance matrices $Q$ and $R$. | Innovation whiteness validation, Out-of-Sample residual stationarity checks. |
+| **05** | Structure & Risk | **Cointegration Pairs & Tracking Spread** | $z_t = \frac{\text{Spread}_t - \mu_t}{\sigma_t}$ | Economic relationships can break permanently due to basket reweighting or structural AMC changes. | Out-of-Sample Augmented Dickey-Fuller (ADF) test, Ornstein-Uhlenbeck half-life stability, multiple-testing penalty. |
+| **06** | Structure & Risk | **Hidden Markov Model (HMM) Regimes** | $P(S_t = j \mid S_{t-1} = i) = A_{ij}$ | Lagging state transitions; state flipping instability; lookahead leakage if using smoothed probabilities. | **Filtered probabilities only** (point-in-time causal), Out-of-Sample regime persistence duration checks. |
+| **07** | Structure & Risk | **Principal Component Analysis (PCA)** | $\Sigma = V \Lambda V^T$ | Eigenvectors unstable across market crises; statistical factors lack clean economic interpretation. | Rolling window eigenvector stability, Out-of-Sample risk bias tests, Hierarchical Risk Parity (HRP) clustering. |
+| **08** | Structure & Risk | **Value at Risk (VaR) & Expected Shortfall (ES)** | $\text{ES} = \mathbb{E}[\text{Loss} \mid \text{Loss} \ge \text{VaR}_\alpha]$ | Normal distribution assumptions underestimate fat tails; historical VaR assumes past spans all futures. | Kupiec proportion-of-failures test, Christoffersen independence test, extreme value theory (EVT). |
+| **09** | Structure & Risk | **Mean-Variance Optimization (Markowitz)** | $\max \; w^T \mu - \frac{\lambda}{2} w^T \Sigma w$ | "Error maximizer" — places extreme, unfeasible weights on noisy estimated expected returns $\mu$. | Realized vs forecast portfolio volatility, shrinkage estimators (Ledoit-Wolf), strict turnover caps. |
+| **10** | Structure & Risk | **Risk Parity & Hierarchical Risk Parity** | $w_i (\Sigma w)_i = \text{constant} \quad \forall i$ | Needs high leverage on low-vol assets; highly sensitive to rising interest rate environments. | Realized risk contributions vs target parity, stress drawdowns under historic rate hikes. |
+| **11** | Build & Price | **Black-Scholes Options Model** | $C = S \cdot N(d_1) - K e^{-rT} N(d_2)$ | Ignores volatility skew/smile, jumps, discrete dividends, and transaction costs. | Calibrate against live Implied Volatility surface, put-call parity arbitrage bounds, hedging P&L attribution. |
+| **12** | Build & Price | **Monte Carlo Engine** | $V = e^{-rT} \mathbb{E}[\text{Payoff}] \approx \frac{1}{N} \sum \text{Path}$ | Computationally heavy; convergence error shrinks slowly at $O(1/\sqrt{N})$; path drift misspecification. | Standard error confidence bounds, variance reduction (antithetic variates), synthetic market stress generator. |
+| **13** | ML & Execution | **Gradient Boosted Trees (XGB/LGBM)** | $\hat{y} = \sum \eta \cdot h_m(x), \text{ fit to gradients}$ | Highly prone to memorizing low signal-to-noise financial noise; splits overfit regime edges. | Purged K-fold cross-validation with embargo, Deflated Sharpe Ratio, feature importance permutation stability. |
+| **14** | ML & Execution | **LSTMs & Transformers** | $\text{Sequence} \to \text{Attention / Recurrent Gates}$ | Extreme parameter count overfits small financial time series; black-box opacity; compute heavy. | Causal walk-forward evaluation, multiple seed ensembles, ablation studies, cost-adjusted net P&L. |
+| **15** | ML & Execution | **Reinforcement Learning (RL)** | $\max \mathbb{E}\left[\sum \gamma^t r_t\right]$ | Severe "sim-to-real" gap; reward hacking; unviable policies in non-stationary market regimes. | Limit order book simulation with queue priority, implementation shortfall vs TWAP/VWAP, out-of-regime testing. |
+| **16** | ML & Execution | **Almgren-Chriss Optimal Execution** | $\min \mathbb{E}[\text{Cost}] + \lambda \cdot \text{Var}(\text{Cost})$ | Linear permanent/temporary impact assumptions break down during flash crashes and liquidity vacuums. | Implementation shortfall measured against arrival price, dynamic recalibration of market impact parameter $\eta$. |
+
+> **The Golden Law of Institutional Backtesting:**  
+> *"Before trusting any backtest: Purged K-Fold + Embargo · Walk-Forward Validation · Deflated Sharpe Ratio (DSR) & Probability of Backtest Overfitting (PBO) · Statutory Costs, Bid-Ask Spread & Flat Ticket Fees · Zero Look-Ahead · Synthetic Stress Tests."*
+
+---
+
+## 2.6 The Self-Improving System Closed-Loop Architecture (The 7-Step Engine)
+
+Edges decay over time because markets adapt. A static trading system dies slowly. RAVANA adopts the **7-Step Closed-Loop Autonomous Evolution Architecture**, ensuring continuous adaptation without live instability:
+
+```mermaid
+flowchart TD
+    S1["Step 1: LOG<br/>Fill + Full Market Context Vector"] --> S2["Step 2: MEASURE<br/>Live vs Backtest Drift Band & Regime Attribution"]
+    S2 --> S3["Step 3: DIAGNOSE<br/>Identify Where It Bleeds (VIX, Time-of-Day, Spreads)"]
+    S3 --> S4["Step 4: HYPOTHESIZE<br/>AI Breeds Challenger v1.1 (ONE Atomic Mutation)"]
+    S4 --> S5["Step 5: TEST<br/>Purged Walk-Forward & Parameter Stability (±20%)"]
+    S5 --> S6["Step 6: APPROVE<br/>Hurdle Rules (ΔSharpe ≥ 100bps, Max DD ≤ Champion) + Sign-Off"]
+    S6 --> S7["Step 7: DEPLOY<br/>Staged Allocation: Shadow (0%) → Small (20%) → Full (100%)"]
+    S7 -->|Compounding Feedback Loop| S1
+
+    style S1 fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#fff
+    style S4 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
+    style S6 fill:#1e293b,stroke:#22c55e,stroke-width:2px,color:#fff
+```
+
+### The 7 Discrete Operational Steps:
+1. **Step 01 / 07: Log Everything (`Contextual Execution Ledger`):**
+   * Do not just log timestamp, ticker, and filled price.
+   * Log the **Full Context Vector** surrounding the fill: `India_VIX`, `Rolling_Beta`, `Basis_Bps`, `VWAP_Drift`, `Quoted_Spread`, `Trend_Regime`, `Synthetic_Ratio`, and `Time_of_Day`.
+2. **Step 02 / 07: Measure Honestly (`Live vs. Backtest Drift Monitor`):**
+   * Continuous statistical tracking of live returns vs. simulated backtest distributions.
+   * If live P&L falls outside the **95% confidence drift band**, or slippage exceeds backtest modeled slippage, flag strategy degradation.
+   * Attribute net P&L across discrete market regimes (Low VIX vs High VIX; Bull Trend vs Range).
+3. **Step 03 / 07: Diagnose Weak Spots (`Automated Attribution Engine`):**
+   * Identify exact bleeding points: e.g., "Strategy loses money on days when India VIX > 18" or "Stops get hit prematurely during the 09:15–09:30 morning auction widenings".
+4. **Step 04 / 07: Hypothesize (`The Challenger Mutation Protocol`):**
+   * The genetic engine / AI proposes a **Challenger Strategy v1.1** with **ONE ATOMIC CHANGE ONLY**:
+     * Example Fix A: Replace fixed percentage stop with $2.0 \times \text{ATR}_{14}$ trailing stop.
+     * Example Fix B: Add market regime gate: `Skip trade if India VIX > 20.0`.
+     * Example Fix C: Postpone morning entry by 5 minutes (`09:20 IST` instead of `09:15 IST`) to bypass auction uncrossing spread spikes.
+5. **Step 05 / 07: Test & Idea Graveyard (`Purged OOS & Stability Gate`):**
+   * Most candidate hypotheses must fail here.
+   * **Parameter Stability Test:** Perturb all parameters by $\pm 20\%$. If performance collapses, the candidate is rejected as an overfit cliff edge.
+   * **Idea Graveyard:** Failed hypotheses are permanently logged with their failure fingerprints to prevent the system from endlessly retrying identical bad mutations.
+6. **Step 06 / 07: Approve (`The Quantitative Promotion Gate`):**
+   * A Challenger is promoted to Champion **ONLY IF** it meets strict mathematical hurdle criteria:
+     * $\Delta \text{Sharpe} \ge +1.00$ (+100 bps) improvement over current Champion.
+     * Tested across $\ge 100$ independent out-of-sample trades.
+     * $\text{Max Drawdown} \le \text{Champion Max Drawdown}$.
+     * Positive Deflated Sharpe Ratio ($DSR > 0.95$).
+     * Formal Human Sign-Off (Go / No-Go).
+7. **Step 07 / 07: Deploy Small, Roll Back Fast (`Staged Capital Ramp`):**
+   * Never deploy a new version to 100% capital immediately.
+   * **Staged Stance:** `Shadow Mode (0% capital, real-time logging)` $\to$ `Small (20% capital)` $\to$ `Half (50% capital)` $\to$ `Full (100% capital)`.
+   * **One-Click Instant Rollback:** If live drift band breaches 2 standard deviations during rollout, the engine instantly drops capital back to Champion v1.0.
+
+> **The Sovereign Rule:** **NEVER REWRITES ITSELF LIVE.**  
+> Every algorithmic change is offline-tested, version-controlled in Git, parameter-stabilized, and cryptographically signed. No unvetted runtime self-modifications.
+
+---
+
+## 2.7 The 2027 Institutional Quant Data & Tooling Stack
+
+To ensure RAVANA remains sovereign without incurring \$50,000/year terminal licenses, the engine interfaces directly with the highest-tier free/open-access quantitative ecosystem:
+
+| Domain | Institutional Paid Benchmark (\$10K–\$90K/yr) | RAVANA Sovereign Free Stack (\$0/yr) | Architectural Utilization in RAVANA |
+|:---|:---|:---|:---|
+| **Market Data** | Bloomberg Terminal, Refinitiv Eikon, FactSet | **Yahoo! Finance + FRED API + NSE Official APIs + OpenBB** | Primary multi-asset lake (Muscles 3–6); interest rate & yield curve integration via FRED. |
+| **Macro Valuation** | Wall Street Prep, S&P Capital IQ | **Aswath Damodaran (NYU Stern Data Library)** | Country risk premiums, equity risk premiums (ERP), historical sector betas for macro regime priors. |
+| **Scientific Compute** | MATLAB, Mathematica, Stata | **Python 3.11+ · PyTorch (CUDA) · NumPy · Pandas · Polars** | Vectorized GPU tensor engine (Muscle 2); columnar Parquet storage (Muscle 6). |
+| **Mathematical Validation**| Proprietary In-House Math Engines | **MIT OpenCourseWare · Project Euler · 3Blue1Brown Linear Algebra** | Mathematical invariant proofs; algorithmic optimization; graph theory and combinatorial algorithms. |
+| **Machine Learning & AI** | Enterprise ML Platforms (DataRobot, AWS SageMaker) | **Fast.ai · Hugging Face · PyTorch Lightning · Scikit-Learn** | Symbolic AST generation, genetic evolution (Muscle 9), deep reinforcement learning validation. |
+
+---
+
 ## 3. Master Chronological Improvement & Implementation Log
 
 ### Phase 0: Foundations & Domain AST (Muscle 1) — 100% Complete
@@ -194,13 +291,41 @@ What drives the overnight price gap of Indian ETFs while the NSE is closed?
 - [ ] **Memory-Mapped Parquet Queries:** Zero-copy columnar slicing for Muscle 7 feature engineering.
 
 ### Muscle 7: Market Vocabulary Feature Matrix Engine (`ravana/features/`)
-- [ ] **21 Standard Features:** Compute stationary z-scored technical indicators (`VWAP`, `ATR_14`, `VOLATILITY_20`, `RET_1`, `RET_5`, `VOLUME_ZSCORE`, `HIGH_LOW_SPREAD`).
-- [ ] **Macro Inter-Market Features:** Overnight US return ($R_{\text{SP500}}$), VIX delta ($\Delta \text{VIX}$), Brent Crude momentum, and ETF tracking spread ($\text{Spread}_{\text{iNAV}}$).
+- [ ] **21 Standard Stationary Features:** Compute strictly stationary z-scored technical indicators (`VWAP_DRIFT`, `ATR_14_NORM`, `VOLATILITY_20`, `LOG_RET_1`, `LOG_RET_5`, `VOLUME_ZSCORE_LAGGED`, `NORMALIZED_SPREAD`).
+- [ ] **Orthogonal Feature Clustering:** Apply Hierarchical Risk Parity (HRP) / PCA clustering to eliminate collinearity across moving averages.
+- [ ] **Macro Inter-Market Features:** Overnight US return ($R_{\text{SP500}}$), VIX delta ($\Delta \text{VIX}$), USDINR return, Brent Crude momentum, and 10Y US Yield (`^TNX` / FRED).
+- [ ] **Cointegration & Regime Features:** Augmented Dickey-Fuller (ADF) stationarity and Ornstein-Uhlenbeck half-life on ETF spread; point-in-time HMM filtered regime probabilities (Low-Vol Trend, Mean-Reverting, Panic Gap).
 
-### Muscle 8: Target Builder & Execution Strategy Variations (`ravana/targets/`)
-- [ ] **Overnight Target Return:** $t \text{ [15:24 IST]} \to t+1 \text{ [09:16 IST]}$ minus 1.5 bps statutory cash delivery friction.
-- [ ] **Afternoon Intraday Target Return:** $t \text{ [14:00/14:30 IST]} \to t \text{ [15:24 IST]}$ (capturing mutual fund closing inflows without overnight risk).
-- [ ] **Hybrid Continuation Target:** Combined afternoon-to-morning holding window.
+### Muscle 8: Target Builder & Strategy Profiles (`ravana/targets/`)
+- [ ] **Profile B (Overnight ETF Delivery Target):** $t \text{ [15:24 IST]} \to t+1 \text{ [09:16 IST]}$ deducting 2.0 bps variable tax + ₹17 flat DP fee drag.
+- [ ] **Capital Viability Gate:** Enforce ₹2,00,000+ trade sizing threshold to ensure DP flat fee drag $< 1.0\text{ bp}$.
+- [ ] **Profile A (Afternoon Intraday Target):** $t \text{ [14:00/14:30 IST]} \to t \text{ [15:24 IST]}$ (capturing DII cash deployment with zero overnight risk).
+- [ ] **Profile D (Morning Momentum Continuation):** $t \text{ [09:15/09:20 IST]} \to t \text{ [09:45/10:00 IST]}$.
+
+### Muscle 9: Genetic Search & Challenger-Champion Mutation Engine (`ravana/genetic/`)
+- [ ] **The Challenger v1.1 Mutation Protocol:** Genetic search mutates ONE parameter or ONE structural AST node at a time against the incumbent Champion v1.0.
+- [ ] **Idea Graveyard:** Permanent hash ledger of rejected mutations to prevent redundant evaluations of dead hypotheses.
+
+### Muscle 10: Multi-Objective Fitness & Anti-Overfitting Gate (`ravana/fitness/`)
+- [ ] **Deflated Sharpe Ratio (DSR):** Discount observed Sharpe based on $N_{\text{trials}}$ (50,000 candidate evaluations) and non-Gaussian skewness/kurtosis (Marcos López de Prado).
+- [ ] **Benjamini-Hochberg FDR Control:** Statistical significance testing across multiple hypothesis trials.
+- [ ] **Parsimony Regularization:** Penalize tree bloat: $\text{Fitness} = \text{IC} - \lambda \cdot \text{NodeCount} - \gamma \cdot \text{Depth}$.
+
+### Muscle 11: Event-Driven Vectorized Backtester (`ravana/backtest/`)
+- [ ] **Order Book Half-Spread Crossing:** Model $P_{\text{fill}} = P_{\text{close}} + \frac{1}{2}\text{Spread}$ (+3 to 8 bps drag at 15:24:59).
+- [ ] **Opening Auction Volatility Penalty:** Model 15–30 bps slippage during 09:15–09:16 uncrossing.
+- [ ] **Volume Participation Cap:** Limit simulated fills to $\le 5\%$ of bar volume (Almgren-Chriss linear impact boundary).
+
+### Muscle 14: Walk-Forward Matrix & Overfitting Validation (`ravana/validation/`)
+- [ ] **Purged K-Fold with Embargo:** Purge overlapping label periods; embargo training samples immediately following test periods to eliminate autoregressive leakage.
+- [ ] **Parameter Stability Testing:** Perturb parameters by $\pm 20\%$; reject candidates that suffer performance cliff edges.
+- [ ] **Probability of Backtest Overfitting (PBO):** Compute Combinatorial Purged Cross-Validation (CPCV) distribution.
+
+### Muscle 16 & 20: The Self-Improving Production Loop & Execution Orchestrator
+- [ ] **Contextual Execution Ledger (Step 1):** Record execution fills alongside full market state vectors (`India_VIX`, `Rolling_Beta`, `Basis_Bps`, `VWAP_Drift`).
+- [ ] **Live vs. Backtest Drift Band (Step 2):** Real-time monitoring of live performance against the 95% simulated distribution band.
+- [ ] **Attribution & Diagnostic Engine (Step 3):** Diagnose P&L breakdown across VIX regimes and intraday times of day.
+- [ ] **Staged Capital Ramp (Step 7):** Deploy candidates through staged capital allocation (`Shadow 0%` $\to$ `Small 20%` $\to$ `Half 50%` $\to$ `Full 100%`) with One-Click Instant Rollback.
 
 ---
 
