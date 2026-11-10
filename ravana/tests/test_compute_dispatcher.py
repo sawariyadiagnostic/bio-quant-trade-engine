@@ -40,10 +40,18 @@ class TestComputeDispatcher(unittest.TestCase):
 
     def test_auto_dispatch_dataframe(self):
         ast = FormulaParser.parse("TS_CORR_20(Close, Volume) + BLEND(Vol_ZScore, High, Low)")
+        # Auto-dispatch routes to PyTorch on CUDA if GPU is available, or NumPy on CPU
         res = ComputeDispatcher.evaluate(ast, self.df, backend="auto")
-        self.assertIsInstance(res, np.ndarray)
+        self.assertTrue(isinstance(res, (np.ndarray, torch.Tensor)))
         self.assertEqual(len(res), self.T)
-        self.assertTrue(np.all(np.isfinite(res)))
+        is_finite = np.all(np.isfinite(res)) if isinstance(res, np.ndarray) else torch.all(torch.isfinite(res)).item()
+        self.assertTrue(is_finite)
+
+        # Explicit numpy backend always returns np.ndarray
+        res_np = ComputeDispatcher.evaluate(ast, self.df, backend="numpy")
+        self.assertIsInstance(res_np, np.ndarray)
+        self.assertEqual(len(res_np), self.T)
+        self.assertTrue(np.all(np.isfinite(res_np)))
 
     def test_auto_dispatch_tensor(self):
         mat = np.column_stack([self.df[col].to_numpy(dtype=np.float32) for col in STANDARD_FEATURES])
