@@ -66,7 +66,7 @@ class FeatureMatrixEngine:
 
         # 3. Volume & Microstructure
         v = df["Volume"]
-        vwap = df["VWAP"] if "VWAP" in df.columns else c
+        vwap = df["VWAP"] if "VWAP" in df.columns else self._compute_session_vwap(df)
         features[FeatureName.VOLUME_ZSCORE_LAGGED.value] = lagged_volume_zscore(
             v, self.config.volume_window, self.config.volume_lag
         )
@@ -110,8 +110,8 @@ class FeatureMatrixEngine:
             .std()
             .replace(0.0, np.nan)
         )
-        zscore = ((spread_bps - mean) / std).bfill().fillna(0.0).clip(-5.0, 5.0)
-        delta5 = (spread_bps - spread_bps.shift(self.config.spread_delta_window)).bfill().fillna(0.0)
+        zscore = ((spread_bps - mean) / std).fillna(0.0).clip(-5.0, 5.0)
+        delta5 = (spread_bps - spread_bps.shift(self.config.spread_delta_window)).fillna(0.0)
 
         features[FeatureName.SPREAD_BPS.value] = spread_bps
         features[FeatureName.SPREAD_ZSCORE_20.value] = zscore
@@ -123,28 +123,56 @@ class FeatureMatrixEngine:
         self, df: pd.DataFrame, features: Dict[str, pd.Series]
     ) -> None:
         """Compute normalized global macro drivers with fallback."""
-        # VIX
+        # VIX Level
         vix = self._find_column(df, ["Macro_VIX", "^VIX", "VIX", "INDIAVIX"])
         if vix is not None:
             features[FeatureName.MACRO_VIX_LEVEL.value] = np.log(
                 np.maximum(1.0, vix) / self.config.vix_baseline
             )
-            features[FeatureName.MACRO_VIX_RET_1.value] = log_returns(vix, 1)
         else:
             features[FeatureName.MACRO_VIX_LEVEL.value] = pd.Series(0.0, index=df.index)
+
+        # VIX Return (prefer causal inter-day return if present)
+        vix_ret = self._find_column(df, ["Macro_VIX_RET", "VIX_RET", "Macro_VIX_RET_1D"])
+        if vix_ret is not None:
+            features[FeatureName.MACRO_VIX_RET_1.value] = vix_ret.fillna(0.0)
+        elif vix is not None:
+            features[FeatureName.MACRO_VIX_RET_1.value] = log_returns(vix, 1)
+        else:
             features[FeatureName.MACRO_VIX_RET_1.value] = pd.Series(0.0, index=df.index)
 
-        # USDINR
-        usdinr = self._find_column(df, ["Macro_USDINR", "INR=X", "USDINR"])
-        features[FeatureName.MACRO_USDINR_RET_1.value] = (
-            log_returns(usdinr, 1) if usdinr is not None else pd.Series(0.0, index=df.index)
-        )
+        # USDINR Return
+        usdinr_ret = self._find_column(df, ["Macro_USDINR_RET", "USDINR_RET", "Macro_USDINR_RET_1D"])
+        if usdinr_ret is not None:
+            features[FeatureName.MACRO_USDINR_RET_1.value] = usdinr_ret.fillna(0.0)
+        else:
+            usdinr = self._find_column(df, ["Macro_USDINR", "INR=X", "USDINR"])
+            features[FeatureName.MACRO_USDINR_RET_1.value] = (
+                log_returns(usdinr, 1) if usdinr is not None else pd.Series(0.0, index=df.index)
+            )
 
-        # S&P 500
-        sp500 = self._find_column(df, ["Macro_SP500", "^GSPC", "SP500"])
-        features[FeatureName.MACRO_SP500_RET_1.value] = (
-            log_returns(sp500, 1) if sp500 is not None else pd.Series(0.0, index=df.index)
-        )
+        # S&P 500 Return
+        sp500_ret = self._find_column(df, ["Macro_SP500_RET", "SP500_RET", "Macro_SP500_RET_1D"])
+        if sp500_ret is not None:
+            features[FeatureName.MACRO_SP500_RET_1.value] = sp500_ret.fillna(0.0)
+        else:
+            sp500 = self._find_column(df, ["Macro_SP500", "^GSPC", "SP500"])
+            features[FeatureName.MACRO_SP500_RET_1.value] = (
+                log_returns(sp500, 1) if sp500 is not None else pd.Series(0.0, index=df.index)
+            )
+
+    @staticmethod
+    def _compute_session_vwap(df: pd.DataFrame) -> pd.Series:
+        """Calculate intraday cumulative session VWAP resetting each calendar day."""
+        if not isinstance(df.index, pd.DatetimeIndex) or "Volume" not in df.columns:
+            return df["Close"]
+        typical_price = (df["High"] + df["Low"] + df["Close"]) / 3.0
+        pv = typical_price * df["Volume"]
+        session_dates = df.index.normalize()
+        cum_pv = pv.groupby(session_dates).cumsum()
+        cum_vol = df["Volume"].groupby(session_dates).cumsum()
+        vwap = cum_pv / cum_vol.replace(0.0, np.nan)
+        return vwap.fillna(df["Close"])
 
     def _find_column(self, df: pd.DataFrame, candidates: List[str]) -> Optional[pd.Series]:
         """Find first matching column from list of candidate names."""
@@ -155,7 +183,7 @@ class FeatureMatrixEngine:
 
     def _sanitize_matrix(self, matrix: pd.DataFrame) -> pd.DataFrame:
         """Sanitize feature matrix to guarantee zero NaNs, Infs, and finite bounds."""
-        sanitized = matrix.bfill().ffill().fillna(0.0)
+        sanitized = matrix.ffill().fillna(0.0)
         if self.config.clip_outliers:
             bound = self.config.max_abs_feature_val
             sanitized = sanitized.clip(-bound, bound)

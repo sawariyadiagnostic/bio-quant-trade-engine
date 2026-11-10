@@ -146,6 +146,48 @@ class TestOvernightTargetBuilder(unittest.TestCase):
         entry_net_rets = targets.loc[targets["is_entry_bar"] == 1, "net_return"]
         self.assertTrue((entry_net_rets.abs() < 0.15).all())
 
+    def test_calendar_hold_days_weekend_risk(self) -> None:
+        """Verify Friday to Monday hold duration records 3 calendar days."""
+        fri = pd.date_range("2026-01-09 09:15", "2026-01-09 15:25", freq="5min", tz="Asia/Kolkata")
+        mon = pd.date_range("2026-01-12 09:15", "2026-01-12 15:25", freq="5min", tz="Asia/Kolkata")
+        all_dates = fri.append(mon)
+        df_weekend = pd.DataFrame(
+            {
+                "Open": np.full(len(all_dates), 100.0),
+                "High": np.full(len(all_dates), 100.5),
+                "Low": np.full(len(all_dates), 99.5),
+                "Close": np.full(len(all_dates), 100.0),
+                "Volume": np.full(len(all_dates), 1000.0),
+            },
+            index=all_dates,
+        )
+        builder = OvernightTargetBuilder()
+        targets = builder.build_targets(df_weekend)
+        self.assertIn("calendar_hold_days", targets.columns)
+        self.assertEqual(targets["calendar_hold_days"].iloc[74], 3)
+
+    def test_short_session_graceful_handling(self) -> None:
+        """Verify session shorter than offset requirement does not crash with IndexError."""
+        # 1-bar session followed by normal session
+        d1 = pd.date_range("2026-01-05 09:15", periods=1, freq="5min", tz="Asia/Kolkata")
+        d2 = pd.date_range("2026-01-06 09:15", periods=75, freq="5min", tz="Asia/Kolkata")
+        all_dates = d1.append(d2)
+        df_short = pd.DataFrame(
+            {
+                "Open": np.full(len(all_dates), 100.0),
+                "High": np.full(len(all_dates), 100.5),
+                "Low": np.full(len(all_dates), 99.5),
+                "Close": np.full(len(all_dates), 100.0),
+                "Volume": np.full(len(all_dates), 1000.0),
+            },
+            index=all_dates,
+        )
+        # Entry offset is 1 from end, but session only has 1 bar
+        builder = OvernightTargetBuilder(TargetConfig(entry_bar_offset_from_end=2))
+        targets = builder.build_targets(df_short)
+        self.assertEqual(len(targets), 76)
+        self.assertFalse(targets.isna().any().any())
+
 
 if __name__ == "__main__":
     unittest.main()

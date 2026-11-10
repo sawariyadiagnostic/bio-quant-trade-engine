@@ -36,10 +36,11 @@ class OvernightTargetBuilder:
         binary_labels = np.zeros(n, dtype=np.int32)
         is_entry_bar = np.zeros(n, dtype=np.int32)
         sample_weights = np.zeros(n, dtype=np.float64)
+        calendar_days = np.zeros(n, dtype=np.int32)
 
         if n < 2:
             return self._build_result_df(
-                df.index, gross_returns, net_returns, binary_labels, is_entry_bar, sample_weights
+                df.index, gross_returns, net_returns, binary_labels, is_entry_bar, sample_weights, calendar_days
             )
 
         # Group by normalized date to identify distinct trading sessions
@@ -63,17 +64,22 @@ class OvernightTargetBuilder:
                 else float(df["Close"].iloc[exit_idx])
             )
 
-            gross_ret = (exit_price - entry_close) / max(1e-4, entry_close)
+            if not np.isfinite(entry_close) or not np.isfinite(exit_price) or entry_close <= 0.0 or exit_price <= 0.0:
+                continue
+
+            gross_ret = (exit_price - entry_close) / entry_close
             net_ret = self.friction_model.apply_friction(gross_ret, self.config.capital_inr)
+            days_held = max(1, (pd.Timestamp(next_date) - pd.Timestamp(curr_date)).days)
 
             gross_returns[entry_idx] = gross_ret
             net_returns[entry_idx] = net_ret
             binary_labels[entry_idx] = 1 if net_ret >= hurdle_frac else 0
             is_entry_bar[entry_idx] = 1
             sample_weights[entry_idx] = 1.0
+            calendar_days[entry_idx] = days_held
 
         return self._build_result_df(
-            df.index, gross_returns, net_returns, binary_labels, is_entry_bar, sample_weights
+            df.index, gross_returns, net_returns, binary_labels, is_entry_bar, sample_weights, calendar_days
         )
 
     def _get_session_pair_indices(
@@ -83,11 +89,13 @@ class OvernightTargetBuilder:
         curr_locs = np.where(session_dates == curr_date)[0]
         next_locs = np.where(session_dates == next_date)[0]
 
-        if len(curr_locs) == 0 or len(next_locs) == 0:
+        req_curr = 1 + self.config.entry_bar_offset_from_end
+        req_next = 1 + self.config.exit_bar_offset_from_start
+        if len(curr_locs) < req_curr or len(next_locs) < req_next:
             return None, None
 
-        entry_idx = curr_locs[-(1 + self.config.entry_bar_offset_from_end)]
-        exit_idx = next_locs[self.config.exit_bar_offset_from_start]
+        entry_idx = int(curr_locs[-req_curr])
+        exit_idx = int(next_locs[self.config.exit_bar_offset_from_start])
         return entry_idx, exit_idx
 
     def _build_result_df(
@@ -98,6 +106,7 @@ class OvernightTargetBuilder:
         binary_labels: np.ndarray,
         is_entry: np.ndarray,
         weights: np.ndarray,
+        calendar_days: np.ndarray,
     ) -> pd.DataFrame:
         """Package aligned outputs into an immutable target contract."""
         return pd.DataFrame(
@@ -107,6 +116,7 @@ class OvernightTargetBuilder:
                 "binary_label": binary_labels,
                 "is_entry_bar": is_entry,
                 "sample_weight": weights,
+                "calendar_hold_days": calendar_days,
             },
             index=index,
         )

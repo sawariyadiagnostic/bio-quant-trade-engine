@@ -8,7 +8,9 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+import numpy as np
 import pandas as pd
+import torch
 
 from ravana.data.cleaner import CleanerConfig, CleanedDataset, DataCleaningEngine
 from ravana.data.resampler import (
@@ -25,6 +27,8 @@ from ravana.data.ingestion import (
     IngestionConfig,
     MarketDataLoader,
 )
+from ravana.features import FeatureConfig, FeatureMatrixEngine
+from ravana.targets import TargetConfig, OvernightTargetBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +49,8 @@ class BatchPipelineRunner:
         self.m3_dir = self.lake_root / "m3_ingested"
         self.m4_dir = self.lake_root / "m4_cleaned"
         self.m5_dir = self.lake_root / "m5_resampled"
+        self.m7_dir = self.lake_root / "m7_features"
+        self.m8_dir = self.lake_root / "m8_targets"
         self.storage_config = StorageConfig(self.lake_root)
         self.lake_manager = LakeManager(self.storage_config)
         self.loader = MarketDataLoader()
@@ -62,6 +68,8 @@ class BatchPipelineRunner:
             self.m5_dir / "intraday_1h",
             self.m5_dir / "macro_1wk",
             self.m5_dir / "macro_1mo",
+            self.m7_dir / "intraday_5m",
+            self.m8_dir / "intraday_5m",
         ]:
             d.mkdir(parents=True, exist_ok=True)
 
@@ -326,41 +334,115 @@ class BatchPipelineRunner:
 
     def verify_lake(self) -> Dict[str, Any]:
         """Audit all persisted lake tiers and verify complete mathematical invariants."""
-        audit: Dict[str, Any] = {"m3_files": {}, "m4_files": {}, "m5_files": {}, "all_passed": True}
-
-        for p in self.m3_dir.rglob("*.parquet"):
-            df = pd.read_parquet(p)
-            audit["m3_files"][p.name] = {"bars": len(df), "columns": list(df.columns)}
-
-        for p in self.m4_dir.rglob("*.parquet"):
-            df = pd.read_parquet(p)
-            has_nan = bool(df.isna().any().any())
-            has_inf = bool(df.isin([float("inf"), float("-inf")]).any().any())
-            passed = (not has_nan) and (not has_inf)
-            if not passed:
-                audit["all_passed"] = False
-            audit["m4_files"][p.name] = {
-                "bars": len(df),
-                "has_nans": has_nan,
-                "has_infs": has_inf,
-                "passed": passed,
-            }
-
-        for p in self.m5_dir.rglob("*.parquet"):
-            df = pd.read_parquet(p)
-            has_nan = bool(df.isna().any().any())
-            has_inf = bool(df.isin([float("inf"), float("-inf")]).any().any())
-            passed = (not has_nan) and (not has_inf)
-            if not passed:
-                audit["all_passed"] = False
-            audit["m5_files"][f"{p.parent.name}/{p.name}"] = {
-                "bars": len(df),
-                "has_nans": has_nan,
-                "has_infs": has_inf,
-                "passed": passed,
-            }
-
+        audit: Dict[str, Any] = {"all_passed": True}
+        tiers = [
+            ("m3_files", self.m3_dir),
+            ("m4_files", self.m4_dir),
+            ("m5_files", self.m5_dir),
+            ("m7_files", self.m7_dir),
+            ("m8_files", self.m8_dir),
+        ]
+        for tier_name, tier_dir in tiers:
+            audit[tier_name] = {}
+            for p in tier_dir.rglob("*.parquet"):
+                df = pd.read_parquet(p)
+                has_nan = bool(df.isna().any().any())
+                has_inf = bool(df.isin([float("inf"), float("-inf")]).any().any())
+                passed = (not has_nan) and (not has_inf)
+                if not passed:
+                    audit["all_passed"] = False
+                key = f"{p.parent.name}/{p.name}" if tier_name == "m5_files" else p.name
+                audit[tier_name][key] = {"bars": len(df), "columns": len(df.columns), "passed": passed}
         return audit
+
+    def _enrich_intraday_for_m7(self, base: str, df_clean: pd.DataFrame) -> pd.DataFrame:
+        """Merge tracking spread analytics and causally lagged macro series into 5m dataframe."""
+        df = df_clean.copy()
+        spread_path = self.m4_dir / "intraday_5m" / f"{base}_spread.parquet"
+        if spread_path.exists():
+            df_spread = pd.read_parquet(spread_path)
+            for col in ["Theoretical_Close", "Spread_INR"]:
+                if col in df_spread.columns:
+                    df[col] = df_spread[col]
+
+        unique_dates = sorted(list(set(t.date() for t in df.index)))
+        bar_dates = pd.Series([t.date() for t in df.index], index=df.index)
+        macro_specs = [
+            ("VIX", "VIX.parquet", 20.0),
+            ("USDINR", "USDINR.parquet", 85.0),
+            ("SP500", "GSPC.parquet", 5000.0),
+        ]
+        for name, fname, default_v in macro_specs:
+            m_path = self.m3_dir / "daily_1d" / fname
+            if not m_path.exists():
+                continue
+            df_m = pd.read_parquet(m_path)
+            s = pd.Series(df_m["Close"].values, index=[t.date() for t in df_m.index]).sort_index()
+            s = s[~s.index.duplicated(keep="last")]
+            r = np.log(s / s.shift(1)).fillna(0.0)
+            lvl_map: Dict[Any, float] = {}
+            ret_map: Dict[Any, float] = {}
+            for d in unique_dates:
+                prior_s = s[s.index < d]
+                lvl_map[d] = float(prior_s.iloc[-1]) if len(prior_s) > 0 else default_v
+                prior_r = r[r.index < d]
+                ret_map[d] = float(prior_r.iloc[-1]) if len(prior_r) > 0 else 0.0
+            df[f"Macro_{name}"] = bar_dates.map(lvl_map)
+            df[f"Macro_{name}_RET"] = bar_dates.map(ret_map)
+        return df
+
+    def compute_and_persist_m7(self) -> Dict[str, Any]:
+        """Compute 21 stationary features for ETFs and multi-asset 3D tensor."""
+        manifest: Dict[str, Any] = {"features": {}}
+        engine = FeatureMatrixEngine(FeatureConfig())
+        etf_dfs: Dict[str, pd.DataFrame] = {}
+
+        for ticker in ["BANKBEES.NS", "NIFTYBEES.NS"]:
+            base = sanitize_filename(ticker)
+            clean_path = self.m4_dir / "intraday_5m" / f"{base}_clean.parquet"
+            if not clean_path.exists():
+                continue
+            df_clean = pd.read_parquet(clean_path)
+            df_enriched = self._enrich_intraday_for_m7(base, df_clean)
+            feat_df = engine.compute_feature_matrix(df_enriched, symbol=base)
+            out_path = self.m7_dir / "intraday_5m" / f"{base}_features.parquet"
+            self.lake_manager.upsert_engine.upsert(out_path, feat_df)
+            manifest["features"][base] = self._make_meta(ticker, feat_df, out_path)
+            etf_dfs[base] = df_enriched
+
+        if len(etf_dfs) >= 2:
+            tensor, symbols, feature_names, time_index = engine.compute_multi_asset_tensor(etf_dfs)
+            tensor_path = self.m7_dir / "multi_asset_features_3d.pt"
+            torch.save(
+                {
+                    "tensor": tensor,
+                    "symbols": symbols,
+                    "features": feature_names,
+                    "time_index": time_index,
+                },
+                tensor_path,
+            )
+            manifest["tensor_3d"] = {"shape": list(tensor.shape), "path": str(tensor_path)}
+
+        return manifest
+
+    def compute_and_persist_m8(self) -> Dict[str, Any]:
+        """Compute forward overnight economic targets and statutory delivery frictions."""
+        manifest: Dict[str, Any] = {"targets": {}}
+        builder = OvernightTargetBuilder(TargetConfig(capital_inr=200000.0))
+
+        for ticker in ["BANKBEES.NS", "NIFTYBEES.NS"]:
+            base = sanitize_filename(ticker)
+            clean_path = self.m4_dir / "intraday_5m" / f"{base}_clean.parquet"
+            if not clean_path.exists():
+                continue
+            df_clean = pd.read_parquet(clean_path)
+            target_df = builder.build_targets(df_clean)
+            out_path = self.m8_dir / "intraday_5m" / f"{base}_targets.parquet"
+            self.lake_manager.upsert_engine.upsert(out_path, target_df)
+            manifest["targets"][base] = self._make_meta(ticker, target_df, out_path)
+
+        return manifest
 
     def execute_all(self) -> Dict[str, Any]:
         """Execute full end-to-end ingestion, cleaning, and persistence pipeline."""
@@ -370,12 +452,18 @@ class BatchPipelineRunner:
         m4_res = self.clean_and_persist_m4()
         logger.info("Executing Muscle 5 Resampling...")
         m5_res = self.resample_and_persist_m5()
+        logger.info("Executing Muscle 7 Feature Matrix Extraction...")
+        m7_res = self.compute_and_persist_m7()
+        logger.info("Executing Muscle 8 Overnight Target Building...")
+        m8_res = self.compute_and_persist_m8()
         logger.info("Auditing Lake Integrity...")
         audit = self.verify_lake()
         return {
             "m3_manifest": m3_res,
             "m4_reports": m4_res,
             "m5_manifest": m5_res,
+            "m7_manifest": m7_res,
+            "m8_manifest": m8_res,
             "audit": audit,
         }
 

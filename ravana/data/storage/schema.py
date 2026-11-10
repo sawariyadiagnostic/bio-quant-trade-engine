@@ -15,6 +15,8 @@ class SeriesType(str, Enum):
     ETF_SPREAD = "etf_spread"
     MACRO_VIX = "macro_vix"
     MACRO_FX_YIELD = "macro_fx_yield"
+    FEATURES = "features"
+    TARGETS = "targets"
     GENERIC = "generic"
 
 
@@ -46,6 +48,10 @@ class LakeSchemaValidator:
 
         if {"Spread_INR", "Theoretical_Close"}.intersection(cols) or "SPREAD" in ticker_upper:
             return SeriesType.ETF_SPREAD
+        if {"gross_return", "net_return", "binary_label"}.issubset(cols):
+            return SeriesType.TARGETS
+        if {"LOG_RET_1", "ATR_14_NORM", "VOLATILITY_20"}.issubset(cols):
+            return SeriesType.FEATURES
         if "VIX" in ticker_upper:
             return SeriesType.MACRO_VIX
         if any(k in ticker_upper for k in ["USDINR", "YIELD", "10Y", "CRUDE", "BRENT"]):
@@ -88,6 +94,10 @@ class LakeSchemaValidator:
             cls._check_macro_vix(df, errors)
         elif series_type == SeriesType.MACRO_FX_YIELD:
             cls._check_macro_fx_yield(df, errors)
+        elif series_type == SeriesType.FEATURES:
+            cls._check_features(df, errors)
+        elif series_type == SeriesType.TARGETS:
+            cls._check_targets(df, errors)
 
         metadata = {
             "tier": tier,
@@ -211,3 +221,23 @@ class LakeSchemaValidator:
             for flag in ["Is_Synthetic", "Is_Spike"]:
                 if flag not in df.columns:
                     warnings.append(f"Quality flag '{flag}' missing in {tier} partition")
+
+    @staticmethod
+    def _check_features(df: pd.DataFrame, errors: List[str]) -> None:
+        """Verify feature matrix invariants: strictly non-empty, finite."""
+        if len(df.columns) == 0:
+            errors.append("Feature matrix has 0 columns")
+        non_finite = ~np.isfinite(df.values)
+        if non_finite.any():
+            errors.append(f"Feature matrix contains {non_finite.sum()} non-finite values")
+
+    @staticmethod
+    def _check_targets(df: pd.DataFrame, errors: List[str]) -> None:
+        """Verify target labels: binary bounds, non-negative sample weights."""
+        if "binary_label" in df.columns:
+            invalid_binary = ~df["binary_label"].isin([0, 1])
+            if invalid_binary.any():
+                errors.append(f"binary_label contains non-binary values ({invalid_binary.sum()} instances)")
+        if "sample_weight" in df.columns:
+            if (df["sample_weight"] < 0.0).any():
+                errors.append("sample_weight contains negative values")

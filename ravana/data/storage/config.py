@@ -23,6 +23,12 @@ class StorageConfig:
             "m3_ingested": "m3_ingested",
             "m4_cleaned": "m4_cleaned",
             "m5_resampled": "m5_resampled",
+            "m7": "m7_features",
+            "features": "m7_features",
+            "m7_features": "m7_features",
+            "m8": "m8_targets",
+            "targets": "m8_targets",
+            "m8_targets": "m8_targets",
         }
     )
     symbol_aliases: Dict[str, str] = field(
@@ -89,4 +95,8 @@ class StorageConfig:
         tier_norm = self.tier_map.get(tier.strip().lower(), tier.strip().lower())
         if tier_norm == "m4_cleaned":
             return tf_dir / f"{clean_ticker}_clean.parquet"
+        if tier_norm == "m7_features":
+            return tf_dir / f"{clean_ticker}_features.parquet"
+        if tier_norm == "m8_targets":
+            return tf_dir / f"{clean_ticker}_targets.parquet"
         return tf_dir / f"{clean_ticker}_{clean_tf}.parquet"

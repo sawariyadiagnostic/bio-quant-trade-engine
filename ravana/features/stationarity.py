@@ -31,11 +31,8 @@ class RollingADF:
             sub = values[t - self.window + 1 : t + 1]
             out[t] = self._estimate_adf_t_stat(sub)
 
-        # Backfill initial warmup with first valid estimate to eliminate NaNs
-        first_valid_idx = self.window - 1
-        if first_valid_idx < n:
-            out[:first_valid_idx] = out[first_valid_idx]
-
+        # Causal warmup: initial bars prior to full lookback window remain neutral 0.0
+        # Zero backward filling ensures strict temporal causality.
         return pd.Series(out, index=series.index, name="ADF_STAT")
 
     def _estimate_adf_t_stat(self, sub: np.ndarray) -> float:
@@ -64,8 +61,10 @@ class RollingADF:
         """Solve OLS regression and extract t-statistic with numerical stabilization."""
         try:
             xtx = x_mat.T @ x_mat
-            # Add small Tikhonov ridge for collinear/constant series
-            xtx_reg = xtx + np.eye(xtx.shape[0]) * 1e-8
+            # Add trace-scaled Tikhonov ridge for collinear/constant series
+            trace_val = float(np.trace(xtx))
+            ridge = 1e-8 * max(1.0, trace_val)
+            xtx_reg = xtx + np.eye(xtx.shape[0]) * ridge
             beta = np.linalg.solve(xtx_reg, x_mat.T @ y_vec)
             residuals = y_vec - x_mat @ beta
             n, p = x_mat.shape
@@ -106,16 +105,20 @@ class RollingOUHalfLife:
         safe_var = var.replace(0.0, np.nan)
         beta = cov / safe_var
 
-        # Mean reversion requires beta < 0: half_life = -ln(2) / ln(1 + beta) or -ln(2) / beta
-        # Continuous time approximation: half_life = -ln(2) / beta
+        # Mean reversion requires beta < 0 in Delta y_t = beta * y_{t-1}
+        # Discrete AR(1) representation: y_t = (1 + beta) * y_{t-1}
+        # Discrete half-life formula: -ln(2) / ln(1 + beta)
         hl = pd.Series(self.max_half_life, index=series.index, name="OU_HALF_LIFE")
-        valid_reverting = (beta < -1e-6) & (beta > -1.99)
+        
+        # 1. Standard discrete mean-reversion range: -1.0 < beta < -1e-6
+        std_reverting = (beta > -0.9999) & (beta < -1e-6)
+        hl[std_reverting] = -np.log(2.0) / np.log(1.0 + beta[std_reverting])
 
-        # For beta in (-1, 0), discrete half life is -ln(2) / ln(1 + beta)
-        # Using continuous OU form: -ln(2) / beta
-        hl[valid_reverting] = -np.log(2.0) / beta[valid_reverting]
+        # 2. Overshooting regime: beta <= -1.0 (mean crossed within <= 1 period)
+        overshooting = beta <= -0.9999
+        hl[overshooting] = self.min_half_life
 
-        # Apply bounds clipping
+        # Apply bounds clipping and strictly causal forward filling (zero bfill)
         hl = hl.clip(lower=self.min_half_life, upper=self.max_half_life)
-        hl = hl.ffill().bfill().fillna(self.max_half_life)
+        hl = hl.ffill().fillna(self.max_half_life)
         return hl

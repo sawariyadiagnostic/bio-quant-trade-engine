@@ -21,14 +21,14 @@ def log_returns(close: pd.Series, period: int = 1) -> pd.Series:
     c = close.astype(np.float64)
     c_prev = c.shift(period)
     ret = np.log(np.maximum(1e-8, c) / np.maximum(1e-8, c_prev))
-    return ret.bfill().fillna(0.0)
+    return ret.fillna(0.0)
 
 
 def realized_volatility(close: pd.Series, period: int = 20) -> pd.Series:
     """Compute rolling realized volatility of 1-bar log returns."""
     ret = log_returns(close, period=1)
     vol = ret.rolling(period, min_periods=period // 2).std()
-    return vol.bfill().fillna(0.0)
+    return vol.fillna(0.0)
 
 
 def parkinson_volatility(high: pd.Series, low: pd.Series, window: int = 20) -> pd.Series:
@@ -39,7 +39,7 @@ def parkinson_volatility(high: pd.Series, low: pd.Series, window: int = 20) -> p
     factor = 1.0 / (4.0 * np.log(2.0))
     squared_terms = factor * (log_hl**2)
     p_vol = np.sqrt(squared_terms.rolling(window, min_periods=window // 2).mean())
-    return p_vol.bfill().fillna(0.0)
+    return p_vol.fillna(0.0)
 
 
 def garman_klass_volatility(
@@ -62,7 +62,7 @@ def garman_klass_volatility(
     term2 = (2.0 * np.log(2.0) - 1.0) * (log_co**2)
     gk_variance = term1 - term2
     gk_vol = np.sqrt(np.maximum(0.0, gk_variance.rolling(window, min_periods=window // 2).mean()))
-    return gk_vol.bfill().fillna(0.0)
+    return gk_vol.fillna(0.0)
 
 
 def normalized_atr(
@@ -72,7 +72,7 @@ def normalized_atr(
     h = high.astype(np.float64)
     l = low.astype(np.float64)
     c = close.astype(np.float64)
-    c_prev = c.shift(1).bfill()
+    c_prev = c.shift(1).fillna(c.iloc[0] if len(c) > 0 else 0.0)
 
     tr1 = h - l
     tr2 = (h - c_prev).abs()
@@ -81,7 +81,7 @@ def normalized_atr(
 
     atr = true_range.rolling(window, min_periods=window // 2).mean()
     atr_norm = atr / np.maximum(1e-4, c)
-    return atr_norm.bfill().fillna(0.0)
+    return atr_norm.fillna(0.0)
 
 
 def vwap_drift(close: pd.Series, vwap: pd.Series) -> pd.Series:
@@ -100,7 +100,7 @@ def lagged_volume_zscore(volume: pd.Series, window: int = 20, lag: int = 1) -> p
     std = vol_lag.rolling(window, min_periods=window // 2).std().replace(0.0, np.nan)
 
     z = (vol_lag - mean) / std
-    return z.bfill().fillna(0.0).clip(-5.0, 5.0)
+    return z.fillna(0.0).clip(-5.0, 5.0)
 
 
 def relative_strength_index(close: pd.Series, window: int = 14) -> pd.Series:
@@ -116,7 +116,7 @@ def relative_strength_index(close: pd.Series, window: int = 14) -> pd.Series:
     rsi = 100.0 - (100.0 / (1.0 + rs))
     # Normalize from [0, 100] to [-1.0, 1.0]
     norm_rsi = (rsi - 50.0) / 50.0
-    return norm_rsi.bfill().fillna(0.0).clip(-1.0, 1.0)
+    return norm_rsi.fillna(0.0).clip(-1.0, 1.0)
 
 
 def bollinger_pct(close: pd.Series, window: int = 20, num_std: float = 2.0) -> pd.Series:
@@ -130,7 +130,7 @@ def bollinger_pct(close: pd.Series, window: int = 20, num_std: float = 2.0) -> p
     width = np.maximum(1e-4, upper - lower)
 
     pct_b = (c - lower) / width
-    return pct_b.bfill().fillna(0.5).clip(-0.5, 1.5)
+    return pct_b.fillna(0.5).clip(-0.5, 1.5)
 
 
 def macd_normalized(
@@ -144,7 +144,7 @@ def macd_normalized(
     signal_line = macd_line.ewm(span=signal, adjust=False).mean()
     hist = macd_line - signal_line
     norm_hist = hist / np.maximum(1e-4, c)
-    return norm_hist.bfill().fillna(0.0)
+    return norm_hist.fillna(0.0)
 
 
 def tracking_spread_bps(etf_close: pd.Series, theo_close: pd.Series) -> pd.Series:
@@ -152,4 +152,4 @@ def tracking_spread_bps(etf_close: pd.Series, theo_close: pd.Series) -> pd.Serie
     p_etf = etf_close.astype(np.float64)
     p_theo = theo_close.astype(np.float64)
     bps = (p_etf - p_theo) / np.maximum(1e-4, p_theo) * 10000.0
-    return bps.bfill().fillna(0.0)
+    return bps.fillna(0.0)
