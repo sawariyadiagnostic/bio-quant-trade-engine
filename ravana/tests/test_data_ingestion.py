@@ -167,6 +167,21 @@ class TestMarketDataLoader(unittest.TestCase):
             self.assertEqual(len(loaded), 3)
             self.assertEqual(str(loaded.index.tz), "Asia/Kolkata")
 
+    def test_macro_universe_auto_deduction(self) -> None:
+        """Verify IngestionConfig.create automatically deduces exchange profiles and timezones."""
+        cfg_bank = IngestionConfig.create("BANKBEES.NS")
+        self.assertEqual(cfg_bank.timezone, "Asia/Kolkata")
+        self.assertEqual(cfg_bank.market_open_time, "09:15:00")
+
+        cfg_sp500 = IngestionConfig.create("^GSPC")
+        self.assertEqual(cfg_sp500.timezone, "America/New_York")
+        self.assertEqual(cfg_sp500.market_open_time, "09:30:00")
+
+        cfg_fx = IngestionConfig.create("INR=X")
+        self.assertEqual(cfg_fx.timezone, "UTC")
+        self.assertEqual(cfg_fx.market_open_time, "00:00:00")
+
 
 if __name__ == "__main__":
     unittest.main()
+

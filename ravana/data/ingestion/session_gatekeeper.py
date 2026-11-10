@@ -94,11 +94,17 @@ class NSESessionGatekeeper:
         return df.loc[mask]
 
     def _filter_intraday_by_date(
-        self, df: pd.DataFrame, sessions: Dict[str, List[Tuple[str, str]]]
+        self,
+        df: pd.DataFrame,
+        sessions: Dict[str, List[Tuple[str, str]]],
+        market_open: Optional[str] = None,
+        market_close: Optional[str] = None,
     ) -> pd.DataFrame:
         """Filter intraday bars date-by-date adhering to special and regular session windows."""
         cleaned_groups = []
         inclusive_mode = "left" if self.label_convention == "left" else "right"
+        m_open = market_open or self.market_open
+        m_close = market_close or self.market_close
 
         for date_val, group in df.groupby(df.index.date):
             date_str = date_val.strftime("%Y-%m-%d")
@@ -114,10 +120,8 @@ class NSESessionGatekeeper:
             if date_val.weekday() >= 5:
                 continue
 
-            # Standard session: [09:15:00, 15:30:00) excludes synthetic 15:30:00 closing bar
-            reg = group.between_time(
-                self.market_open, self.market_close, inclusive=inclusive_mode
-            )
+            # Standard session: [market_open, market_close) excludes synthetic closing bar
+            reg = group.between_time(m_open, m_close, inclusive=inclusive_mode)
             cleaned_groups.append(reg)
 
         return pd.concat(cleaned_groups).sort_index() if cleaned_groups else pd.DataFrame(columns=df.columns)
@@ -128,19 +132,25 @@ class NSESessionGatekeeper:
         is_intraday: bool = True,
         filter_weekends_flag: bool = True,
         special_whitelist: Optional[List[str]] = None,
+        target_tz: Optional[str] = None,
+        market_open: Optional[str] = None,
+        market_close: Optional[str] = None,
     ) -> pd.DataFrame:
         """Enforce market hours, special session profiles, and weekend cleansing."""
         if df.empty:
             return df
 
-        df_std = self.standardize_timezone(df)
+        df_std = self.standardize_timezone(df, target_tz=target_tz)
         df_valid_days = self.filter_weekends(df_std, special_whitelist) if filter_weekends_flag else df_std
 
         if not is_intraday:
             return df_valid_days
 
         sessions = self.get_special_sessions(special_whitelist)
-        return self._filter_intraday_by_date(df_valid_days, sessions)
+        return self._filter_intraday_by_date(
+            df_valid_days, sessions, market_open=market_open, market_close=market_close
+        )
+
 
 
     def is_market_open(self, timestamp: pd.Timestamp) -> bool:

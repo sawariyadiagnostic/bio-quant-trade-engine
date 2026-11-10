@@ -102,7 +102,9 @@ class MarketDataLoader:
                 out[col] = pd.to_numeric(out[col], errors="coerce").astype(np.float64)
         return CandlestickSanityValidator.sanitize(out)
 
-    def clean_index_and_chronology(self, df: pd.DataFrame) -> pd.DataFrame:
+    def clean_index_and_chronology(
+        self, df: pd.DataFrame, target_tz: Optional[str] = None
+    ) -> pd.DataFrame:
         """Sort DatetimeIndex chronologically and drop duplicate timestamps."""
         if df.empty:
             return df
@@ -116,7 +118,7 @@ class MarketDataLoader:
                 out = out.set_index(date_col)
             out.index = pd.to_datetime(out.index)
 
-        out = self.gatekeeper.standardize_timezone(out)
+        out = self.gatekeeper.standardize_timezone(out, target_tz=target_tz)
         out = out[~out.index.duplicated(keep="last")]
         return out.sort_index()
 
@@ -132,6 +134,7 @@ class MarketDataLoader:
         file_path: str,
         is_intraday: Optional[bool] = None,
         special_whitelist: Optional[List[str]] = None,
+        target_tz: Optional[str] = None,
     ) -> pd.DataFrame:
         """Load market bars from local CSV or Parquet file with gatekeeping."""
         if file_path.endswith(".parquet"):
@@ -142,10 +145,13 @@ class MarketDataLoader:
             raise ValueError(f"Unsupported file format: {file_path}")
 
         std = self.standardize_columns(raw)
-        indexed = self.clean_index_and_chronology(std)
+        indexed = self.clean_index_and_chronology(std, target_tz=target_tz)
         intraday_flag = is_intraday if is_intraday is not None else self._detect_is_intraday(indexed)
         return self.gatekeeper.filter_trading_hours(
-            indexed, is_intraday=intraday_flag, special_whitelist=special_whitelist
+            indexed,
+            is_intraday=intraday_flag,
+            special_whitelist=special_whitelist,
+            target_tz=target_tz,
         )
 
     def fetch_yfinance(self, config: IngestionConfig) -> pd.DataFrame:
@@ -165,14 +171,33 @@ class MarketDataLoader:
             return pd.DataFrame()
 
         std = self.standardize_columns(raw)
-        indexed = self.clean_index_and_chronology(std)
+        indexed = self.clean_index_and_chronology(std, target_tz=config.timezone)
         should_filter_weekends = not any(config.interval.lower().endswith(u) for u in ["mo", "wk", "y", "month", "year"])
         return self.gatekeeper.filter_trading_hours(
             indexed,
             is_intraday=config.is_intraday(),
             filter_weekends_flag=should_filter_weekends,
             special_whitelist=config.special_session_dates,
+            target_tz=config.timezone,
+            market_open=config.market_open_time,
+            market_close=config.market_close_time,
         )
+
+    def fetch_universe(
+        self,
+        tickers: List[str],
+        interval: str = "1d",
+        period: Optional[str] = None,
+    ) -> Dict[str, pd.DataFrame]:
+        """Fetch and clean an entire multi-asset universe with automatic exchange profiles."""
+        universe_data: Dict[str, pd.DataFrame] = {}
+        for ticker in tickers:
+            cfg = IngestionConfig.create(ticker=ticker, interval=interval, period=period)
+            df = self.fetch_yfinance(cfg)
+            if not df.empty:
+                universe_data[ticker] = df
+        return universe_data
+
 
 
     def ingest(
