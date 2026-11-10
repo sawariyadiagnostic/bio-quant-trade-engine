@@ -17,6 +17,7 @@ from ravana.data.resampler import (
     ResamplingEngine,
     SessionAwareResampler,
 )
+from ravana.data.storage import LakeManager, StorageConfig
 from ravana.data.ingestion import (
     ETF_BENCHMARK_MAP,
     ExchangeType,
@@ -44,6 +45,8 @@ class BatchPipelineRunner:
         self.m3_dir = self.lake_root / "m3_ingested"
         self.m4_dir = self.lake_root / "m4_cleaned"
         self.m5_dir = self.lake_root / "m5_resampled"
+        self.storage_config = StorageConfig(self.lake_root)
+        self.lake_manager = LakeManager(self.storage_config)
         self.loader = MarketDataLoader()
         self.cleaner = DataCleaningEngine(CleanerConfig.standard())
         self.resampler = ResamplingEngine(ResamplerConfig())
@@ -73,7 +76,7 @@ class BatchPipelineRunner:
             if not df.empty:
                 fname = f"{sanitize_filename(ticker)}.parquet"
                 fpath = self.m3_dir / "intraday_5m" / fname
-                df.to_parquet(fpath)
+                self.lake_manager.upsert_engine.upsert(fpath, df)
                 manifest["intraday_5m"][ticker] = self._make_meta(ticker, df, fpath)
 
         # 2. Daily 1d universe (Full max history: 2008–present)
@@ -86,7 +89,7 @@ class BatchPipelineRunner:
             if not df.empty:
                 fname = f"{sanitize_filename(ticker)}.parquet"
                 fpath = self.m3_dir / "daily_1d" / fname
-                df.to_parquet(fpath)
+                self.lake_manager.upsert_engine.upsert(fpath, df)
                 manifest["daily_1d"][ticker] = self._make_meta(ticker, df, fpath)
 
         # Write manifest
@@ -166,19 +169,19 @@ class BatchPipelineRunner:
             target_dir.mkdir(parents=True, exist_ok=True)
 
             fpath = target_dir / f"{base}_{tf}.parquet"
-            df.to_parquet(fpath)
+            self.lake_manager.upsert_engine.upsert(fpath, df)
             meta["timeframes"][tf] = self._make_meta(cleaned.ticker, df, fpath)
 
             if cleaned.benchmark_ticker and tf in res_ds.benchmark_timeframes:
                 b_df = res_ds.benchmark_timeframes[tf]
                 b_base = sanitize_filename(cleaned.benchmark_ticker)
                 b_path = target_dir / f"{b_base}_{tf}.parquet"
-                b_df.to_parquet(b_path)
+                self.lake_manager.upsert_engine.upsert(b_path, b_df)
 
             if tf in res_ds.spread_timeframes:
                 s_df = res_ds.spread_timeframes[tf]
                 s_path = target_dir / f"{base}_spread_{tf}.parquet"
-                s_df.to_parquet(s_path)
+                self.lake_manager.upsert_engine.upsert(s_path, s_df)
 
         return meta
 
@@ -197,7 +200,7 @@ class BatchPipelineRunner:
                 df, freq=freq, require_closed_period=self.resampler.config.require_closed_period
             )
             fpath = self.m5_dir / f"macro_{tf}" / f"{base}_{tf}.parquet"
-            res_df.to_parquet(fpath)
+            self.lake_manager.upsert_engine.upsert(fpath, res_df)
             meta["timeframes"][tf] = self._make_meta(ticker, res_df, fpath)
 
         return meta
@@ -217,8 +220,14 @@ class BatchPipelineRunner:
         df_spread = pd.read_parquet(spread_path) if spread_path.exists() else None
 
         bench_base = sanitize_filename(bench_ticker)
+        bench_m4_path = self.m4_dir / sub / f"{bench_base}_clean.parquet"
         bench_m3_path = self.m3_dir / sub / f"{bench_base}.parquet"
-        df_bench = pd.read_parquet(bench_m3_path) if bench_m3_path.exists() else None
+        if bench_m4_path.exists():
+            df_bench = pd.read_parquet(bench_m4_path)
+        elif bench_m3_path.exists():
+            df_bench = pd.read_parquet(bench_m3_path)
+        else:
+            df_bench = None
 
         cfg = IngestionConfig.create(ticker=etf_ticker, interval=interval)
         return CleanedDataset(
@@ -281,12 +290,18 @@ class BatchPipelineRunner:
 
         # Save Clean Primary
         clean_path = self.m4_dir / subfolder / f"{base}_clean.parquet"
-        cleaned.data.to_parquet(clean_path)
+        self.lake_manager.upsert_engine.upsert(clean_path, cleaned.data)
 
         # Save Tracking Spread Analytics
         if cleaned.spread_data is not None and not cleaned.spread_data.empty:
             spread_path = self.m4_dir / subfolder / f"{base}_spread.parquet"
-            cleaned.spread_data.to_parquet(spread_path)
+            self.lake_manager.upsert_engine.upsert(spread_path, cleaned.spread_data)
+
+        # Save Clean Benchmark if present
+        if cleaned.benchmark_data is not None and not cleaned.benchmark_data.empty and dataset.benchmark_ticker:
+            bench_base = sanitize_filename(dataset.benchmark_ticker)
+            bench_clean_path = self.m4_dir / subfolder / f"{bench_base}_clean.parquet"
+            self.lake_manager.upsert_engine.upsert(bench_clean_path, cleaned.benchmark_data)
 
         return {
             "ticker": dataset.ticker,

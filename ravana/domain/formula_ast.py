@@ -107,7 +107,7 @@ class ASTNode:
         """Deterministic 16-character hex hash invariant to commutative child ordering."""
         if self.op in ("FEATURE", "CONST"):
             raw = f"{self.op}:{self.val}"
-        elif self.op in ("ADD", "MUL") and len(self.children) == 2:
+        elif self.op in ("ADD", "MUL", "TS_CORR_20") and len(self.children) == 2:
             h0 = self.children[0].canonical_hash()
             h1 = self.children[1].canonical_hash()
             ordered = sorted([h0, h1])
@@ -221,18 +221,22 @@ class ASTNode:
             return ASTNode("CONST", val="0.0")
         if self.op == "DIV_SAFE" and l.canonical_hash() == r.canonical_hash():
             return ASTNode("CONST", val="1.0")
-        if self.op == "ADD":
-            if l.op == "CONST" and float(l.val or 0) == 0.0: return r
-            if r.op == "CONST" and float(r.val or 0) == 0.0: return l
-        if self.op == "SUB" and r.op == "CONST" and float(r.val or 0) == 0.0:
-            return l
-        if self.op == "MUL":
-            if (l.op == "CONST" and float(l.val or 0) == 0.0) or (r.op == "CONST" and float(r.val or 0) == 0.0):
-                return ASTNode("CONST", val="0.0")
-            if l.op == "CONST" and float(l.val or 0) == 1.0: return r
-            if r.op == "CONST" and float(r.val or 0) == 1.0: return l
-        if self.op == "DIV_SAFE" and r.op == "CONST" and float(r.val or 0) == 1.0:
-            return l
+
+        try:
+            if self.op == "ADD":
+                if l.op == "CONST" and float(l.val or 0) == 0.0: return r
+                if r.op == "CONST" and float(r.val or 0) == 0.0: return l
+            if self.op == "SUB" and r.op == "CONST" and float(r.val or 0) == 0.0:
+                return l
+            if self.op == "MUL":
+                if (l.op == "CONST" and float(l.val or 0) == 0.0) or (r.op == "CONST" and float(r.val or 0) == 0.0):
+                    return ASTNode("CONST", val="0.0")
+                if l.op == "CONST" and float(l.val or 0) == 1.0: return r
+                if r.op == "CONST" and float(r.val or 0) == 1.0: return l
+            if self.op == "DIV_SAFE" and r.op == "CONST" and float(r.val or 0) == 1.0:
+                return l
+        except (ValueError, TypeError):
+            pass
         return self
 
 
@@ -448,6 +452,10 @@ class TreeGenerator:
             "SIGMOID", "TANH", "SIGN", "TS_ARGMAX_10", "TS_ARGMIN_10"
         ):
             return FeatureDimension.DIMENSIONLESS
+        if node.op == "ADD" and len(node.children) >= 2:
+            d0 = TreeGenerator.infer_dimension(node.children[0])
+            d1 = TreeGenerator.infer_dimension(node.children[1])
+            return d0 if d0 != FeatureDimension.DIMENSIONLESS else d1
         if node.op in ("ADD", "SUB") and node.children:
             return TreeGenerator.infer_dimension(node.children[0])
         if node.children:

@@ -141,13 +141,25 @@ class SessionAwareResampler:
             return base_df.copy()
 
         target_higher = higher_df.copy()
+
+        # Causal Sealing: If higher series is normalized to midnight in its native timezone,
+        # seal it to the end of its native session (23:59:59) BEFORE timezone conversion
+        # to prevent leaking US market closes 15 hours early into Indian trading hours.
+        if (target_higher.index.time == pd.Timestamp("00:00:00").time()).all():
+            target_higher.index = target_higher.index + pd.Timedelta(hours=23, minutes=59, seconds=59)
+
         if target_higher.index.tz != base_df.index.tz:
-            target_higher = target_higher.tz_convert(base_df.index.tz)
+            if target_higher.index.tz is None and base_df.index.tz is not None:
+                target_higher = target_higher.tz_localize(base_df.index.tz)
+            elif target_higher.index.tz is not None and base_df.index.tz is None:
+                target_higher = target_higher.tz_localize(None)
+            else:
+                target_higher = target_higher.tz_convert(base_df.index.tz)
 
         features = target_higher[higher_cols] if higher_cols else target_higher
 
-        is_macro_midnight = (features.index.time == pd.Timestamp("00:00:00").time()).all()
-        if is_macro_midnight and (base_df.index.time != pd.Timestamp("00:00:00").time()).any():
+        # Guard any remaining midnight-aligned series in base timezone
+        if (features.index.time == pd.Timestamp("00:00:00").time()).all() and (base_df.index.time != pd.Timestamp("00:00:00").time()).any():
             features = features.copy()
             features.index = features.index + pd.Timedelta(hours=23, minutes=59, seconds=59)
 

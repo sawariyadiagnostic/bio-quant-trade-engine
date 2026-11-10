@@ -10,16 +10,32 @@ from typing import Dict, List, Optional
 class StorageConfig:
     """Configuration for Sovereign Columnar Parquet Data Lake."""
 
-    lake_root: Path = field(default_factory=lambda: Path("ravana/data/lake"))
+    lake_root: Path = field(default_factory=lambda: Path("ravana/data/lake").resolve())
     compression: str = "snappy"
     tier_map: Dict[str, str] = field(
         default_factory=lambda: {
             "bronze": "m3_ingested",
             "silver": "m4_cleaned",
             "gold": "m5_resampled",
+            "m3": "m3_ingested",
+            "m4": "m4_cleaned",
+            "m5": "m5_resampled",
             "m3_ingested": "m3_ingested",
             "m4_cleaned": "m4_cleaned",
             "m5_resampled": "m5_resampled",
+        }
+    )
+    symbol_aliases: Dict[str, str] = field(
+        default_factory=lambda: {
+            "INR=X": "USDINR",
+            "USDINR=X": "USDINR",
+            "^NSEBANK": "NSEBANK",
+            "^NSEI": "NIFTY50",
+            "^INDIAVIX": "INDIAVIX",
+            "^VIX": "VIX",
+            "^GSPC": "GSPC",
+            "BZ=F": "BRENT",
+            "^TNX": "US10Y",
         }
     )
 
@@ -42,17 +58,24 @@ class StorageConfig:
             return "macro_1mo"
         return tf
 
+    def normalize_ticker(self, ticker: str) -> str:
+        """Standardize raw ticker symbol to canonical lake symbol."""
+        cleaned = self.symbol_aliases.get(ticker, ticker)
+        return cleaned.replace(".NS", "").replace("^", "").replace("=X", "").replace("=F", "")
+
     def resolve_path(self, tier: str, timeframe: str, ticker: str) -> Path:
         """Resolve partition file path across medallion tiers with convention awareness."""
         tier_dir = self.get_tier_dir(tier)
         tf_dir = tier_dir / self.get_timeframe_subfolder(timeframe)
 
-        clean_ticker = ticker.replace(".NS", "").replace("^", "")
+        clean_ticker = self.normalize_ticker(ticker)
         clean_tf = timeframe.replace("intraday_", "").replace("macro_", "").replace("daily_", "")
 
         candidates = [
             tf_dir / f"{clean_ticker}_{clean_tf}.parquet",
             tf_dir / f"{clean_ticker}_clean.parquet",
+            tf_dir / f"{clean_ticker}_spread.parquet",
+            tf_dir / f"{clean_ticker}_spread_{clean_tf}.parquet",
             tf_dir / f"{clean_ticker}.parquet",
             tf_dir / f"{ticker}_{clean_tf}.parquet",
             tf_dir / f"{ticker}_clean.parquet",

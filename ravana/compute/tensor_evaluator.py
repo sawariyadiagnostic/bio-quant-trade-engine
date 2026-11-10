@@ -394,6 +394,20 @@ class TensorASTEvaluator:
             chunks.append(torch.stack([cls.eval_node(n, X, feature_names) for n in batch], dim=0))
         return torch.cat(chunks, dim=0)
 
+    @classmethod
+    def evaluate_batch_streaming(
+        cls,
+        nodes: Sequence[ASTNode],
+        X: torch.Tensor,
+        feature_names: Optional[Union[List[str], Dict[str, int]]] = None,
+        chunk_size: int = 512,
+    ):
+        """Yields chunks of evaluated formulas sequentially to prevent GPU VRAM exhaustion."""
+        for i in range(0, len(nodes), chunk_size):
+            batch = nodes[i : i + chunk_size]
+            chunk_tensor = torch.stack([cls.eval_node(n, X, feature_names) for n in batch], dim=0)
+            yield chunk_tensor
+
     @staticmethod
     def _build_feature_map(
         feature_names: Optional[Union[List[str], Dict[str, int]]]

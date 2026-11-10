@@ -111,15 +111,36 @@ class DataCleaningEngine:
         macro_dict: Dict[str, pd.DataFrame],
         target_index: pd.DatetimeIndex,
     ) -> Dict[str, pd.DataFrame]:
-        """Causally reindex macro series to the primary session index."""
+        """Causally align macro series to the primary session index via backward as-of merge."""
         cleaned_macros: Dict[str, pd.DataFrame] = {}
+        target_df = pd.DataFrame(index=target_index.sort_values())
+
         for ticker, m_df in macro_dict.items():
             if m_df.empty or "Close" not in m_df.columns:
                 continue
-            aligned_m = m_df.reindex(target_index).ffill()
+
+            m_copy = m_df.copy()
+            if (m_copy.index.time == pd.Timestamp("00:00:00").time()).all():
+                m_copy.index = m_copy.index + pd.Timedelta(hours=23, minutes=59, seconds=59)
+
+            if m_copy.index.tz != target_index.tz:
+                if m_copy.index.tz is None and target_index.tz is not None:
+                    m_copy = m_copy.tz_localize(target_index.tz)
+                elif m_copy.index.tz is not None and target_index.tz is None:
+                    m_copy = m_copy.tz_localize(None)
+                else:
+                    m_copy = m_copy.tz_convert(target_index.tz)
+
+            aligned_m = pd.merge_asof(
+                target_df,
+                m_copy[["Close"]].sort_index(),
+                left_index=True,
+                right_index=True,
+                direction="backward",
+            )
             if aligned_m["Close"].isna().any():
                 first_val = aligned_m["Close"].dropna().iloc[0] if not aligned_m["Close"].dropna().empty else 1.0
-                aligned_m = aligned_m.fillna(first_val)
+                aligned_m = aligned_m.bfill().fillna(first_val)
             cleaned_macros[ticker] = aligned_m
         return cleaned_macros
 
