@@ -24,73 +24,58 @@ class SessionAwareResampler:
     }
 
     @classmethod
-    def _resample_single_session(
-        cls,
-        session_df: pd.DataFrame,
-        turnover_series: Optional[pd.Series],
-        rule: str,
-        agg_rules: Dict[str, str],
-        base_delta: pd.Timedelta,
-    ) -> pd.DataFrame:
-        """Resample a single session's bars with right-labeling and session clamping."""
-        resampled = session_df[list(agg_rules.keys())].resample(
-            rule, closed="left", label="right", origin="start"
-        ).agg(agg_rules)
-
-        if turnover_series is not None and "Volume" in resampled.columns and "Close" in resampled.columns:
-            session_to = turnover_series.loc[session_df.index].resample(
-                rule, closed="left", label="right", origin="start"
-            ).sum()
-            vol = resampled["Volume"]
-            resampled["VWAP"] = np.where(vol > 0, session_to / vol, resampled["Close"])
-
-        if "Is_Synthetic" in session_df.columns:
-            resampled["Synthetic_Ratio"] = session_df["Is_Synthetic"].astype(float).resample(
-                rule, closed="left", label="right", origin="start"
-            ).mean()
-
-        session_close_ts = session_df.index[-1] + base_delta
-        clamped_idx = [min(ts, session_close_ts) for ts in resampled.index]
-        resampled.index = pd.DatetimeIndex(clamped_idx, tz=session_df.index.tz)
-
-        if resampled.isna().any().any():
-            nan_cols = resampled.columns[resampled.isna().any()].tolist()
-            raise ValueError(f"Resampling produced NaNs in columns: {nan_cols}")
-
-        return resampled
-
-    @classmethod
     def resample_intraday(
         cls,
         df: pd.DataFrame,
         target_minutes: int,
         base_bar_minutes: int = 5,
     ) -> pd.DataFrame:
-        """Resample intraday bars with session-anchored origin and boundary clamping."""
+        """Resample intraday bars with session-anchored origin, boundary clamping, and vectorized performance."""
         if df.empty:
             return df.copy()
 
-        rule = f"{target_minutes}min"
+        df = df.sort_index()
+        target_delta = pd.Timedelta(minutes=target_minutes)
         base_delta = pd.Timedelta(minutes=base_bar_minutes)
+
+        index_series = df.index.to_series()
+        time_diff = index_series.diff()
+        date_diff = df.index.normalize() != pd.Series(df.index.normalize(), index=df.index).shift(1)
+        is_new_session = (time_diff > pd.Timedelta(minutes=60)) | date_diff
+        is_new_session.iloc[0] = True
+        session_id = is_new_session.cumsum()
+
+        session_starts = index_series.groupby(session_id).transform("first")
+        session_ends = index_series.groupby(session_id).transform("last") + base_delta
+
+        elapsed = df.index - session_starts
+        bin_num = elapsed // target_delta
+        bin_right = session_starts + (bin_num + 1) * target_delta
+        clamped_right = np.minimum(bin_right, session_ends)
+
+        agg_rules = {col: cls.BASE_AGG_RULES.get(col, "last") for col in df.columns}
+        resampled = df.groupby(clamped_right).agg(agg_rules)
+
         has_ohlcv = all(c in df.columns for c in ["High", "Low", "Close", "Volume"])
         if has_ohlcv:
             typical_price = (df["High"] + df["Low"] + df["Close"]) / 3.0
-            turnover: Optional[pd.Series] = typical_price * df["Volume"]
-        else:
-            turnover = None
+            turnover = typical_price * df["Volume"]
+            session_to = turnover.groupby(clamped_right).sum()
+            vol = resampled["Volume"]
+            resampled["VWAP"] = np.where(vol > 0, session_to / vol, resampled["Close"])
 
-        agg_rules = {col: cls.BASE_AGG_RULES.get(col, "last") for col in df.columns}
-        session_frames: List[pd.DataFrame] = []
+        if "Is_Synthetic" in df.columns:
+            resampled["Synthetic_Ratio"] = df["Is_Synthetic"].astype(float).groupby(clamped_right).mean()
 
-        for _, session_df in df.groupby(df.index.normalize()):
-            if session_df.empty:
-                continue
-            frame = cls._resample_single_session(session_df, turnover, rule, agg_rules, base_delta)
-            session_frames.append(frame)
+        resampled.index.name = None
+        resampled.index = pd.DatetimeIndex(resampled.index, tz=df.index.tz)
 
-        if not session_frames:
-            return pd.DataFrame(columns=df.columns)
-        return pd.concat(session_frames)
+        resampled = resampled.dropna(how="all")
+        if resampled.isna().any().any():
+            nan_cols = resampled.columns[resampled.isna().any()].tolist()
+            raise ValueError(f"Resampling produced NaNs in columns: {nan_cols}")
+
+        return resampled
 
     @classmethod
     def resample_daily_to_higher(
@@ -103,12 +88,9 @@ class SessionAwareResampler:
         if df.empty:
             return df.copy()
 
+        df = df.sort_index()
         has_ohlcv = all(c in df.columns for c in ["High", "Low", "Close", "Volume"])
-        if has_ohlcv:
-            typical_price = (df["High"] + df["Low"] + df["Close"]) / 3.0
-            turnover: Optional[pd.Series] = typical_price * df["Volume"]
-        else:
-            turnover = None
+        turnover = (df["High"] + df["Low"] + df["Close"]) / 3.0 * df["Volume"] if has_ohlcv else None
 
         agg_rules = {col: cls.BASE_AGG_RULES.get(col, "last") for col in df.columns}
         res = df[list(agg_rules.keys())].resample(freq, closed="right", label="right").agg(agg_rules)
@@ -124,8 +106,28 @@ class SessionAwareResampler:
 
         res = res[res["Bar_Count"] > 0]
         if require_closed_period and not res.empty:
-            if df.index[-1] < res.index[-1]:
+            last_date = df.index[-1]
+            last_res_date = res.index[-1]
+            is_weekly = "W" in freq.upper()
+            is_monthly = freq.upper() in ("ME", "M", "1MO")
+            if is_weekly:
+                is_fri_or_later = last_date.weekday() >= 4
+                from ravana.data.ingestion.session_gatekeeper import NSESessionGatekeeper
+                rem_days = [last_date + pd.Timedelta(days=d) for d in range(1, 5 - last_date.weekday())]
+                all_rem_holidays = bool(rem_days) and all(
+                    d.strftime("%Y-%m-%d") in NSESessionGatekeeper.KNOWN_NSE_HOLIDAYS or d.weekday() >= 5
+                    for d in rem_days
+                )
+                is_closed = is_fri_or_later or all_rem_holidays or (last_date >= last_res_date)
+            elif is_monthly:
+                next_bday = last_date + pd.offsets.BDay(1)
+                is_closed = (next_bday.month != last_date.month) or (last_date >= last_res_date)
+            else:
+                is_closed = last_date >= last_res_date
+
+            if not is_closed:
                 res = res.iloc[:-1]
+
         return res
 
     @staticmethod
@@ -138,11 +140,17 @@ class SessionAwareResampler:
         if base_df.empty or higher_df.empty:
             return base_df.copy()
 
-        target_higher = higher_df
-        if higher_df.index.tz != base_df.index.tz:
-            target_higher = higher_df.tz_convert(base_df.index.tz)
+        target_higher = higher_df.copy()
+        if target_higher.index.tz != base_df.index.tz:
+            target_higher = target_higher.tz_convert(base_df.index.tz)
 
         features = target_higher[higher_cols] if higher_cols else target_higher
+
+        is_macro_midnight = (features.index.time == pd.Timestamp("00:00:00").time()).all()
+        if is_macro_midnight and (base_df.index.time != pd.Timestamp("00:00:00").time()).any():
+            features = features.copy()
+            features.index = features.index + pd.Timedelta(hours=23, minutes=59, seconds=59)
+
         return pd.merge_asof(
             base_df.sort_index(),
             features.sort_index(),

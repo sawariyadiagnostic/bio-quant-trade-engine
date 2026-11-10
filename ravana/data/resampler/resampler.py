@@ -17,7 +17,11 @@ class ResamplingEngine:
 
     def __init__(self, config: Optional[ResamplerConfig] = None) -> None:
         self.config = config or ResamplerConfig()
-        self.spread_aligner = ETFBUSpreadAligner()
+
+    def _get_spread_aligner(self, timeframe_minutes: int) -> ETFBUSpreadAligner:
+        """Return adaptive ETFBUSpreadAligner maintaining a constant ~5-hour lookback horizon."""
+        adaptive_window = max(10, int(round(300.0 / max(1, timeframe_minutes))))
+        return ETFBUSpreadAligner(rolling_window=adaptive_window)
 
     def resample_dataset(self, cleaned: CleanedDataset) -> ResampledDataset:
         """Transform a CleanedDataset into a complete multi-timeframe ResampledDataset."""
@@ -32,6 +36,8 @@ class ResamplingEngine:
         bench_timeframes: Dict[str, pd.DataFrame] = {}
         spread_timeframes: Dict[str, pd.DataFrame] = {}
 
+        base_m = self.config.parse_interval_to_minutes(cleaned.interval)
+
         if cleaned.benchmark_data is not None:
             bench_timeframes[cleaned.interval] = cleaned.benchmark_data
         if cleaned.spread_data is not None:
@@ -40,19 +46,20 @@ class ResamplingEngine:
         for tf in self.config.intraday_intervals:
             target_m = self.config.parse_interval_to_minutes(tf)
             timeframes[tf] = SessionAwareResampler.resample_intraday(
-                cleaned.data, target_m, self.config.base_bar_minutes
+                cleaned.data, target_m, base_bar_minutes=base_m
             )
             if cleaned.benchmark_data is not None:
                 bench_timeframes[tf] = SessionAwareResampler.resample_intraday(
-                    cleaned.benchmark_data, target_m, self.config.base_bar_minutes
+                    cleaned.benchmark_data, target_m, base_bar_minutes=base_m
                 )
             if cleaned.benchmark_ticker and tf in bench_timeframes:
-                aligned_spread = self.spread_aligner.align(timeframes[tf], bench_timeframes[tf], cleaned.ticker)
+                aligner = self._get_spread_aligner(target_m)
+                aligned_spread = aligner.align(timeframes[tf], bench_timeframes[tf], cleaned.ticker)
                 if aligned_spread is not None:
                     spread_timeframes[tf] = aligned_spread
             elif cleaned.spread_data is not None:
                 spread_timeframes[tf] = SessionAwareResampler.resample_intraday(
-                    cleaned.spread_data, target_m, self.config.base_bar_minutes
+                    cleaned.spread_data, target_m, base_bar_minutes=base_m
                 )
 
         return ResampledDataset(
@@ -88,7 +95,8 @@ class ResamplingEngine:
                     cleaned.benchmark_data, freq, self.config.require_closed_period
                 )
             if cleaned.benchmark_ticker and tf in bench_timeframes:
-                aligned_spread = self.spread_aligner.align(timeframes[tf], bench_timeframes[tf], cleaned.ticker)
+                macro_aligner = ETFBUSpreadAligner(rolling_window=20)
+                aligned_spread = macro_aligner.align(timeframes[tf], bench_timeframes[tf], cleaned.ticker)
                 if aligned_spread is not None:
                     spread_timeframes[tf] = aligned_spread
             elif cleaned.spread_data is not None:

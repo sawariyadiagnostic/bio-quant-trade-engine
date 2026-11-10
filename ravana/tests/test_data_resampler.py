@@ -213,6 +213,77 @@ class TestDataResamplingEngine(unittest.TestCase):
         self.assertEqual(len(dataset.timeframes["30m"]), 26)
         self.assertEqual(len(dataset.timeframes["1h"]), 14)
 
+    def test_muhurat_trading_session_resampling(self) -> None:
+        """Verify Diwali Muhurat session (18:15-19:15) resamples without NaN or clamping bugs."""
+        times = pd.date_range("2025-11-01 18:15:00", "2025-11-01 19:10:00", freq="5min", tz=self.tz)
+        df = self._make_sample_df(times)
+
+        for target in [15, 30, 60, 75, 125]:
+            res = SessionAwareResampler.resample_intraday(df, target_minutes=target, base_bar_minutes=5)
+            self.assertFalse(res.isna().any().any())
+            self.assertEqual(res.index[-1].strftime("%H:%M:%S"), "19:15:00")
+
+    def test_disaster_recovery_two_session_day_no_crash(self) -> None:
+        """Verify multi-session day (DR switchover 09:15-10:00 and 11:30-12:30) does not crash on NaNs."""
+        t1 = pd.date_range("2024-05-18 09:15", "2024-05-18 09:55", freq="5min", tz=self.tz)
+        t2 = pd.date_range("2024-05-18 11:30", "2024-05-18 12:25", freq="5min", tz=self.tz)
+        df = self._make_sample_df(t1.union(t2))
+
+        res = SessionAwareResampler.resample_intraday(df, target_minutes=15, base_bar_minutes=5)
+        self.assertFalse(res.isna().any().any())
+        self.assertEqual(len(res), 7)
+
+    def test_good_friday_and_weekend_month_end_causal_sealing(self) -> None:
+        """Verify holiday 4-day weeks and weekend month-ends are NOT dropped as unclosed."""
+        dates_thurs = pd.date_range("2026-03-30", "2026-04-02", freq="B", tz=self.tz)
+        df_thurs = self._make_sample_df(dates_thurs)
+        res_wk = SessionAwareResampler.resample_daily_to_higher(df_thurs, freq="W-FRI", require_closed_period=True)
+        self.assertEqual(len(res_wk), 1)
+
+        dates_may = pd.bdate_range("2026-05-01", "2026-05-29", tz=self.tz)
+        df_may = self._make_sample_df(dates_may)
+        res_mo = SessionAwareResampler.resample_daily_to_higher(df_may, freq="ME", require_closed_period=True)
+        self.assertEqual(len(res_mo), 1)
+
+    def test_point_in_time_merge_zero_intraday_lookahead(self) -> None:
+        """Verify intraday bars on Friday morning NEVER observe Friday's weekly close."""
+        daily_dates = pd.date_range("2026-03-02", "2026-03-06", freq="B", tz=self.tz)
+        daily_df = self._make_sample_df(daily_dates, base_price=100.0)
+        daily_df.iloc[-1, daily_df.columns.get_loc("Close")] = 999.0
+
+        weekly_df = SessionAwareResampler.resample_daily_to_higher(daily_df, freq="W-FRI", require_closed_period=False)
+
+        intraday_times = pd.date_range("2026-03-06 09:15:00", "2026-03-06 10:00:00", freq="5min", tz=self.tz)
+        intraday_df = self._make_sample_df(intraday_times, base_price=100.0)
+
+        merged = SessionAwareResampler.point_in_time_merge(intraday_df, weekly_df[["Close"]])
+        self.assertNotEqual(merged.iloc[0]["Close_y"], 999.0)
+
+    def test_spread_aligner_adaptive_window_scaling(self) -> None:
+        """Verify ResamplingEngine adapts spread aligner window across timeframes."""
+        engine = ResamplingEngine()
+        aligner_5m = engine._get_spread_aligner(5)
+        aligner_15m = engine._get_spread_aligner(15)
+        aligner_60m = engine._get_spread_aligner(60)
+
+        self.assertEqual(aligner_5m.rolling_window, 60)
+        self.assertEqual(aligner_15m.rolling_window, 20)
+        self.assertEqual(aligner_60m.rolling_window, 10)
+
+    def test_vectorized_resampling_performance(self) -> None:
+        """Verify 100 sessions resample in under 1.5 seconds."""
+        import time
+        days = pd.bdate_range("2025-01-01", periods=100)
+        all_times = [pd.date_range(d.strftime("%Y-%m-%d") + " 09:15:00", d.strftime("%Y-%m-%d") + " 15:25:00", freq="5min", tz=self.tz) for d in days]
+        idx = pd.DatetimeIndex(np.concatenate(all_times))
+        df = self._make_sample_df(idx)
+
+        t0 = time.perf_counter()
+        res = SessionAwareResampler.resample_intraday(df, target_minutes=15)
+        elapsed = time.perf_counter() - t0
+        self.assertLess(elapsed, 1.5, f"Vectorized resample must complete <1.5s, took {elapsed:.3f}s")
+        self.assertEqual(len(res), 2500)
+
 
 if __name__ == "__main__":
     unittest.main()
