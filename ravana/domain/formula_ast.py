@@ -138,6 +138,10 @@ class ASTNode:
         right = self.children[1].to_formula_str() if len(self.children) > 1 else "0"
         return f"({left} {sym} {right})"
 
+    def to_infix(self) -> str:
+        """Alias for to_formula_str() conforming to standard compiler AST conventions."""
+        return self.to_formula_str()
+
     def to_dict(self) -> Dict[str, Any]:
         """Serializes AST node and all children into a JSON-compatible dictionary."""
         return {
