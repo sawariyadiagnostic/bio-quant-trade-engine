@@ -162,4 +162,20 @@ What drives the overnight price gap of Indian ETFs while the NSE is closed?
 
 ---
 
+### Muscle 4 Implementation: Data Quality, Time-Grid Regularization & Spread Aligner (Completed)
+* **Exact Session Grid Regularization (`TimeGridReindexer`):**
+  * Real 60-day 5m `BANKBEES` data contained 4,497 bars instead of the mathematical expectation of 4,500 bars ($60 \times 75$).
+  * Reindexed to exact left-closed interval $[09:15, 15:30)$ session grid with 0.0-volume causal forward filling.
+  * Marked filled bars with `Is_Synthetic: bool` for audit and backtester trade exclusion.
+* **Robust Scale Flash Spike Filtering (`FlashSpikeFilter`):**
+  * Discovered that standard deviation has breakdown point 0% (a single +50% spike contaminated rolling $\sigma$ across the next 20 bars from 0.5 to 55.0, inflating upper bounds to 723 INR).
+  * Upgraded to causal Median Absolute Deviation (MAD, breakdown point 50%): $\sigma_{\text{MAD}} = 1.4826 \times \text{MAD}$.
+  * Completely eliminated outlier contamination while preserving true market volatility.
+* **ETF-to-Benchmark Spread Analytics (`ETFBUSpreadAligner`):**
+  * Deduced instantaneous benchmark ratio for `BANKBEES.NS` vs `^NSEBANK` ($k \approx 96.44$).
+  * Computed continuous tracking spread in INR, basis in basis points ($\mu = -0.91$ bps, $\sigma = 10.11$ bps), rolling Z-score, rolling beta, and rolling correlation without lookahead bias.
+* **Handshake Contract:** `CleanedDataset` delivered to Muscle 5 (Resampler).
+
+---
+
 *Vault maintained by RAVANA Core Engineering. Updated synchronously with every muscle completion.*

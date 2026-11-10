@@ -1,0 +1,130 @@
+"""Muscle 4: Data Quality & Cleaning Engine orchestrator."""
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+import pandas as pd
+
+from ravana.data.cleaner.config import CleanerConfig
+from ravana.data.cleaner.dataset import CleanedDataset
+from ravana.data.cleaner.grid_reindexer import TimeGridReindexer
+from ravana.data.cleaner.spike_filter import FlashSpikeFilter
+from ravana.data.cleaner.spread_aligner import ETFBUSpreadAligner
+from ravana.data.ingestion.dataset import IngestedDataset
+
+
+class DataCleaningEngine:
+    """Orchestrates time grid regularization, spike sanitization, and ETF tracking spread alignment.
+    
+    Transforms raw IngestedDataset contracts into hardened, contiguous CleanedDataset
+    instances ready for rolling feature calculations and multi-timeframe resampling.
+    """
+
+    def __init__(self, config: Optional[CleanerConfig] = None) -> None:
+        self.config = config or CleanerConfig.standard()
+        self.reindexer = TimeGridReindexer()
+        self.spike_filter = FlashSpikeFilter(
+            window=self.config.spike_window,
+            threshold_std=self.config.spike_threshold_std,
+            clamp_spikes=self.config.clamp_spikes,
+        )
+        self.spread_aligner = ETFBUSpreadAligner(rolling_window=self.config.spread_rolling_window)
+
+    def clean(self, dataset: IngestedDataset) -> CleanedDataset:
+        """Execute full cleaning pipeline on an IngestedDataset.
+        
+        Args:
+            dataset: Immutable IngestedDataset from Muscle 3.
+            
+        Returns:
+            Hardened, contiguous, and validated CleanedDataset.
+        """
+        raw_bars = dataset.bar_count
+        clean_df, synthetic_bars = self._clean_series(dataset.data, dataset.interval)
+        clean_df, spikes_detected = self._filter_spikes(clean_df)
+
+        clean_benchmark: Optional[pd.DataFrame] = None
+        if dataset.benchmark_data is not None and not dataset.benchmark_data.empty:
+            clean_benchmark, _ = self._clean_series(dataset.benchmark_data, dataset.interval)
+            clean_benchmark, _ = self._filter_spikes(clean_benchmark)
+
+        spread_df: Optional[pd.DataFrame] = None
+        if self.config.align_spread and clean_benchmark is not None:
+            spread_df = self.spread_aligner.align(clean_df, clean_benchmark)
+
+        clean_macros = self._clean_macro_data(dataset.macro_data, clean_df.index)
+
+        quality_report = self._build_quality_report(
+            raw_bars=raw_bars,
+            cleaned_bars=len(clean_df),
+            synthetic_bars=synthetic_bars,
+            spikes=spikes_detected,
+            spread_df=spread_df,
+        )
+
+        return CleanedDataset(
+            ticker=dataset.ticker,
+            interval=dataset.interval,
+            exchange=dataset.exchange,
+            data=clean_df,
+            benchmark_ticker=dataset.benchmark_ticker,
+            benchmark_data=clean_benchmark,
+            spread_data=spread_df,
+            macro_data=clean_macros,
+            quality_report=quality_report,
+            metadata={**dataset.metadata, "cleaning_engine_version": "1.0.0"},
+        )
+
+    def _clean_series(self, df: pd.DataFrame, interval: str) -> tuple[pd.DataFrame, int]:
+        """Apply grid reindexing if enabled."""
+        if self.config.fill_gaps:
+            return self.reindexer.reindex(df, interval)
+        out = df.copy()
+        if "Is_Synthetic" not in out.columns:
+            out["Is_Synthetic"] = False
+        return out, 0
+
+    def _filter_spikes(self, df: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+        """Apply spike sanitization if enabled."""
+        if self.config.spike_filter_enabled:
+            return self.spike_filter.filter(df)
+        out = df.copy()
+        if "Is_Spike" not in out.columns:
+            out["Is_Spike"] = False
+        return out, 0
+
+    def _clean_macro_data(
+        self,
+        macro_dict: Dict[str, pd.DataFrame],
+        target_index: pd.DatetimeIndex,
+    ) -> Dict[str, pd.DataFrame]:
+        """Causally reindex macro series to the primary session index."""
+        cleaned_macros: Dict[str, pd.DataFrame] = {}
+        for ticker, m_df in macro_dict.items():
+            if m_df.empty or "Close" not in m_df.columns:
+                continue
+            aligned_m = m_df.reindex(target_index).ffill().bfill()
+            cleaned_macros[ticker] = aligned_m
+        return cleaned_macros
+
+    def _build_quality_report(
+        self,
+        raw_bars: int,
+        cleaned_bars: int,
+        synthetic_bars: int,
+        spikes: int,
+        spread_df: Optional[pd.DataFrame],
+    ) -> Dict[str, Any]:
+        """Generate quantitative quality audit metrics."""
+        report: Dict[str, Any] = {
+            "raw_bars": raw_bars,
+            "cleaned_bars": cleaned_bars,
+            "synthetic_bars_filled": synthetic_bars,
+            "synthetic_bar_pct": (synthetic_bars / max(1, cleaned_bars)) * 100.0,
+            "spikes_sanitized": spikes,
+            "gap_integrity_passed": synthetic_bars == (cleaned_bars - raw_bars),
+        }
+        if spread_df is not None and not spread_df.empty:
+            report["spread_mean_bps"] = float(spread_df["Basis_Bps"].mean())
+            report["spread_std_bps"] = float(spread_df["Basis_Bps"].std())
+            report["multiplier"] = float(spread_df["Multiplier"].iloc[0])
+        return report

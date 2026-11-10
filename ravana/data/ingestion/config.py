@@ -92,12 +92,17 @@ class IngestionConfig:
                 market_close_time="15:30:00",
             )
 
-    def is_intraday(self) -> bool:
+    @staticmethod
+    def is_interval_intraday(interval: str) -> bool:
         """Return True if the interval represents intraday minutes/hours/seconds.
         
         Strictly excludes Daily ('1d'), Weekly ('1wk'), and Monthly ('1mo', '3mo').
         """
-        val = self.interval.strip().lower()
+        val = interval.strip().lower()
         if any(val.endswith(unit) for unit in ["d", "wk", "mo", "y", "month", "year"]):
             return False
         return any(unit in val for unit in ["m", "h", "s", "min", "sec", "hour"])
+
+    def is_intraday(self) -> bool:
+        """Return True if this config instance represents intraday."""
+        return self.is_interval_intraday(self.interval)

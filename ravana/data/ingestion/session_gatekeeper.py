@@ -39,6 +39,9 @@ KNOWN_NSE_HOLIDAYS: Set[str] = {
 class NSESessionGatekeeper:
     """Institutional gatekeeper enforcing NSE trading session boundaries."""
 
+    KNOWN_SPECIAL_SESSIONS = KNOWN_SPECIAL_SESSIONS
+    KNOWN_NSE_HOLIDAYS = KNOWN_NSE_HOLIDAYS
+
     def __init__(
         self,
         market_open: str = "09:15:00",
