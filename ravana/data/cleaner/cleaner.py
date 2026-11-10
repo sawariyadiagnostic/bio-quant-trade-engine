@@ -51,7 +51,10 @@ class DataCleaningEngine:
 
         clean_benchmark: Optional[pd.DataFrame] = None
         if dataset.benchmark_data is not None and not dataset.benchmark_data.empty:
-            clean_benchmark, _ = self._clean_series(dataset.benchmark_data, dataset.interval, reindexer)
+            bench_in = dataset.benchmark_data.copy()
+            if clean_df.index.tz is not None and bench_in.index.tz is not None and bench_in.index.tz != clean_df.index.tz:
+                bench_in.index = bench_in.index.tz_convert(clean_df.index.tz)
+            clean_benchmark, _ = self._clean_series(bench_in, dataset.interval, reindexer)
             clean_benchmark, _ = self._filter_spikes(clean_benchmark)
 
         spread_df: Optional[pd.DataFrame] = None
