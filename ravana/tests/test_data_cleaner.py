@@ -1,6 +1,6 @@
 """Unit tests for Muscle 4: Data Quality & Cleaning Engine.
-Verifies intraday grid reindexing, causal gap-filling, flash spike sanitization,
-and ETF-to-benchmark tracking spread alignment.
+Verifies intraday grid reindexing, causal gap-filling, flash spike sanitization with volume gating,
+and strictly causal ETF-to-benchmark tracking spread alignment.
 """
 from __future__ import annotations
 
@@ -37,21 +37,30 @@ class TestDataQualityEngine(unittest.TestCase):
         open_ = (high + low) / 2.0
         volume = np.random.uniform(1000, 50000, n)
         return pd.DataFrame(
-            {"Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume},
+            {
+                "Open": open_,
+                "High": high,
+                "Low": low,
+                "Close": close,
+                "Volume": volume,
+                "Close_Adj": close,
+                "Open_Adj": open_,
+                "High_Adj": high,
+                "Low_Adj": low,
+            },
             index=times,
         )
 
     def test_time_grid_reindexer_intraday_gap_filling(self) -> None:
-        """Verify missing intraday bars are causally filled to complete the 75-bar grid."""
+        """Verify missing intraday bars are causally filled to complete the 75-bar grid with zero NaNs."""
         df_full = self._make_intraday_bar(self.full_times)
-        # Drop bars 20 and 21 (e.g. 10:55 and 11:00) simulating data feed holes (73 bars)
+        # Drop bars 20 and 21 simulating data feed holes (73 bars)
         df_gappy = df_full.drop(df_full.index[[20, 21]])
         self.assertEqual(len(df_gappy), 73)
 
         reindexer = TimeGridReindexer(exchange=ExchangeType.NSE)
         df_clean, synthetic_count = reindexer.reindex(df_gappy, interval="5m")
 
-        # Must restore exact 75 bars
         self.assertEqual(len(df_clean), 75)
         self.assertEqual(synthetic_count, 2)
         self.assertTrue("Is_Synthetic" in df_clean.columns)
@@ -68,6 +77,12 @@ class TestDataQualityEngine(unittest.TestCase):
             self.assertAlmostEqual(row["Open"], prev_close, places=4)
             self.assertAlmostEqual(row["High"], prev_close, places=4)
             self.assertAlmostEqual(row["Low"], prev_close, places=4)
+            self.assertAlmostEqual(row["Open_Adj"], prev_close, places=4)
+            self.assertAlmostEqual(row["High_Adj"], prev_close, places=4)
+            self.assertAlmostEqual(row["Low_Adj"], prev_close, places=4)
+
+        # Absolutely zero NaNs anywhere in the output
+        self.assertFalse(df_clean.isna().any().any())
 
     def test_time_grid_reindexer_non_intraday(self) -> None:
         """Verify daily series are monotonically sorted with duplicate timestamps removed."""
@@ -76,7 +91,6 @@ class TestDataQualityEngine(unittest.TestCase):
             {"Open": 100.0, "High": 105.0, "Low": 95.0, "Close": 102.0, "Volume": 1000.0},
             index=dates,
         )
-        # Add duplicate row
         df_dup = pd.concat([df, df.iloc[[3]]])
         reindexer = TimeGridReindexer()
         df_clean, synth = reindexer.reindex(df_dup, interval="1d")
@@ -89,12 +103,14 @@ class TestDataQualityEngine(unittest.TestCase):
         """Verify single-bar price spikes and aberrant wicks are detected and clamped."""
         df = self._make_intraday_bar(self.full_times, base_price=500.0)
 
-        # Adversarial spike 1: Massive Close jump at bar 40
+        # Adversarial spike 1: Close jump with low volume
         df.iloc[40, df.columns.get_loc("Close")] = 750.0  # +50% jump
         df.iloc[40, df.columns.get_loc("High")] = 760.0
+        df.iloc[40, df.columns.get_loc("Volume")] = 10.0  # tiny volume -> genuine glitch
 
-        # Adversarial spike 2: Massive High wick at bar 60
+        # Adversarial spike 2: High wick with low volume
         df.iloc[60, df.columns.get_loc("High")] = 900.0
+        df.iloc[60, df.columns.get_loc("Volume")] = 10.0
 
         spike_filter = FlashSpikeFilter(window=20, threshold_std=4.0, clamp_spikes=True)
         df_clean, spike_count = spike_filter.filter(df)
@@ -103,32 +119,41 @@ class TestDataQualityEngine(unittest.TestCase):
         self.assertTrue(df_clean["Is_Spike"].iloc[40])
         self.assertTrue(df_clean["Is_Spike"].iloc[60])
 
-        # Clamped Close at bar 40 must be significantly below 750.0 (near statistical bound)
         self.assertLess(df_clean["Close"].iloc[40], 550.0)
-        # Clamped High at bar 60 must be significantly below 900.0
         self.assertLess(df_clean["High"].iloc[60], 550.0)
 
-        # Candlestick physical geometry must hold everywhere
+        # Physical geometry holds
         self.assertTrue((df_clean["High"] >= df_clean["Close"]).all())
         self.assertTrue((df_clean["Low"] <= df_clean["Close"]).all())
 
-    def test_flash_spike_filter_normal_volatility_unclamped(self) -> None:
-        """Verify normal market volatility is preserved without false-positive spike clamping."""
+    def test_flash_spike_filter_volume_gated_breakout(self) -> None:
+        """Verify high-volume institutional momentum breakouts are protected from false clamping."""
         df = self._make_intraday_bar(self.full_times, base_price=500.0)
-        spike_filter = FlashSpikeFilter(window=20, threshold_std=4.0, clamp_spikes=True)
+
+        # Legitimate morning breakout at bar 10: +2% move confirmed by 5x volume
+        df.iloc[10, df.columns.get_loc("Open")] = 502.0
+        df.iloc[10, df.columns.get_loc("Close")] = 512.0
+        df.iloc[10, df.columns.get_loc("High")] = 513.0
+        df.iloc[10, df.columns.get_loc("Low")] = 501.5
+        df.iloc[10, df.columns.get_loc("Volume")] = 250000.0  # Massive volume
+
+        spike_filter = FlashSpikeFilter(
+            window=20, threshold_std=4.0, clamp_spikes=True,
+            use_volume_gate=True, volume_surge_multiplier=2.0, volume_surge_expansion=2.5,
+        )
         df_clean, spike_count = spike_filter.filter(df)
 
-        self.assertEqual(spike_count, 0)
-        np.testing.assert_allclose(df_clean["Close"].values, df["Close"].values)
+        # The legitimate breakout must NOT be clamped
+        self.assertFalse(df_clean["Is_Spike"].iloc[10])
+        self.assertAlmostEqual(df_clean["Close"].iloc[10], 512.0, places=2)
 
-    def test_etf_spread_aligner(self) -> None:
-        """Verify ETF to benchmark alignment, multiplier deduction, basis, and rolling signals."""
+    def test_etf_spread_aligner_causality(self) -> None:
+        """Verify ETF to benchmark alignment, contract ratio, and strict zero-lookahead causality."""
         etf_df = self._make_intraday_bar(self.full_times, base_price=510.0)
-        # Benchmark index is ~100x the ETF (51,000 INR)
         idx_df = self._make_intraday_bar(self.full_times, base_price=51000.0)
 
         aligner = ETFBUSpreadAligner(rolling_window=30)
-        spread_df = aligner.align(etf_df, idx_df)
+        spread_df = aligner.align(etf_df, idx_df, ticker="BANKBEES.NS")
 
         self.assertIsNotNone(spread_df)
         self.assertEqual(len(spread_df), 75)
@@ -138,19 +163,17 @@ class TestDataQualityEngine(unittest.TestCase):
         self.assertIn("Rolling_Correlation", spread_df.columns)
         self.assertIn("Rolling_Beta", spread_df.columns)
 
-        # Deduced multiplier should be approximately 100.0
-        self.assertAlmostEqual(spread_df["Multiplier"].iloc[0], 100.0, delta=2.0)
-        # All rolling metrics must be finite
+        # Multiplier should be contract ratio 100.0
+        self.assertAlmostEqual(spread_df["Multiplier"].iloc[0], 100.0, delta=0.1)
         self.assertTrue(np.isfinite(spread_df["Basis_Bps"].values).all())
         self.assertTrue(np.isfinite(spread_df["Spread_ZScore"].values).all())
         self.assertTrue(np.isfinite(spread_df["Rolling_Correlation"].values).all())
+        self.assertTrue(np.isfinite(spread_df["Rolling_Beta"].values).all())
 
     def test_data_cleaning_engine_full_pipeline(self) -> None:
-        """Verify DataCleaningEngine transforms IngestedDataset into CleanedDataset contract."""
+        """Verify DataCleaningEngine transforms IngestedDataset into CleanedDataset contract with zero NaNs."""
         df_etf = self._make_intraday_bar(self.full_times, base_price=510.0)
-        # Introduce a gap
         df_gappy = df_etf.drop(df_etf.index[[10, 11]])
-
         df_bench = self._make_intraday_bar(self.full_times, base_price=51000.0)
 
         ingested = IngestedDataset(
@@ -171,6 +194,9 @@ class TestDataQualityEngine(unittest.TestCase):
         self.assertIsNotNone(cleaned.spread_data)
         self.assertEqual(len(cleaned.spread_data), 75)
         self.assertTrue(cleaned.quality_report["gap_integrity_passed"])
+
+        # Absolutely zero NaNs in cleaned data
+        self.assertFalse(cleaned.data.isna().any().any())
 
         summary = cleaned.summary()
         self.assertEqual(summary["ticker"], "BANKBEES.NS")

@@ -6,7 +6,11 @@ from typing import List, Optional, Tuple
 import pandas as pd
 
 from ravana.data.ingestion.config import ExchangeType, IngestionConfig
-from ravana.data.ingestion.session_gatekeeper import NSESessionGatekeeper
+from ravana.data.ingestion.session_gatekeeper import (
+    KNOWN_SPECIAL_SESSIONS,
+    KNOWN_NSE_HOLIDAYS,
+    NSESessionGatekeeper,
+)
 
 
 class TimeGridReindexer:
@@ -60,12 +64,15 @@ class TimeGridReindexer:
         out["Open"] = out["Open"].fillna(out["Close"])
         out["High"] = out["High"].fillna(out["Close"])
         out["Low"] = out["Low"].fillna(out["Close"])
+        for col in ["Close_Adj", "Open_Adj", "High_Adj", "Low_Adj"]:
+            if col in out.columns:
+                out[col] = out[col].fillna(out["Close"])
         if "Volume" in out.columns:
             out["Volume"] = out["Volume"].fillna(0.0)
         return out, 0
 
     def _reindex_intraday(self, df: pd.DataFrame, interval: str) -> Tuple[pd.DataFrame, int]:
-        """Reindex intraday series to exact regular session bars."""
+        """Reindex intraday series to exact regular session bars with zero lookahead."""
         freq = self._resolve_frequency(interval)
         target_grid = self._build_target_grid(df.index, freq)
 
@@ -79,15 +86,28 @@ class TimeGridReindexer:
         reindexed = out.reindex(target_grid)
         reindexed["Is_Synthetic"] = is_missing_mask
 
-        # Causal forward-fill prices
-        reindexed["Close"] = reindexed["Close"].ffill().bfill()
-        synthetic_idx = reindexed["Is_Synthetic"]
+        # Causal forward-fill prices only (strictly zero lookahead)
+        reindexed["Close"] = reindexed["Close"].ffill()
 
+        # If initial bars on the first session are missing, truncate leading unobserved NaNs
+        # rather than backward-filling future prices into the past
+        if reindexed["Close"].isna().any():
+            valid_start = reindexed["Close"].first_valid_index()
+            if valid_start is not None:
+                reindexed = reindexed.loc[valid_start:]
+            num_synthetic = int(reindexed["Is_Synthetic"].sum())
+
+        synthetic_idx = reindexed["Is_Synthetic"]
         reindexed.loc[synthetic_idx, "Open"] = reindexed.loc[synthetic_idx, "Close"]
         reindexed.loc[synthetic_idx, "High"] = reindexed.loc[synthetic_idx, "Close"]
         reindexed.loc[synthetic_idx, "Low"] = reindexed.loc[synthetic_idx, "Close"]
-        if "Close_Adj" in reindexed.columns:
-            reindexed.loc[synthetic_idx, "Close_Adj"] = reindexed.loc[synthetic_idx, "Close"]
+
+        # Fill all adjusted columns to prevent NaNs in downstream feature matrices
+        for col in ["Close_Adj", "Open_Adj", "High_Adj", "Low_Adj"]:
+            if col in reindexed.columns:
+                reindexed[col] = reindexed[col].ffill()
+                reindexed.loc[synthetic_idx, col] = reindexed.loc[synthetic_idx, "Close"]
+
         if "Volume" in reindexed.columns:
             reindexed.loc[synthetic_idx, "Volume"] = 0.0
 
@@ -113,6 +133,14 @@ class TimeGridReindexer:
 
         for session_date in unique_dates:
             date_str = session_date.strftime("%Y-%m-%d")
+
+            # Defensive guard: skip weekends/holidays if exchange is NSE and date is not a special session
+            if self.exchange == ExchangeType.NSE:
+                if session_date.weekday() >= 5 and date_str not in KNOWN_SPECIAL_SESSIONS:
+                    continue
+                if date_str in KNOWN_NSE_HOLIDAYS and date_str not in KNOWN_SPECIAL_SESSIONS:
+                    continue
+
             windows = self._get_session_windows(date_str)
             for start_hm, end_hm in windows:
                 start_ts = pd.Timestamp(f"{date_str} {start_hm}", tz=tz)
@@ -134,8 +162,13 @@ class TimeGridReindexer:
         return full_index.unique().sort_values()
 
     def _get_session_windows(self, date_str: str) -> List[Tuple[str, str]]:
-        """Return list of (start_time, end_time) session windows for a date."""
-        if date_str in NSESessionGatekeeper.KNOWN_SPECIAL_SESSIONS:
-            return NSESessionGatekeeper.KNOWN_SPECIAL_SESSIONS[date_str]
-        # Standard NSE session is 09:15:00 to 15:30:00 (left-closed)
+        """Return list of (start_time, end_time) session windows based on exchange profile."""
+        if self.exchange == ExchangeType.NSE:
+            if date_str in KNOWN_SPECIAL_SESSIONS:
+                return KNOWN_SPECIAL_SESSIONS[date_str]
+            return [("09:15:00", "15:30:00")]
+        elif self.exchange == ExchangeType.US:
+            return [("09:30:00", "16:00:00")]
+        elif self.exchange == ExchangeType.GLOBAL_24H:
+            return [("00:00:00", "23:59:59")]
         return [("09:15:00", "15:30:00")]

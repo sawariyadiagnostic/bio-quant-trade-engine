@@ -1,7 +1,7 @@
 """Configuration dataclasses for Muscle 4: Data Quality & Cleaning Engine."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -14,10 +14,13 @@ class CleanerConfig:
     spike_window: int = 20
     spike_threshold_std: float = 4.0
     clamp_spikes: bool = True
+    use_volume_gate: bool = True
+    volume_surge_multiplier: float = 2.0
+    volume_surge_expansion: float = 2.0
     align_spread: bool = True
     spread_rolling_window: int = 60
+    contract_multiplier: Optional[float] = None
     strict_causality: bool = True
-    min_volume_threshold: float = 0.0
 
     @classmethod
     def standard(cls) -> "CleanerConfig":
@@ -30,4 +33,5 @@ class CleanerConfig:
         return cls(
             spike_threshold_std=6.0,
             clamp_spikes=False,
+            use_volume_gate=True,
         )
