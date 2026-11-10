@@ -1,0 +1,86 @@
+{
+  "intraday_5m": {
+    "BANKBEES.NS": {
+      "ticker": "BANKBEES.NS",
+      "interval": "5m",
+      "raw_bars": 4497,
+      "cleaned_bars": 4500,
+      "synthetic_bars": 3,
+      "spikes_flagged": 20,
+      "zero_nans": true,
+      "quality_metrics": {
+        "raw_bars": 4497,
+        "cleaned_bars": 4500,
+        "synthetic_bars_filled": 3,
+        "synthetic_bar_pct": 0.06666666666666667,
+        "spikes_sanitized": 20,
+        "gap_integrity_passed": true,
+        "spread_mean_bps": 368.2096458830517,
+        "spread_std_bps": 11.460974749381453,
+        "multiplier": 100.0
+      }
+    },
+    "NIFTYBEES.NS": {
+      "ticker": "NIFTYBEES.NS",
+      "interval": "5m",
+      "raw_bars": 4496,
+      "cleaned_bars": 4500,
+      "synthetic_bars": 4,
+      "spikes_flagged": 38,
+      "zero_nans": true,
+      "quality_metrics": {
+        "raw_bars": 4496,
+        "cleaned_bars": 4500,
+        "synthetic_bars_filled": 4,
+        "synthetic_bar_pct": 0.08888888888888889,
+        "spikes_sanitized": 38,
+        "gap_integrity_passed": true,
+        "spread_mean_bps": 1414.294786807093,
+        "spread_std_bps": 11.70360418836283,
+        "multiplier": 100.0
+      }
+    }
+  },
+  "daily_1d": {
+    "BANKBEES.NS": {
+      "ticker": "BANKBEES.NS",
+      "interval": "1d",
+      "raw_bars": 4399,
+      "cleaned_bars": 4399,
+      "synthetic_bars": 0,
+      "spikes_flagged": 58,
+      "zero_nans": true,
+      "quality_metrics": {
+        "raw_bars": 4399,
+        "cleaned_bars": 4399,
+        "synthetic_bars_filled": 0,
+        "synthetic_bar_pct": 0.0,
+        "spikes_sanitized": 58,
+        "gap_integrity_passed": true,
+        "spread_mean_bps": 132.00340280220192,
+        "spread_std_bps": 111.2657826472921,
+        "multiplier": 100.0
+      }
+    },
+    "NIFTYBEES.NS": {
+      "ticker": "NIFTYBEES.NS",
+      "interval": "1d",
+      "raw_bars": 4399,
+      "cleaned_bars": 4399,
+      "synthetic_bars": 0,
+      "spikes_flagged": 96,
+      "zero_nans": true,
+      "quality_metrics": {
+        "raw_bars": 4399,
+        "cleaned_bars": 4399,
+        "synthetic_bars_filled": 0,
+        "synthetic_bar_pct": 0.0,
+        "spikes_sanitized": 96,
+        "gap_integrity_passed": true,
+        "spread_mean_bps": 491.5826695961535,
+        "spread_std_bps": 442.2578988958853,
+        "multiplier": 100.0
+      }
+    }
+  }
+}

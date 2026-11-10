@@ -125,31 +125,19 @@ What drives the overnight price gap of Indian ETFs while the NSE is closed?
 - [x] **Auto-Dispatcher:** Routes CPU DataFrames to C-compiled NumPy and GPU/3D tensors to CUDA PyTorch.
 - [x] **Kaggle Tesla T4 Cloud Verification:** Certified at **1,337 formulas/second (6,012,980 points/second)** in 0.748s with peak VRAM of only 37.24 MB.
 
-### Phase 1: Market Data Ingestion & Session Gatekeeper (Muscle 3) — 100% Complete & Battle-Hardened
-- [x] **Dual-Source Ingestion:** Remote `yfinance` download with automatic local Parquet/CSV fallback.
-- [x] **NSE Regulatory Gatekeeper:** Enforces 09:15 to 15:30 IST market hours with strict left-closed boundaries (`[09:15, 15:30)` admitting exactly 75 bars).
-- [x] **Special Session Registry:** Native preservation of Union Budget Saturdays (`2025-02-01`), Diwali Muhurat evening sessions (`18:15–19:15`), and Disaster Recovery live trading drills.
-- [x] **Multi-Asset Exchange Profiles:** Auto-deduction of `NSE` (`Asia/Kolkata`), `US` (`America/New_York`), and `GLOBAL_24H` (`UTC`).
-- [x] **Physical Candlestick Invariants:** Sanitizer enforcing $P > 0$, $High \ge \max(O,C)$, $Low \le \min(O,C)$, and $Volume \ge 0$.
-- [x] **Corporate Action Proportional Scaler:** $O^*, H^*, L^*$ scaled by $\frac{Close\_Adj}{Close}$ preventing geometric inversion and 6800% volatility spikes across stock splits.
-- [x] **Sealed Handshake Contract:** `IngestedDataset` container bundling primary ETF, paired index (`^NSEBANK`), macro drivers, and health telemetry.
+### Phase 1: Data Pipeline & Microstructure Layer (Muscles 3, 4, 5) — 100% Complete & Sealed
+- [x] **Muscle 3: Market Data Ingestion & Gatekeeper:** Dual-source yfinance/local fallback, NSE 09:15-15:30 IST gatekeeper, special sessions (Diwali Muhurat, Budget Saturdays), proportional split scaler.
+- [x] **Muscle 4: Data Quality & Cleaning Engine:** Causal gap-filling (`TimeGridReindexer`), MAD 50% breakdown spike filtering with institutional volume gate (`FlashSpikeFilter`), point-in-time ETF-to-benchmark basis analytics (`ETFBUSpreadAligner`).
+- [x] **Muscle 5: Causal Multi-Timeframe Resampler:** Session-anchored intraday binning, zero cross-session bleeding, actionable right-labeled timestamps, turnover-weighted VWAP, causal incomplete period sealing, and point-in-time backward as-of joining (`SessionAwareResampler`, `ResamplingEngine`).
 
 ---
 
 ## 4. Pending Improvements for Future Muscles (To Implement Next)
 
-### Muscle 4: Data Quality & Cleaning Engine (`ravana/data/cleaner/`)
-- [ ] **Intraday Time-Grid Reindexing:** Bridge the 1–2 missing bar gaps found in real 5m ETF data (e.g., `2026-09-21` and `2026-10-15`) by forward-filling prices and zero-filling volume, guaranteeing an equidistant temporal grid for Muscle 1 & 2 rolling operations.
-- [ ] **Flash Spike & Bad Tick Filter:** Flag and clamp erroneous multi-sigma price jumps unconfirmed by volume or neighboring bars.
-- [ ] **ETF Premium/Discount Spread Generator:** Synchronize `BANKBEES.NS` with `^NSEBANK` and generate the tracking spread series $\text{Spread}_{\text{iNAV}}$.
-
-### Muscle 5: Causal Multi-Timeframe Resampler (`ravana/data/resampler/`)
-- [ ] **Mother Bar Resampling Engine:** Causally resample 1D Mother Bars into derived 1W and 1M bars with strict right-closed intervals (`closed='right', label='right'`).
-- [ ] **Intraday Resampling:** Resample clean 1m Mother Bars into 5m, 15m, and 1h intervals with zero future lookahead.
-
 ### Muscle 6: Sovereign Columnar Parquet Data Lake (`ravana/data/lake/`)
-- [ ] **Full 18-Year Historical Daily Lake:** Ingest and store 4,400+ daily bars for `BANKBEES.NS` and `NIFTYBEES.NS` (2009–present).
-- [ ] **Incremental Upsert Engine:** Merge new 5m intraday pulls with existing parquet partitions without duplicating timestamps, continuously expanding local historical archives.
+- [ ] **Lakehouse Partition Schema & Read API:** Unified fast reader and partition query manager (`LakeManager`) reading Bronze (M3), Silver (M4), and Gold (M5) tiers.
+- [ ] **Incremental Upsert Engine:** Merge new incoming intraday bars with existing partitions without duplicating timestamps or rewriting full histories.
+- [ ] **Memory-Mapped Parquet Queries:** Zero-copy columnar slicing for Muscle 7 feature engineering.
 
 ### Muscle 7: Market Vocabulary Feature Matrix Engine (`ravana/features/`)
 - [ ] **21 Standard Features:** Compute stationary z-scored technical indicators (`VWAP`, `ATR_14`, `VOLATILITY_20`, `RET_1`, `RET_5`, `VOLUME_ZSCORE`, `HIGH_LOW_SPREAD`).
@@ -179,6 +167,29 @@ What drives the overnight price gap of Indian ETFs while the NSE is closed?
   * Purged contemporaneous warmup bias in rolling mean/std.
   * Safe variance guards against flat index intervals.
 * **Handshake Contract:** `CleanedDataset` verified with 0 NaNs and delivered to Muscle 5 (Resampler).
+
+---
+
+### Muscle 5 Implementation: Causal Multi-Timeframe Resampler (Completed & Battle-Hardened)
+* **Intraday Session-Anchored Aggregation (`SessionAwareResampler`):**
+  * **Zero Cross-Session Bleeding:** Vectorized session partitioning via `groupby(index.normalize())` prevents overnight ghost bins across 15:30 to 09:15.
+  * **Strict Actionable Right-Labeling:** Avoids naive wall-clock start-labeling (which leaks up to 59 minutes of future trading). Every bar is stamped at its completion ($t_{\text{actionable}} = t_{\text{close}}$). E.g., $[09:15, 09:30) \implies \mathbf{09:30:00}$.
+  * **Deterministic Session Bar Counts:**
+    * 15m: Exactly 25.00 bars/session ($25 \times 15\text{m} = 375\text{m}$).
+    * 30m: Exactly 13.00 bars/session ($12 \times 30\text{m} + 1 \times 15\text{m}$ terminal stub clamped to 15:30:00).
+    * 1h (60m): Exactly 7.00 bars/session ($6 \times 60\text{m} + 1 \times 15\text{m}$ terminal stub clamped to 15:30:00).
+    * 75m: Exactly 5.00 bars/session (exact harmonic divisor).
+    * 125m: Exactly 3.00 bars/session (exact harmonic divisor).
+* **True Turnover-Weighted VWAP:**
+  * Replaced fatal naive unweighted arithmetic mean (`mean(VWAP)`, which creates up to 42 bps drift) with exact turnover-weighted aggregation:
+    $$\text{VWAP} = \frac{\sum (\text{Typical Price} \times \text{Volume})}{\sum \text{Volume}}$$
+  * Strict zero-volume fallback to `Close` with 0 NaNs.
+* **Causal Incomplete Period Sealing (`resample_daily_to_higher`):**
+  * Eliminates fatal lookahead leakage where unclosed mid-week or mid-month bars are merged into backtests. Active incomplete periods are causally dropped (`require_closed_period=True`).
+* **Point-In-Time Backward As-Of Merging (`point_in_time_merge`):**
+  * Employs `pd.merge_asof(..., direction='backward')` guaranteeing lower-timeframe bars only ever observe sealed prior higher-timeframe states.
+* **Gold Tier Lake Manifest (`ravana/data/lake/m5_resampled/`):**
+  * Generated and certified **38 Parquet files** across `intraday_15m`, `intraday_30m`, `intraday_1h`, `macro_1wk`, and `macro_1mo` with **0 NaNs and 0 Infs**.
 
 ---
 

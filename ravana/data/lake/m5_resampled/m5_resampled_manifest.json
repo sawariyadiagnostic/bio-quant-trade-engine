@@ -1,0 +1,172 @@
+{
+  "intraday": {
+    "BANKBEES.NS": {
+      "ticker": "BANKBEES.NS",
+      "timeframes": {
+        "15m": {
+          "ticker": "BANKBEES.NS",
+          "bars": 1500,
+          "start": "2026-08-13 09:30:00+05:30",
+          "end": "2026-11-09 15:30:00+05:30",
+          "file_size_bytes": 109265
+        },
+        "30m": {
+          "ticker": "BANKBEES.NS",
+          "bars": 780,
+          "start": "2026-08-13 09:45:00+05:30",
+          "end": "2026-11-09 15:30:00+05:30",
+          "file_size_bytes": 63961
+        },
+        "1h": {
+          "ticker": "BANKBEES.NS",
+          "bars": 420,
+          "start": "2026-08-13 10:15:00+05:30",
+          "end": "2026-11-09 15:30:00+05:30",
+          "file_size_bytes": 39529
+        }
+      }
+    },
+    "NIFTYBEES.NS": {
+      "ticker": "NIFTYBEES.NS",
+      "timeframes": {
+        "15m": {
+          "ticker": "NIFTYBEES.NS",
+          "bars": 1500,
+          "start": "2026-08-13 09:30:00+05:30",
+          "end": "2026-11-09 15:30:00+05:30",
+          "file_size_bytes": 106713
+        },
+        "30m": {
+          "ticker": "NIFTYBEES.NS",
+          "bars": 780,
+          "start": "2026-08-13 09:45:00+05:30",
+          "end": "2026-11-09 15:30:00+05:30",
+          "file_size_bytes": 63755
+        },
+        "1h": {
+          "ticker": "NIFTYBEES.NS",
+          "bars": 420,
+          "start": "2026-08-13 10:15:00+05:30",
+          "end": "2026-11-09 15:30:00+05:30",
+          "file_size_bytes": 39646
+        }
+      }
+    }
+  },
+  "macro": {
+    "BANKBEES.NS": {
+      "ticker": "BANKBEES.NS",
+      "timeframes": {
+        "1wk": {
+          "ticker": "BANKBEES.NS",
+          "bars": 932,
+          "start": "2009-01-02 00:00:00+05:30",
+          "end": "2026-11-06 00:00:00+05:30",
+          "file_size_bytes": 92417
+        },
+        "1mo": {
+          "ticker": "BANKBEES.NS",
+          "bars": 214,
+          "start": "2009-01-31 00:00:00+05:30",
+          "end": "2026-10-31 00:00:00+05:30",
+          "file_size_bytes": 28733
+        }
+      }
+    },
+    "NIFTYBEES.NS": {
+      "ticker": "NIFTYBEES.NS",
+      "timeframes": {
+        "1wk": {
+          "ticker": "NIFTYBEES.NS",
+          "bars": 932,
+          "start": "2009-01-02 00:00:00+05:30",
+          "end": "2026-11-06 00:00:00+05:30",
+          "file_size_bytes": 91859
+        },
+        "1mo": {
+          "ticker": "NIFTYBEES.NS",
+          "bars": 214,
+          "start": "2009-01-31 00:00:00+05:30",
+          "end": "2026-10-31 00:00:00+05:30",
+          "file_size_bytes": 28848
+        }
+      }
+    },
+    "^GSPC": {
+      "ticker": "^GSPC",
+      "timeframes": {
+        "1wk": {
+          "ticker": "^GSPC",
+          "bars": 5158,
+          "start": "1927-12-30 00:00:00-05:00",
+          "end": "2026-11-06 00:00:00-05:00",
+          "file_size_bytes": 465399
+        },
+        "1mo": {
+          "ticker": "^GSPC",
+          "bars": 1187,
+          "start": "1927-12-31 00:00:00-05:00",
+          "end": "2026-10-31 00:00:00-04:00",
+          "file_size_bytes": 116935
+        }
+      }
+    },
+    "^VIX": {
+      "ticker": "^VIX",
+      "timeframes": {
+        "1wk": {
+          "ticker": "^VIX",
+          "bars": 1923,
+          "start": "1990-01-05 00:00:00-05:00",
+          "end": "2026-11-06 00:00:00-05:00",
+          "file_size_bytes": 135393
+        },
+        "1mo": {
+          "ticker": "^VIX",
+          "bars": 442,
+          "start": "1990-01-31 00:00:00-05:00",
+          "end": "2026-10-31 00:00:00-04:00",
+          "file_size_bytes": 42482
+        }
+      }
+    },
+    "INR=X": {
+      "ticker": "INR=X",
+      "timeframes": {
+        "1wk": {
+          "ticker": "INR=X",
+          "bars": 1194,
+          "start": "2003-12-05 00:00:00+00:00",
+          "end": "2026-11-06 00:00:00+00:00",
+          "file_size_bytes": 104895
+        },
+        "1mo": {
+          "ticker": "INR=X",
+          "bars": 275,
+          "start": "2003-12-31 00:00:00+00:00",
+          "end": "2026-10-31 00:00:00+00:00",
+          "file_size_bytes": 31003
+        }
+      }
+    },
+    "^INDIAVIX": {
+      "ticker": "^INDIAVIX",
+      "timeframes": {
+        "1wk": {
+          "ticker": "^INDIAVIX",
+          "bars": 975,
+          "start": "2008-03-07 00:00:00+05:30",
+          "end": "2026-11-06 00:00:00+05:30",
+          "file_size_bytes": 77969
+        },
+        "1mo": {
+          "ticker": "^INDIAVIX",
+          "bars": 224,
+          "start": "2008-03-31 00:00:00+05:30",
+          "end": "2026-10-31 00:00:00+05:30",
+          "file_size_bytes": 26166
+        }
+      }
+    }
+  }
+}
