@@ -1,6 +1,6 @@
 """Universal Market Data Loader.
 Dual-source data ingestion (yfinance remote API and local Parquet/CSV)
-with session gatekeeping and contract normalization.
+with session gatekeeping, physical invariant validation, and contract normalization.
 """
 from __future__ import annotations
 
@@ -29,6 +29,46 @@ STANDARD_COL_MAP: Dict[str, str] = {
 }
 
 
+class CandlestickSanityValidator:
+    """Enforces physical and mathematical invariants on OHLCV candles."""
+
+    @staticmethod
+    def sanitize(df: pd.DataFrame) -> pd.DataFrame:
+        """Repair or clamp physically impossible candles (High < Low, Open <= 0, etc.)."""
+        if df.empty:
+            return df
+        out = df.copy()
+
+        # 1. Repair non-positive Open/Close/High/Low prices
+        if "Close" in out.columns:
+            out["Close"] = out["Close"].replace(0.0, np.nan).ffill().bfill()
+        if "Open" in out.columns and "Close" in out.columns:
+            out["Open"] = np.where(out["Open"] <= 0.0, out["Close"], out["Open"])
+        if "Low" in out.columns and "Close" in out.columns:
+            out["Low"] = np.where(out["Low"] <= 0.0, out["Close"], out["Low"])
+        if "High" in out.columns and "Close" in out.columns:
+            out["High"] = np.where(out["High"] <= 0.0, out["Close"], out["High"])
+
+        # 2. Geometric bounds: High >= max(Open, Close), Low <= min(Open, Close)
+        if all(col in out.columns for col in ["Open", "High", "Low", "Close"]):
+            max_oc = np.maximum(out["Open"], out["Close"])
+            min_oc = np.minimum(out["Open"], out["Close"])
+            out["High"] = np.maximum(out["High"], max_oc)
+            out["Low"] = np.minimum(out["Low"], min_oc)
+
+        # 3. Volume non-negativity
+        if "Volume" in out.columns:
+            out["Volume"] = np.maximum(out["Volume"], 0.0)
+
+        # 4. Proportional OHLC scaling across splits if Close_Adj is available
+        if "Close_Adj" in out.columns and "Close" in out.columns:
+            ratio = np.where(out["Close"] > 0, out["Close_Adj"] / out["Close"], 1.0)
+            out["Open_Adj"] = out["Open"] * ratio
+            out["High_Adj"] = out["High"] * ratio
+            out["Low_Adj"] = out["Low"] * ratio
+        return out
+
+
 class MarketDataLoader:
     """Institutional data loader for live feeds and local historical lakes."""
 
@@ -39,8 +79,12 @@ class MarketDataLoader:
         """Normalize DataFrame columns to standard TitleCase names and cast float64."""
         out = df.copy()
         if isinstance(out.columns, pd.MultiIndex):
-            # Flatten yfinance MultiIndex (e.g. ('Close', 'BANKBEES.NS') -> 'Close')
-            out.columns = [col[0] for col in out.columns]
+            # Flatten multi-level headers while guarding against duplicate collision
+            flattened = []
+            for col in out.columns:
+                c = col[0] if isinstance(col, tuple) else col
+                flattened.append(c)
+            out.columns = flattened
 
         rename_dict = {}
         for col in out.columns:
@@ -49,11 +93,14 @@ class MarketDataLoader:
                 rename_dict[col] = STANDARD_COL_MAP[cleaned_col]
         out = out.rename(columns=rename_dict)
 
-        required = ["Open", "High", "Low", "Close", "Volume"]
+        # Eliminate duplicate column names if multi-ticker was downloaded
+        out = out.loc[:, ~out.columns.duplicated()]
+
+        required = ["Open", "High", "Low", "Close", "Volume", "Close_Adj"]
         for col in required:
             if col in out.columns:
                 out[col] = pd.to_numeric(out[col], errors="coerce").astype(np.float64)
-        return out
+        return CandlestickSanityValidator.sanitize(out)
 
     def clean_index_and_chronology(self, df: pd.DataFrame) -> pd.DataFrame:
         """Sort DatetimeIndex chronologically and drop duplicate timestamps."""
@@ -73,10 +120,17 @@ class MarketDataLoader:
         out = out[~out.index.duplicated(keep="last")]
         return out.sort_index()
 
+    def _detect_is_intraday(self, df: pd.DataFrame) -> bool:
+        """Detect whether a DataFrame's index represents intraday frequency."""
+        if len(df) < 2 or not isinstance(df.index, pd.DatetimeIndex):
+            return False
+        deltas = df.index[1:min(10, len(df))] - df.index[0:min(9, len(df) - 1)]
+        return any(d < pd.Timedelta(days=1) for d in deltas)
+
     def load_local(
         self,
         file_path: str,
-        is_intraday: bool = False,
+        is_intraday: Optional[bool] = None,
         special_whitelist: Optional[List[str]] = None,
     ) -> pd.DataFrame:
         """Load market bars from local CSV or Parquet file with gatekeeping."""
@@ -89,8 +143,9 @@ class MarketDataLoader:
 
         std = self.standardize_columns(raw)
         indexed = self.clean_index_and_chronology(std)
+        intraday_flag = is_intraday if is_intraday is not None else self._detect_is_intraday(indexed)
         return self.gatekeeper.filter_trading_hours(
-            indexed, is_intraday=is_intraday, special_whitelist=special_whitelist
+            indexed, is_intraday=intraday_flag, special_whitelist=special_whitelist
         )
 
     def fetch_yfinance(self, config: IngestionConfig) -> pd.DataFrame:
@@ -111,11 +166,14 @@ class MarketDataLoader:
 
         std = self.standardize_columns(raw)
         indexed = self.clean_index_and_chronology(std)
+        should_filter_weekends = not any(config.interval.lower().endswith(u) for u in ["mo", "wk", "y", "month", "year"])
         return self.gatekeeper.filter_trading_hours(
             indexed,
             is_intraday=config.is_intraday(),
+            filter_weekends_flag=should_filter_weekends,
             special_whitelist=config.special_session_dates,
         )
+
 
     def ingest(
         self, config: IngestionConfig, local_fallback_path: Optional[str] = None

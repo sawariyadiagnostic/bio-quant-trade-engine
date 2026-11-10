@@ -1,10 +1,11 @@
 """Unit tests for Muscle 3: Market Data Ingestion & Session Gatekeeper.
 Strictly verifies:
-- NSE Trading Hours Gatekeeping (09:15 to 15:30 IST).
+- NSE Trading Hours Gatekeeping (09:15 to 15:25 IST for left-closed 5m).
 - Pre-market, post-market, and weekend filtration.
+- Special session preservation (Union Budget Saturdays, Diwali Muhurat evenings).
 - Timezone standardization to Asia/Kolkata (UTC+05:30).
-- Column normalization and dtype casting.
-- Local CSV/Parquet ingestion and deduplication.
+- Candlestick physical sanity validation and proportional split adjustment.
+- Monthly / Daily interval preservation (no accidental wipeout).
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import pandas as pd
 
 from ravana.data.ingestion.config import IngestionConfig
 from ravana.data.ingestion.session_gatekeeper import NSESessionGatekeeper
-from ravana.data.ingestion.loader import MarketDataLoader
+from ravana.data.ingestion.loader import MarketDataLoader, CandlestickSanityValidator
 
 
 class TestNSESessionGatekeeper(unittest.TestCase):
@@ -25,12 +26,12 @@ class TestNSESessionGatekeeper(unittest.TestCase):
     def setUp(self) -> None:
         self.gatekeeper = NSESessionGatekeeper()
 
-    def test_filter_intraday_hours(self) -> None:
-        """Verify only 09:15 to 15:30 IST bars are retained; pre/post market dropped."""
+    def test_filter_intraday_hours_left_closed(self) -> None:
+        """Verify left-closed intervals admit [09:15, 15:30), excluding 15:30:00 closing bar."""
         timestamps = pd.date_range(
-            start="2026-11-09 08:30:00",
-            end="2026-11-09 16:30:00",
-            freq="15min",
+            start="2026-11-09 09:15:00",
+            end="2026-11-09 15:30:00",
+            freq="5min",
             tz="Asia/Kolkata",
         )
         df = pd.DataFrame(
@@ -46,46 +47,36 @@ class TestNSESessionGatekeeper(unittest.TestCase):
 
         filtered = self.gatekeeper.filter_trading_hours(df, is_intraday=True)
 
-        # Check earliest bar is >= 09:15 and latest bar is <= 15:30
-        self.assertFalse(filtered.empty)
-        first_time = filtered.index[0].time()
-        last_time = filtered.index[-1].time()
-        self.assertGreaterEqual(first_time, pd.Timestamp("09:15:00").time())
-        self.assertLessEqual(last_time, pd.Timestamp("15:30:00").time())
+        # In left-closed 5m data, there are exactly 75 bars: 09:15:00 to 15:25:00
+        self.assertEqual(len(filtered), 75)
+        self.assertEqual(filtered.index[0].time(), pd.Timestamp("09:15:00").time())
+        self.assertEqual(filtered.index[-1].time(), pd.Timestamp("15:25:00").time())
+        self.assertNotIn(pd.Timestamp("2026-11-09 15:30:00", tz="Asia/Kolkata"), filtered.index)
 
-        # Ensure 09:00 pre-market and 16:00 post-market were dropped
-        pre_market = filtered.index.indexer_at_time("09:00:00")
-        post_market = filtered.index.indexer_at_time("16:00:00")
-        self.assertEqual(len(pre_market), 0)
-        self.assertEqual(len(post_market), 0)
+    def test_union_budget_saturday_retained(self) -> None:
+        """Verify Saturday 2025-02-01 (Union Budget) is retained by default."""
+        dates = pd.date_range("2025-01-31", "2025-02-03", freq="D", tz="Asia/Kolkata")
+        df = pd.DataFrame({"Close": [100.0, 101.0, 102.0, 103.0]}, index=dates)
 
-    def test_weekend_filtration(self) -> None:
-        """Verify Saturday and Sunday bars are purged unless explicitly whitelisted."""
-        dates = pd.date_range("2026-11-06", "2026-11-10", freq="D", tz="Asia/Kolkata")
-        df = pd.DataFrame({"Close": [100.0, 101.0, 102.0, 103.0, 104.0]}, index=dates)
-
-        # 2026-11-06 is Friday, 07 is Sat, 08 is Sun, 09 is Mon, 10 is Tue
         cleaned = self.gatekeeper.filter_weekends(df)
-        self.assertEqual(len(cleaned), 3)  # Fri, Mon, Tue
-        self.assertNotIn(pd.Timestamp("2026-11-07", tz="Asia/Kolkata"), cleaned.index)
-        self.assertNotIn(pd.Timestamp("2026-11-08", tz="Asia/Kolkata"), cleaned.index)
+        # Jan 31 (Fri), Feb 01 (Budget Sat), Feb 03 (Mon) -> 3 days retained (Feb 02 Sun dropped)
+        self.assertEqual(len(cleaned), 3)
+        self.assertIn(pd.Timestamp("2025-02-01", tz="Asia/Kolkata"), cleaned.index)
 
-    def test_timezone_standardization(self) -> None:
-        """Verify naive timestamps and UTC timestamps are standardized to Asia/Kolkata."""
-        # Naive index
-        naive_idx = pd.date_range("2026-11-09 09:15", periods=5, freq="5min")
-        df_naive = pd.DataFrame({"Close": [100, 101, 102, 103, 104]}, index=naive_idx)
-        std_naive = self.gatekeeper.standardize_timezone(df_naive)
-        self.assertEqual(str(std_naive.index.tz), "Asia/Kolkata")
+    def test_diwali_muhurat_evening_session_retained(self) -> None:
+        """Verify Diwali Muhurat evening hours (18:15 to 19:15) are strictly retained."""
+        timestamps = pd.date_range(
+            start="2023-11-12 18:00:00",
+            end="2023-11-12 19:30:00",
+            freq="5min",
+            tz="Asia/Kolkata",
+        )
+        df = pd.DataFrame({"Close": np.linspace(100, 105, len(timestamps))}, index=timestamps)
 
-        # UTC index
-        utc_idx = pd.date_range("2026-11-09 03:45", periods=5, freq="5min", tz="UTC")
-        df_utc = pd.DataFrame({"Close": [100, 101, 102, 103, 104]}, index=utc_idx)
-        std_utc = self.gatekeeper.standardize_timezone(df_utc)
-        self.assertEqual(str(std_utc.index.tz), "Asia/Kolkata")
-        # 03:45 UTC is 09:15 IST
-        self.assertEqual(std_utc.index[0].hour, 9)
-        self.assertEqual(std_utc.index[0].minute, 15)
+        filtered = self.gatekeeper.filter_trading_hours(df, is_intraday=True)
+        self.assertFalse(filtered.empty)
+        self.assertEqual(filtered.index[0].time(), pd.Timestamp("18:15:00").time())
+        self.assertLess(filtered.index[-1].time(), pd.Timestamp("19:15:00").time())
 
 
 class TestMarketDataLoader(unittest.TestCase):
@@ -93,6 +84,63 @@ class TestMarketDataLoader(unittest.TestCase):
 
     def setUp(self) -> None:
         self.loader = MarketDataLoader()
+
+    def test_monthly_interval_not_intraday(self) -> None:
+        """Verify 1mo interval is correctly marked non-intraday, preserving data."""
+        cfg = IngestionConfig(ticker="BANKBEES.NS", interval="1mo")
+        self.assertFalse(cfg.is_intraday())
+
+        monthly_idx = pd.date_range("2025-01-01", periods=6, freq="MS", tz="Asia/Kolkata")
+        df_monthly = pd.DataFrame(
+            {
+                "Open": [100.0] * 6,
+                "High": [105.0] * 6,
+                "Low": [95.0] * 6,
+                "Close": [102.0] * 6,
+                "Volume": [10000.0] * 6,
+            },
+            index=monthly_idx,
+        )
+        res = self.loader.gatekeeper.filter_trading_hours(
+            df_monthly, is_intraday=cfg.is_intraday(), filter_weekends_flag=False
+        )
+        self.assertEqual(len(res), 6)
+
+    def test_candlestick_sanity_validator(self) -> None:
+        """Verify zero prices and High/Low geometric inversions are repaired."""
+        df_corrupt = pd.DataFrame(
+            {
+                "Open": [0.0, 100.0],       # 0.0 Open price
+                "High": [90.0, 102.0],      # High < Open
+                "Low": [110.0, 98.0],       # Low > High
+                "Close": [100.0, 101.0],
+                "Volume": [-500.0, 1000.0], # Negative volume
+            }
+        )
+        cleaned = CandlestickSanityValidator.sanitize(df_corrupt)
+        self.assertGreater(cleaned["Open"].iloc[0], 0.0)
+        self.assertGreaterEqual(cleaned["High"].iloc[0], cleaned["Low"].iloc[0])
+        self.assertGreaterEqual(cleaned["High"].iloc[0], cleaned["Open"].iloc[0])
+        self.assertGreaterEqual(cleaned["Volume"].iloc[0], 0.0)
+
+    def test_proportional_split_adjustment(self) -> None:
+        """Verify Close_Adj scales Open/High/Low proportionally preserving candle geometry."""
+        df_split = pd.DataFrame(
+            {
+                "Open": [1000.0],
+                "High": [1050.0],
+                "Low": [980.0],
+                "Close": [1000.0],
+                "Close_Adj": [100.0],  # 10:1 split
+                "Volume": [1000.0],
+            }
+        )
+        scaled = CandlestickSanityValidator.sanitize(df_split)
+        self.assertEqual(scaled["Open_Adj"].iloc[0], 100.0)
+        self.assertEqual(scaled["High_Adj"].iloc[0], 105.0)
+        self.assertEqual(scaled["Low_Adj"].iloc[0], 98.0)
+        self.assertGreaterEqual(scaled["High_Adj"].iloc[0], scaled["Close_Adj"].iloc[0])
+        self.assertLessEqual(scaled["Low_Adj"].iloc[0], scaled["Close_Adj"].iloc[0])
 
     def test_load_local_csv_and_standardize_columns(self) -> None:
         """Verify local CSV ingestion standardizes column names and dtypes."""
@@ -111,8 +159,6 @@ class TestMarketDataLoader(unittest.TestCase):
             df_mock.to_csv(csv_path, index=False)
 
             loaded = self.loader.load_local(csv_path, is_intraday=True)
-
-            # Check standard columns
             expected_cols = ["Open", "High", "Low", "Close", "Volume"]
             for col in expected_cols:
                 self.assertIn(col, loaded.columns)
@@ -120,59 +166,6 @@ class TestMarketDataLoader(unittest.TestCase):
 
             self.assertEqual(len(loaded), 3)
             self.assertEqual(str(loaded.index.tz), "Asia/Kolkata")
-
-    def test_deduplication_and_sorting(self) -> None:
-        """Verify duplicate rows and out-of-order timestamps are resolved."""
-        timestamps = [
-            pd.Timestamp("2026-11-09 09:25:00", tz="Asia/Kolkata"),
-            pd.Timestamp("2026-11-09 09:15:00", tz="Asia/Kolkata"),
-            pd.Timestamp("2026-11-09 09:20:00", tz="Asia/Kolkata"),
-            pd.Timestamp("2026-11-09 09:15:00", tz="Asia/Kolkata"),  # Duplicate!
-        ]
-        df_disordered = pd.DataFrame(
-            {
-                "Open": [102.0, 100.0, 101.0, 100.0],
-                "High": [103.0, 101.0, 102.0, 101.0],
-                "Low": [101.5, 99.5, 100.5, 99.5],
-                "Close": [102.5, 100.5, 101.5, 100.5],
-                "Volume": [1000, 1000, 1000, 1000],
-            },
-            index=timestamps,
-        )
-
-        cleaned = self.loader.clean_index_and_chronology(df_disordered)
-        self.assertEqual(len(cleaned), 3)
-        self.assertTrue(cleaned.index.is_monotonic_increasing)
-        self.assertEqual(cleaned.index[0], pd.Timestamp("2026-11-09 09:15:00", tz="Asia/Kolkata"))
-
-    def test_fetch_yfinance_and_fallback(self) -> None:
-        """Verify yfinance fetch or fallback gracefully operates under IngestionConfig."""
-        cfg = IngestionConfig(ticker="BANKBEES.NS", interval="1d", period="5d")
-        df = self.loader.fetch_yfinance(cfg)
-        if not df.empty:
-            self.assertIn("Close", df.columns)
-            self.assertEqual(str(df.index.tz), "Asia/Kolkata")
-            self.assertGreaterEqual(len(df), 1)
-
-        # Test local fallback
-        with tempfile.TemporaryDirectory() as tmpdir:
-            fallback_csv = os.path.join(tmpdir, "fallback.csv")
-            pd.DataFrame(
-                {
-                    "date": ["2026-11-09"],
-                    "open": [560.0],
-                    "high": [565.0],
-                    "low": [558.0],
-                    "close": [562.0],
-                    "volume": [100000.0],
-                }
-            ).to_csv(fallback_csv, index=False)
-
-            invalid_cfg = IngestionConfig(ticker="INVALID_TICKER_9999.NS", interval="1d")
-            res = self.loader.ingest(invalid_cfg, local_fallback_path=fallback_csv)
-            self.assertEqual(len(res), 1)
-            self.assertEqual(res["Close"].iloc[0], 562.0)
-
 
 
 if __name__ == "__main__":

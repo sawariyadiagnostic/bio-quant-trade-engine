@@ -21,5 +21,12 @@ class IngestionConfig:
     special_session_dates: List[str] = field(default_factory=list)
 
     def is_intraday(self) -> bool:
-        """Return True if the interval represents intraday minutes/hours."""
-        return any(unit in self.interval.lower() for unit in ["m", "h", "s"])
+        """Return True if the interval represents intraday minutes/hours/seconds.
+        
+        Strictly excludes Daily ('1d'), Weekly ('1wk'), and Monthly ('1mo', '3mo').
+        """
+        val = self.interval.strip().lower()
+        # Guard against Daily, Weekly, Monthly, and Yearly intervals
+        if any(val.endswith(unit) for unit in ["d", "wk", "mo", "y", "month", "year"]):
+            return False
+        return any(unit in val for unit in ["m", "h", "s", "min", "sec", "hour"])
