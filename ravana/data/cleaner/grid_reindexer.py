@@ -60,7 +60,8 @@ class TimeGridReindexer:
         out = df[~df.index.duplicated(keep="last")].sort_index()
         if "Is_Synthetic" not in out.columns:
             out["Is_Synthetic"] = False
-        out["Close"] = out["Close"].ffill().bfill()
+        out["Close"] = out["Close"].ffill()
+        out = out.dropna(subset=["Close"])
         out["Open"] = out["Open"].fillna(out["Close"])
         out["High"] = out["High"].fillna(out["Close"])
         out["Low"] = out["Low"].fillna(out["Close"])

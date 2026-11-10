@@ -20,19 +20,21 @@ class IdeaGraveyard:
         self._visited_hashes: Set[str] = set()
         self._records: List[Dict[str, Any]] = []
 
-    def _hash_formula(self, formula: str) -> str:
-        """Compute deterministic SHA-256 fingerprint for standardized formula string."""
-        normalized = formula.strip().replace(" ", "").upper()
+    def _hash_target(self, target: Any) -> str:
+        """Compute canonical hash for ASTNode or fallback to SHA-256 for string formula."""
+        if hasattr(target, "canonical_hash"):
+            return target.canonical_hash()
+        normalized = str(target).strip().replace(" ", "").upper()
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
-    def contains(self, formula: str) -> bool:
+    def contains(self, formula: Any) -> bool:
         """Check in O(1) time whether this formula has previously failed and been buried."""
-        h = self._hash_formula(formula)
+        h = self._hash_target(formula)
         return h in self._visited_hashes
 
     def record_rejection(
         self,
-        formula: str,
+        formula: Any,
         reason: str,
         ic: Optional[float] = None,
         rank_ic: Optional[float] = None,
@@ -40,11 +42,12 @@ class IdeaGraveyard:
         generation: int = 0,
     ) -> None:
         """Bury a failed hypothesis into the graveyard with diagnostic attribution."""
-        h = self._hash_formula(formula)
+        h = self._hash_target(formula)
         self._visited_hashes.add(h)
+        f_str = formula.to_infix() if hasattr(formula, "to_infix") else str(formula)
         record = {
             "hash": h,
-            "formula": formula,
+            "formula": f_str,
             "reason": reason,
             "ic": ic,
             "rank_ic": rank_ic,

@@ -116,6 +116,10 @@ class GeneticAlphaEngine:
             sig_entry = sig[entry_mask]
             ic, rank_ic = self._compute_ic(sig_entry, y_entry)
             penalty = self.config.parsimony_penalty * ind.node_count()
+            if ic < 0.0:
+                ind.tree = ASTNode("NEG", children=[ind.tree.clone()]).simplify()
+                ic = -ic
+                rank_ic = -rank_ic
             ind.ic = ic
             ind.rank_ic = rank_ic
             ind.fitness = float(ic - penalty)
@@ -131,22 +135,22 @@ class GeneticAlphaEngine:
 
         s = sig[valid]
         y = target[valid]
-        std_s = float(np.std(s))
-        std_y = float(np.std(y))
+        std_s = float(np.std(s, ddof=1))
+        std_y = float(np.std(y, ddof=1))
 
         if std_s < 1e-8 or std_y < 1e-8:
             return 0.0, 0.0
 
-        # Pearson correlation
+        # Pearson correlation (ddof=1)
         cov = float(np.cov(s, y)[0, 1])
         ic = float(np.clip(cov / (std_s * std_y), -1.0, 1.0))
 
-        # Spearman rank correlation
-        rank_s = np.argsort(np.argsort(s))
-        rank_y = np.argsort(np.argsort(y))
+        # Spearman rank correlation with fractional tie ranking
+        rank_s = pd.Series(s).rank().to_numpy(dtype=np.float64)
+        rank_y = pd.Series(y).rank().to_numpy(dtype=np.float64)
         cov_r = float(np.cov(rank_s, rank_y)[0, 1])
-        std_rs = float(np.std(rank_s))
-        std_ry = float(np.std(rank_y))
+        std_rs = float(np.std(rank_s, ddof=1))
+        std_ry = float(np.std(rank_y, ddof=1))
         rank_ic = float(np.clip(cov_r / (std_rs * std_ry), -1.0, 1.0)) if std_rs > 0 and std_ry > 0 else 0.0
 
         return ic, rank_ic

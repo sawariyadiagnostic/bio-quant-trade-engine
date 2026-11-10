@@ -417,9 +417,9 @@ class ASTEvaluator:
             return _fast_ts_decay_linear(child, w=10)
         s = pd.Series(child)
         if node.op == "TS_DELAY_1":
-            return s.shift(1).bfill().fillna(0.0).to_numpy()
+            return s.shift(1).fillna(0.0).to_numpy()
         elif node.op == "TS_DELAY_5":
-            return s.shift(5).bfill().fillna(0.0).to_numpy()
+            return s.shift(5).fillna(0.0).to_numpy()
         elif node.op == "DELTA_5":
             res = s.diff(5).fillna(0.0).to_numpy()
         elif node.op == "EMA_10":
@@ -441,161 +441,21 @@ class ASTEvaluator:
         return np.nan_to_num(res, nan=0.0)
 
 
-class TreeGenerator:
-    """Randomly generates dimensionally sound AST expression trees with bounded depth."""
+# Re-export genetic generation and search operators for backward compatibility
+from ravana.domain.genetics import TreeGenerator, GeneticMutator, GeneticCrossover
 
-    @staticmethod
-    def infer_dimension(node: ASTNode) -> FeatureDimension:
-        """Infers the physical dimension of an AST node subtree."""
-        if node.op == "CONST":
-            return FeatureDimension.DIMENSIONLESS
-        if node.op == "FEATURE":
-            return FEATURE_DIMENSIONS.get(node.val, FeatureDimension.DIMENSIONLESS)
-        if node.op in (
-            "DIV_SAFE", "TS_CORR_20", "TS_RANK_20", "TS_ZSCORE_20",
-            "SIGMOID", "TANH", "SIGN", "TS_ARGMAX_10", "TS_ARGMIN_10"
-        ):
-            return FeatureDimension.DIMENSIONLESS
-        if node.op == "ADD" and len(node.children) >= 2:
-            d0 = TreeGenerator.infer_dimension(node.children[0])
-            d1 = TreeGenerator.infer_dimension(node.children[1])
-            return d0 if d0 != FeatureDimension.DIMENSIONLESS else d1
-        if node.op in ("ADD", "SUB") and node.children:
-            return TreeGenerator.infer_dimension(node.children[0])
-        if node.children:
-            return TreeGenerator.infer_dimension(node.children[0])
-        return FeatureDimension.DIMENSIONLESS
-
-    @staticmethod
-    def generate(
-        max_depth: int = 4,
-        target_dimension: FeatureDimension = FeatureDimension.DIMENSIONLESS,
-        method: str = "grow"
-    ) -> ASTNode:
-        """Generates an AST tree guaranteed to conform to target dimension."""
-        if max_depth <= 1 or (method == "grow" and random.random() < 0.35):
-            # Pick a feature matching target dimension or a constant
-            matching_feats = [
-                f for f, dim in FEATURE_DIMENSIONS.items()
-                if dim == target_dimension
-            ]
-            if target_dimension == FeatureDimension.DIMENSIONLESS and random.random() < 0.25:
-                const_val = str(round(random.uniform(-2.0, 2.0), 2))
-                return ASTNode("CONST", const_val)
-            if matching_feats:
-                return ASTNode("FEATURE", random.choice(matching_feats))
-            return ASTNode("CONST", "1.0")
-
-        # Select compatible operator
-        if target_dimension == FeatureDimension.DIMENSIONLESS:
-            op_choices = (
-                OPERATORS_BINARY_ARITHMETIC + OPERATORS_BINARY_ROLLING +
-                OPERATORS_UNARY + OPERATORS_ROLLING_UNARY + OPERATORS_TERNARY
-            )
-            op = random.choice(op_choices)
-        else:
-            op = random.choice(("ADD", "SUB", "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_STD_20", "TS_MEDIAN_10"))
-
-        if op == "BLEND":
-            cond = TreeGenerator.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
-            a = TreeGenerator.generate(max_depth - 1, target_dimension, method)
-            b = TreeGenerator.generate(max_depth - 1, target_dimension, method)
-            return ASTNode("BLEND", children=[cond, a, b])
-
-        if op in OPERATORS_BINARY_ROLLING:
-            a = TreeGenerator.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
-            b = TreeGenerator.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
-            return ASTNode(op, children=[a, b])
-
-        if op in OPERATORS_BINARY_ARITHMETIC:
-            if op == "DIV_SAFE":
-                # Price / Price or Dim / Dim -> Dimensionless
-                dim_choice = random.choice([FeatureDimension.PRICE, FeatureDimension.DIMENSIONLESS])
-                left = TreeGenerator.generate(max_depth - 1, dim_choice, method)
-                right = TreeGenerator.generate(max_depth - 1, dim_choice, method)
-                return ASTNode("DIV_SAFE", children=[left, right])
-            else:
-                left = TreeGenerator.generate(max_depth - 1, target_dimension, method)
-                right = TreeGenerator.generate(max_depth - 1, target_dimension, method)
-                return ASTNode(op, children=[left, right])
-
-        # Unary operations
-        child_dim = FeatureDimension.DIMENSIONLESS if op in ("TS_ZSCORE_20", "SIGMOID", "TANH", "TS_ARGMAX_10", "TS_ARGMIN_10") else target_dimension
-        child = TreeGenerator.generate(max_depth - 1, child_dim, method)
-        return ASTNode(op, children=[child])
-
-
-class GeneticMutator:
-    """Applies point and subtree mutations respecting dimensional soundness."""
-
-    @staticmethod
-    def mutate_subtree(tree: ASTNode, max_depth: int = 3) -> ASTNode:
-        cloned = tree.clone()
-        all_nodes = cloned.get_all_subnodes()
-        target = random.choice(all_nodes)
-        target_dim = TreeGenerator.infer_dimension(target)
-        sub = TreeGenerator.generate(max_depth, target_dim)
-        target.op, target.val, target.children = sub.op, sub.val, sub.children
-        return cloned.simplify()
-
-    @staticmethod
-    def mutate_point(tree: ASTNode) -> ASTNode:
-        """Mutates a single node operator or feature without breaking arity."""
-        cloned = tree.clone()
-        target = random.choice(cloned.get_all_subnodes())
-        if target.op == "FEATURE":
-            current_dim = FEATURE_DIMENSIONS.get(target.val, FeatureDimension.DIMENSIONLESS)
-            candidates = [f for f, d in FEATURE_DIMENSIONS.items() if d == current_dim]
-            if candidates:
-                target.val = random.choice(candidates)
-        elif target.op == "CONST":
-            target.val = str(round(random.uniform(-2.0, 2.0), 2))
-        elif target.op in OPERATORS_BINARY_ARITHMETIC:
-            target.op = random.choice(OPERATORS_BINARY_ARITHMETIC)
-        elif target.op in OPERATORS_UNARY:
-            target.op = random.choice(OPERATORS_UNARY)
-        elif target.op in OPERATORS_ROLLING_UNARY:
-            target.op = random.choice(OPERATORS_ROLLING_UNARY)
-        return cloned.simplify()
-
-
-class GeneticCrossover:
-    """Performs genetic crossover with strict dimensional integrity and arity hardening."""
-
-    @staticmethod
-    def crossover(parent1: ASTNode, parent2: ASTNode) -> Tuple[ASTNode, ASTNode]:
-        c1, c2 = parent1.clone(), parent2.clone()
-        nodes1 = c1.get_all_subnodes()
-        nodes2 = c2.get_all_subnodes()
-
-        t1 = random.choice(nodes1)
-        dim1 = TreeGenerator.infer_dimension(t1)
-
-        # Match dimensional candidates in parent 2 to prevent dimensional drift
-        matching_t2 = [n for n in nodes2 if TreeGenerator.infer_dimension(n) == dim1]
-        t2 = random.choice(matching_t2) if matching_t2 else random.choice(nodes2)
-
-        t1.op, t2.op = t2.op, t1.op
-        t1.val, t2.val = t2.val, t1.val
-        t1.children, t2.children = [c.clone() for c in t2.children], [c.clone() for c in t1.children]
-
-        # Arity hardening to prevent child count mismatches
-        for node in (t1, t2):
-            if node.op == "BLEND":
-                while len(node.children) < 3:
-                    node.children.append(ASTNode("CONST", val="1.0"))
-                if len(node.children) > 3:
-                    node.children = node.children[:3]
-            elif node.op in OPERATORS_BINARY:
-                while len(node.children) < 2:
-                    node.children.append(ASTNode("CONST", val="1.0"))
-                if len(node.children) > 2:
-                    node.children = node.children[:2]
-            elif node.op in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY):
-                if len(node.children) == 0:
-                    node.children.append(ASTNode("CONST", val="1.0"))
-                elif len(node.children) > 1:
-                    node.children = node.children[:1]
-            elif node.op in ("FEATURE", "CONST"):
-                node.children = []
-        return c1.simplify(), c2.simplify()
+__all__ = [
+    "ASTNode",
+    "ASTEvaluator",
+    "FeatureDimension",
+    "FEATURE_DIMENSIONS",
+    "OPERATORS_BINARY",
+    "OPERATORS_BINARY_ARITHMETIC",
+    "OPERATORS_BINARY_ROLLING",
+    "OPERATORS_UNARY",
+    "OPERATORS_ROLLING_UNARY",
+    "OPERATORS_TERNARY",
+    "TreeGenerator",
+    "GeneticMutator",
+    "GeneticCrossover",
+]

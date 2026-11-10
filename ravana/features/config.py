@@ -79,6 +79,11 @@ class FeatureRegistry:
         return [f.value for f in FeatureName]
 
     @classmethod
+    def get_feature_names(cls) -> List[str]:
+        """Alias for all_features() for backward compatibility."""
+        return cls.all_features()
+
+    @classmethod
     def get_description(cls, feature_name: str) -> str:
         """Return human-readable mathematical description of feature."""
         return cls._DESCRIPTIONS.get(feature_name, "Unknown feature")

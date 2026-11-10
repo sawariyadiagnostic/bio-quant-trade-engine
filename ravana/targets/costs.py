@@ -14,11 +14,13 @@ class DeliveryFrictionModel:
     def __init__(
         self,
         variable_bps: float = 2.0,
+        slippage_bps: float = 0.0,
         flat_dp_charge_inr: float = 17.0,
         default_capital_inr: float = 200000.0,
         min_capital_inr: float = 200000.0,
     ) -> None:
         self.variable_bps = variable_bps
+        self.slippage_bps = slippage_bps
         self.flat_dp_charge_inr = flat_dp_charge_inr
         self.default_capital_inr = default_capital_inr
         self.min_capital_inr = min_capital_inr
@@ -27,7 +29,7 @@ class DeliveryFrictionModel:
         """Compute total roundtrip drag in basis points for given capital."""
         cap = capital_inr or self.default_capital_inr
         fixed_drag_bps = (self.flat_dp_charge_inr / max(1000.0, cap)) * 10000.0
-        return self.variable_bps + fixed_drag_bps
+        return self.variable_bps + self.slippage_bps + fixed_drag_bps
 
     def apply_friction(
         self, gross_return: float, capital_inr: Optional[float] = None

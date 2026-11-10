@@ -33,17 +33,17 @@ class EvaluationContext:
 
         self.is_3d = isinstance(data, (torch.Tensor, np.ndarray)) and data.ndim == 3
         if isinstance(data, pd.DataFrame):
-            cols = list(data.columns)
-            actual_feature_names = feature_names if feature_names is not None else cols
-            self.feature_names = ComputeDispatcher._extract_feature_cols(actual_feature_names, len(cols))
+            cols = set(data.columns)
+            candidates = feature_names if feature_names is not None else list(data.columns)
+            valid_feats = [c for c in candidates if c in cols]
+            self.feature_names = valid_feats if valid_feats else list(data.columns)
             self.f_map = {name: i for i, name in enumerate(self.feature_names)}
             self.df = data
-            mat = np.column_stack([data[c].to_numpy(dtype=np.float32) for c in self.feature_names if c in data])
+            mat = np.column_stack([data[c].to_numpy(dtype=np.float32) for c in self.feature_names])
             self.tensor = torch.tensor(mat, dtype=dtype, device=self.device)
             self.cpu_arrays = {
                 c: np.nan_to_num(data[c].to_numpy(dtype=np.float64), nan=0.0)
                 for c in self.feature_names
-                if c in data
             }
         else:
             num_cols = data.shape[-1] if hasattr(data, "shape") else 0
@@ -155,8 +155,9 @@ class ComputeDispatcher:
             X_tensor = data.to(target_device)
         elif isinstance(data, pd.DataFrame):
             cols = list(data.columns)
-            actual_features = cols if feature_names is None else cls._extract_feature_cols(feature_names, len(cols))
-            mat = np.column_stack([data[c].to_numpy(dtype=np.float32) for c in actual_features if c in data])
+            cand_features = cols if feature_names is None else cls._extract_feature_cols(feature_names, len(cols))
+            actual_features = [c for c in cand_features if c in data.columns]
+            mat = np.column_stack([data[c].to_numpy(dtype=np.float32) for c in actual_features])
             X_tensor = torch.tensor(mat, dtype=torch.float32, device=target_device)
             f_map = {c: i for i, c in enumerate(actual_features)}
             return TensorASTEvaluator.eval_node(node, X_tensor, f_map)

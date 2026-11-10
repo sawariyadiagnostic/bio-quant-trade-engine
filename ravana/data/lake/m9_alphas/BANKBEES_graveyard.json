@@ -1,0 +1,20 @@
+[
+  {
+    "hash": "4d53ab55ec90234ba55040e61d1f40c49520008e542a077c68aae596239a25f3",
+    "formula": "GARMAN_KLASS_VOL_20",
+    "reason": "Failed Challenger Hurdle",
+    "ic": 0.2892074570909385,
+    "rank_ic": null,
+    "fitness": 0.2882074570909385,
+    "generation": 0
+  },
+  {
+    "hash": "4d53ab55ec90234ba55040e61d1f40c49520008e542a077c68aae596239a25f3",
+    "formula": "GARMAN_KLASS_VOL_20",
+    "reason": "Failed Challenger Hurdle",
+    "ic": 0.2892074570909385,
+    "rank_ic": null,
+    "fitness": 0.2882074570909385,
+    "generation": 0
+  }
+]

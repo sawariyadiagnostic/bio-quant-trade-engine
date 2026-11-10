@@ -54,9 +54,12 @@ class ETFBUSpreadAligner:
         merged["ETF_Close"] = etf_df["Close"]
 
         aligned_idx = benchmark_df["Close"].reindex(etf_df.index).ffill()
+        first_valid = aligned_idx.first_valid_index()
+        if first_valid is None:
+            return None
         if aligned_idx.isna().any():
-            first_val = aligned_idx.dropna().iloc[0] if not aligned_idx.dropna().empty else 1.0
-            aligned_idx = aligned_idx.fillna(first_val)
+            merged = merged.loc[first_valid:].copy()
+            aligned_idx = aligned_idx.loc[first_valid:]
         merged["Index_Close"] = aligned_idx
 
         # Compute strictly causal point-in-time multiplier

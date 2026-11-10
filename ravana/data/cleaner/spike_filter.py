@@ -133,13 +133,9 @@ class FlashSpikeFilter:
         df["High"] = np.maximum(df["High"].values, np.maximum(df["Open"].values, df["Close"].values))
         df["Low"] = np.minimum(df["Low"].values, np.minimum(df["Open"].values, df["Close"].values))
 
-        if "Close_Adj" in df.columns:
-            df["Close_Adj"] = df["Close"]
-        if "Open_Adj" in df.columns and "Open" in df.columns:
-            df["Open_Adj"] = df["Open"]
-        if "High_Adj" in df.columns:
-            df["High_Adj"] = df["High"]
-        if "Low_Adj" in df.columns:
-            df["Low_Adj"] = df["Low"]
+        for p_col, a_col in [("Close", "Close_Adj"), ("Open", "Open_Adj"), ("High", "High_Adj"), ("Low", "Low_Adj")]:
+            if a_col in df.columns and p_col in df.columns:
+                ratio = np.where(df[p_col] > 0, df[a_col] / df[p_col], 1.0)
+                df[a_col] = df[p_col] * ratio
 
         return df

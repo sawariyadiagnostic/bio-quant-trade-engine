@@ -143,10 +143,10 @@ class SessionAwareResampler:
         target_higher = higher_df.copy()
 
         # Causal Sealing: If higher series is normalized to midnight in its native timezone,
-        # seal it to the end of its native session (23:59:59) BEFORE timezone conversion
-        # to prevent leaking US market closes 15 hours early into Indian trading hours.
+        # seal it to the end of regular market session (16:00:00 for US, 15:30:00 for Indian)
+        # BEFORE timezone conversion so overnight close is causally available at 09:15 IST open.
         if (target_higher.index.time == pd.Timestamp("00:00:00").time()).all():
-            target_higher.index = target_higher.index + pd.Timedelta(hours=23, minutes=59, seconds=59)
+            target_higher.index = target_higher.index + pd.Timedelta(hours=16)
 
         if target_higher.index.tz != base_df.index.tz:
             if target_higher.index.tz is None and base_df.index.tz is not None:
