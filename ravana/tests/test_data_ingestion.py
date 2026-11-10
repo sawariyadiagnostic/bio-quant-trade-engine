@@ -181,7 +181,27 @@ class TestMarketDataLoader(unittest.TestCase):
         self.assertEqual(cfg_fx.timezone, "UTC")
         self.assertEqual(cfg_fx.market_open_time, "00:00:00")
 
+    def test_ingest_etf_contract(self) -> None:
+        """Verify ingest_etf bundles ETF data, benchmark pair, and contract metadata."""
+        # Use local parquet to verify offline pairing
+        local_path = "data/lake/Indices/BANKBEES.parquet"
+        if os.path.exists(local_path):
+            dataset = self.loader.ingest_etf(
+                ticker="BANKBEES.NS",
+                interval="1d",
+                period="5y",
+                include_macro=False,
+                local_fallback_path=local_path,
+            )
+            self.assertEqual(dataset.ticker, "BANKBEES.NS")
+            self.assertEqual(dataset.benchmark_ticker, "^NSEBANK")
+            self.assertGreater(dataset.bar_count, 1000)
+            summary = dataset.summary()
+            self.assertEqual(summary["ticker"], "BANKBEES.NS")
+            self.assertIn("bars", summary)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

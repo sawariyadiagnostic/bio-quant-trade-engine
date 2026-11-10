@@ -9,8 +9,9 @@ from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from ravana.data.ingestion.config import IngestionConfig
+from ravana.data.ingestion.config import IngestionConfig, ETF_BENCHMARK_MAP
 from ravana.data.ingestion.session_gatekeeper import NSESessionGatekeeper
+from ravana.data.ingestion.dataset import IngestedDataset
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +198,47 @@ class MarketDataLoader:
             if not df.empty:
                 universe_data[ticker] = df
         return universe_data
+
+    def ingest_etf(
+        self,
+        ticker: str = "BANKBEES.NS",
+        interval: str = "5m",
+        period: Optional[str] = "60d",
+        include_macro: bool = False,
+        local_fallback_path: Optional[str] = None,
+    ) -> IngestedDataset:
+        """Ingest primary ETF paired with its underlying benchmark index and macro drivers."""
+        cfg_etf = IngestionConfig.create(ticker=ticker, interval=interval, period=period)
+        df_etf = self.ingest(cfg_etf, local_fallback_path=local_fallback_path)
+
+        # Pair with underlying index (e.g. ^NSEBANK for BANKBEES.NS)
+        benchmark_ticker = ETF_BENCHMARK_MAP.get(ticker.upper())
+        df_bench = None
+        if benchmark_ticker:
+            cfg_bench = IngestionConfig.create(ticker=benchmark_ticker, interval=interval, period=period)
+            df_bench = self.ingest(cfg_bench)
+
+        macro_dfs: Dict[str, pd.DataFrame] = {}
+        if include_macro:
+            macro_tickers = ["^GSPC", "^VIX", "INR=X"]
+            macro_dfs = self.fetch_universe(macro_tickers, interval="1d", period=period)
+
+        metadata = {
+            "source": "yfinance" if not df_etf.empty else "local",
+            "is_intraday": cfg_etf.is_intraday(),
+        }
+
+        return IngestedDataset(
+            ticker=ticker,
+            interval=interval,
+            exchange=cfg_etf.exchange,
+            data=df_etf,
+            benchmark_ticker=benchmark_ticker,
+            benchmark_data=df_bench,
+            macro_data=macro_dfs,
+            metadata=metadata,
+        )
+
 
 
 

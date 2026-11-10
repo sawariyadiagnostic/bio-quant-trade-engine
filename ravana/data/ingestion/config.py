@@ -10,6 +10,14 @@ CORE_ETF_UNIVERSE: List[str] = ["BANKBEES.NS", "NIFTYBEES.NS"]
 GLOBAL_MACRO_UNIVERSE: List[str] = ["^GSPC", "^VIX", "INR=X", "BZ=F", "^TNX"]
 DOMESTIC_MACRO_UNIVERSE: List[str] = ["^NSEBANK", "^NSEI", "^INDIAVIX"]
 
+# Native ETF-to-Underlying Benchmark Index Mapping
+ETF_BENCHMARK_MAP: dict[str, str] = {
+    "BANKBEES.NS": "^NSEBANK",
+    "NIFTYBEES.NS": "^NSEI",
+    "GOLDBEES.NS": "GC=F",
+}
+
+
 
 class ExchangeType(str, Enum):
     """Supported exchange market session profiles."""
