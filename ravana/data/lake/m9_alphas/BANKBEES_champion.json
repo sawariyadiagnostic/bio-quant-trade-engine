@@ -1,6 +1,6 @@
 {
-  "formula": "GARMAN_KLASS_VOL_20",
-  "ic": 0.2892074570909385,
-  "fitness": 0.2872074570909385,
-  "graveyard_size": 2
+  "formula_str": "TS_DELAY_5(TS_MAX_10(ATR_14_NORM))",
+  "ic": 0.3678191760498735,
+  "composite_fitness": 0.19073158660328934,
+  "graveyard_size": 1
 }

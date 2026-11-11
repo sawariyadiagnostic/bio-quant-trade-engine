@@ -1,6 +1,6 @@
 {
-  "formula": "NEG(TS_ARGMAX_10(MACD_DIFF_NORM))",
-  "ic": 0.33626932035359186,
-  "fitness": 0.33426932035359186,
-  "graveyard_size": 2
+  "formula_str": "(-1.13 - TS_ARGMAX_10(MACD_DIFF_NORM))",
+  "ic": 0.3362693203535919,
+  "composite_fitness": 0.1726408270849548,
+  "graveyard_size": 1
 }

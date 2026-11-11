@@ -34,6 +34,7 @@ class Individual:
     fitness: Optional[float] = None
     ic: Optional[float] = None
     rank_ic: Optional[float] = None
+    metrics: Optional[Dict[str, Any]] = None
     generation_born: int = 0
 
     def formula_str(self) -> str:

@@ -5,16 +5,7 @@
     "reason": "Failed Challenger Hurdle",
     "ic": 0.33626932035359186,
     "rank_ic": null,
-    "fitness": 0.33326932035359186,
-    "generation": 0
-  },
-  {
-    "hash": "a41f25a446ed7d8bbe22124c0eb298a92388da74a6dfe20bcda01338dc61f606",
-    "formula": "NEG(TS_ARGMAX_10(MACD_DIFF_NORM))",
-    "reason": "Failed Challenger Hurdle",
-    "ic": 0.33626932035359186,
-    "rank_ic": null,
-    "fitness": 0.33326932035359186,
+    "fitness": 0.14721663698907939,
     "generation": 0
   }
 ]

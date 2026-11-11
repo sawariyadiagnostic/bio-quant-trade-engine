@@ -1,20 +1,11 @@
 [
   {
-    "hash": "4d53ab55ec90234ba55040e61d1f40c49520008e542a077c68aae596239a25f3",
-    "formula": "GARMAN_KLASS_VOL_20",
+    "hash": "608f0cb8b011f289dc0e13bb3277d2448403cdcc01e559b883da4e456a673b42",
+    "formula": "TS_DELAY_5(TS_MAX_10(ATR_14_NORM))",
     "reason": "Failed Challenger Hurdle",
-    "ic": 0.2892074570909385,
+    "ic": 0.3678191760498735,
     "rank_ic": null,
-    "fitness": 0.2882074570909385,
-    "generation": 0
-  },
-  {
-    "hash": "4d53ab55ec90234ba55040e61d1f40c49520008e542a077c68aae596239a25f3",
-    "formula": "GARMAN_KLASS_VOL_20",
-    "reason": "Failed Challenger Hurdle",
-    "ic": 0.2892074570909385,
-    "rank_ic": null,
-    "fitness": 0.2882074570909385,
+    "fitness": 0.19073158660328934,
     "generation": 0
   }
 ]

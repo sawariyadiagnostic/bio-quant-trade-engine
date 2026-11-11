@@ -414,12 +414,13 @@ class BatchPipelineRunner:
             res = engine.evolve(f_df, t_df)
 
             champ = res.champion or res.best_individual
-            manifest["champions"][base] = {
-                "formula": champ.formula_str() if champ else "NONE",
+            metrics_payload = champ.metrics if (champ and champ.metrics) else {
+                "formula_str": champ.formula_str() if champ else "NONE",
                 "ic": champ.ic if champ else 0.0,
-                "fitness": champ.fitness if champ else 0.0,
-                "graveyard_size": res.graveyard_count,
+                "composite_fitness": champ.fitness if champ else 0.0,
             }
+            manifest["champions"][base] = metrics_payload
+            manifest["champions"][base]["graveyard_size"] = res.graveyard_count
 
             champ_path = self.m9_dir / f"{base}_champion.json"
             grave_path = self.m9_dir / f"{base}_graveyard.json"

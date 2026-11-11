@@ -111,18 +111,23 @@ class GeneticAlphaEngine:
         net_ret = targets_df["net_return"].to_numpy(dtype=np.float64)
         y_entry = net_ret[entry_mask]
 
+        from ravana.fitness import FitnessConfig, MultiObjectiveFitnessEngine
+        fit_engine = MultiObjectiveFitnessEngine(
+            FitnessConfig(num_tested_trials=self.config.population_size)
+        )
+        sig_entry = signals[:, entry_mask] if signals.ndim == 2 else np.expand_dims(signals[entry_mask], 0)
+        pop_nodes = [ind.tree for ind in population]
+        metrics = fit_engine.evaluate_population(sig_entry, y_entry, nodes=pop_nodes, sort_by_fitness=False)
+
         for idx, ind in enumerate(population):
-            sig = signals[idx]
-            sig_entry = sig[entry_mask]
-            ic, rank_ic = self._compute_ic(sig_entry, y_entry)
-            penalty = self.config.parsimony_penalty * ind.node_count()
-            if ic < 0.0:
+            m = metrics[idx]
+            if m.ic < 0.0:
                 ind.tree = ASTNode("NEG", children=[ind.tree.clone()]).simplify()
-                ic = -ic
-                rank_ic = -rank_ic
-            ind.ic = ic
-            ind.rank_ic = rank_ic
-            ind.fitness = float(ic - penalty)
+                m = fit_engine.evaluate_single(-sig_entry[idx], y_entry, node=ind.tree)
+            ind.ic = m.ic
+            ind.rank_ic = m.rank_ic
+            ind.fitness = m.composite_fitness
+            ind.metrics = m.to_dict()
 
         population.sort(key=lambda x: x.fitness if x.fitness is not None else -999.0, reverse=True)
         return population
