@@ -14,14 +14,7 @@
 *.crt
 id_rsa*
 id_ed25519*
-
-# Account Logs & Financial Audit Records
-audit/
-*.audit
-logs/
-*.log
-*.sqlite
-*.db
+.kaggle/
 
 # Python Bytecode & Runtime Caches
 __pycache__/
@@ -34,20 +27,11 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Quant Market Data, Models & Artifacts
-*.parquet
-*.snappy
-*.feather
-*.h5
-*.hdf5
-*.pkl
-*.pickle
-*.weights
-*.pt
-*.pth
-*.onnx
+# Internal Snapshot Backups & Engine Caches
+**/.snapshots/
 data/cache/
 data/raw/
+ravana/graphify-out/cache/
 
 # IDE & OS Metadata
 .vscode/
@@ -59,10 +43,6 @@ data/raw/
 Thumbs.db
 desktop.ini
 
-# Scratch & Temporary Testing Files
-scratch/
+# Temporary Run Dumps
 tmp/
 temp/
-graphify-out/
-.kaggle/
-

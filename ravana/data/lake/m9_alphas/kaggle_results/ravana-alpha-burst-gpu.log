@@ -1,0 +1,43 @@
+[{"stream_name":"stdout","time":11.383254811,"data":"=================================================================\n"}
+,{"stream_name":"stdout","time":11.383300776,"data":"  RAVANA SOVEREIGN QUANT ENGINE: PHASE 3 KAGGLE GPU BURST RUN    \n"}
+,{"stream_name":"stdout","time":11.38330547,"data":"=================================================================\n"}
+,{"stream_name":"stdout","time":11.622711077,"data":"CUDA Available: True\n"}
+,{"stream_name":"stdout","time":11.660614961,"data":"GPU Device: Tesla T4\n"}
+,{"stream_name":"stdout","time":11.660649475,"data":"Device Count: 2\n"}
+,{"stream_name":"stdout","time":11.660673791,"data":"Decompressing feature and target parquet payloads...\n"}
+,{"stream_name":"stdout","time":11.904244431,"data":"Features Loaded: Shape=(4575, 21), Columns=21\n"}
+,{"stream_name":"stdout","time":11.904273009,"data":"Targets Loaded: Shape=(4575, 6), Columns=6\n"}
+,{"stream_name":"stdout","time":11.922985359,"data":"Aligned Historical Bars: 4575\n"}
+,{"stream_name":"stdout","time":12.174252162,"data":"GPU Feature Matrix Materialized: torch.Size([4575, 21]) on cuda:0\n"}
+,{"stream_name":"stdout","time":12.174533441,"data":"Initializing Population: 500 formulas, 15 generations...\n"}
+,{"stream_name":"stdout","time":13.118618186,"data":"Gen [01/15] | Best Fitness: 0.6292 | IC: +0.0426 | Sharpe: 6.25 | Formula: TsDelay(TsMin(TsMin(VOLATILITY_20)))... (0.94s)\n"}
+,{"stream_name":"stdout","time":13.583082676,"data":"Gen [02/15] | Best Fitness: 0.6347 | IC: +0.0307 | Sharpe: 6.45 | Formula: Add(TsMax(TsMin(PARKINSON_VOL_20)), TsDelay(T... (0.46s)\n"}
+,{"stream_name":"stdout","time":14.097358212,"data":"Gen [03/15] | Best Fitness: 0.6347 | IC: +0.0307 | Sharpe: 6.45 | Formula: Add(TsMax(TsMin(PARKINSON_VOL_20)), TsDelay(T... (0.51s)\n"}
+,{"stream_name":"stdout","time":14.70226637,"data":"Gen [04/15] | Best Fitness: 0.6347 | IC: +0.0307 | Sharpe: 6.45 | Formula: Add(TsMax(TsMin(PARKINSON_VOL_20)), TsDelay(T... (0.60s)\n"}
+,{"stream_name":"stdout","time":15.358171458,"data":"Gen [05/15] | Best Fitness: 0.6647 | IC: +0.0683 | Sharpe: 7.12 | Formula: Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT... (0.65s)\n"}
+,{"stream_name":"stdout","time":16.154041303,"data":"Gen [06/15] | Best Fitness: 0.6647 | IC: +0.0683 | Sharpe: 7.12 | Formula: Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT... (0.79s)\n"}
+,{"stream_name":"stdout","time":17.078304861,"data":"Gen [07/15] | Best Fitness: 0.6705 | IC: +0.0780 | Sharpe: 7.23 | Formula: Mul(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_D... (0.92s)\n"}
+,{"stream_name":"stdout","time":18.115325283,"data":"Gen [08/15] | Best Fitness: 0.6705 | IC: +0.0780 | Sharpe: 7.23 | Formula: Mul(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_D... (1.03s)\n"}
+,{"stream_name":"stdout","time":19.184338615,"data":"Gen [09/15] | Best Fitness: 0.6705 | IC: +0.0780 | Sharpe: 7.23 | Formula: Mul(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_D... (1.07s)\n"}
+,{"stream_name":"stdout","time":20.236528374,"data":"Gen [10/15] | Best Fitness: 0.7148 | IC: +0.0349 | Sharpe: 8.20 | Formula: Mul(Mul(Mul(Add(Add(TsRank(TsDelay(TsDelay(VW... (1.05s)\n"}
+,{"stream_name":"stdout","time":21.403077995,"data":"Gen [11/15] | Best Fitness: 0.7282 | IC: +0.2071 | Sharpe: 8.51 | Formula: Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(Ts... (1.16s)\n"}
+,{"stream_name":"stdout","time":22.675815399,"data":"Gen [12/15] | Best Fitness: 0.7282 | IC: +0.2071 | Sharpe: 8.51 | Formula: Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(Ts... (1.27s)\n"}
+,{"stream_name":"stdout","time":23.875686738,"data":"Gen [13/15] | Best Fitness: 0.7282 | IC: +0.2071 | Sharpe: 8.51 | Formula: Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(Ts... (1.20s)\n"}
+,{"stream_name":"stdout","time":25.183800612,"data":"Gen [14/15] | Best Fitness: 0.7282 | IC: +0.2071 | Sharpe: 8.51 | Formula: Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(Ts... (1.31s)\n"}
+,{"stream_name":"stdout","time":26.48428937,"data":"Gen [15/15] | Best Fitness: 0.7639 | IC: +0.0757 | Sharpe: 8.31 | Formula: Add(Sub(TsDelay(TsMin(TsMin(VOLATILITY_20))),... (1.30s)\n"}
+,{"stream_name":"stdout","time":26.4863314,"data":"=================================================================\n"}
+,{"stream_name":"stdout","time":26.486356115,"data":"Evolution Complete! Evaluated 7500 formulas in 14.31s (524.2 evals/sec)\n"}
+,{"stream_name":"stdout","time":26.486644893,"data":"Peak GPU VRAM Allocated: 1.34 MB\n"}
+,{"stream_name":"stdout","time":26.486654899,"data":"Computing Multi-Objective Pareto Frontier...\n"}
+,{"stream_name":"stdout","time":26.487998557,"data":"Identified 12 Pareto-optimal alpha formulas!\n"}
+,{"stream_name":"stdout","time":26.489188566,"data":"Saved champion_alpha.json, pareto_frontier.json, evolution_summary.json\n"}
+,{"stream_name":"stdout","time":26.489202514,"data":"=================================================================\n"}
+,{"stream_name":"stdout","time":26.4892073,"data":"  BURST RUN COMPLETE. TERMINATING INSTANCE TO SAVE GPU QUOTA.    \n"}
+,{"stream_name":"stdout","time":26.489211436,"data":"=================================================================\n"}
+,{"stream_name":"stderr","time":32.189902201,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":32.189938914,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":32.490171475,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":32.490225225,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":33.326907088,"data":"[NbConvertApp] Converting notebook __script__.ipynb to html\n"}
+,{"stream_name":"stderr","time":34.464550628,"data":"[NbConvertApp] Writing 946292 bytes to __results__.html\n"}
+]

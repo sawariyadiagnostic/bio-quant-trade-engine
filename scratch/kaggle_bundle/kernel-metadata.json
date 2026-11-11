@@ -1,0 +1,14 @@
+{
+  "id": "avgsmutenjoy/ravana-alpha-burst",
+  "title": "Ravana Alpha Burst GPU",
+  "code_file": "burst_run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_tpu": false,
+  "enable_internet": false,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}
