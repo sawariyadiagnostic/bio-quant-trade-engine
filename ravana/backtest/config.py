@@ -33,9 +33,14 @@ class BacktestConfig:
     regime: TradingRegime = TradingRegime.OVERNIGHT
     execution_timing: ExecutionTiming = ExecutionTiming.NEXT_BAR_OPEN
     max_volume_participation: float = 0.05  # Max 5% of bar volume to limit impact
+    default_half_spread_bps: float = 1.5    # Half-spread baseline in basis points
     fixed_dp_fee_inr: float = 17.0          # Flat ₹17 CDSL debit fee per sell on delivery
     brokerage_per_order_inr: float = 0.0    # Discount broker zero delivery brokerage
     allow_shorting: bool = False            # Long-only by default for Indian cash delivery
     impact_gamma: float = 0.1               # Almgren-Chriss square-root impact coefficient
     entry_cutoff_time: str = "15:20"        # Entry cutoff for overnight strategies
     exit_cutoff_time: str = "09:15"         # Exit time for overnight strategies
+
+    @property
+    def initial_capital_inr(self) -> float:
+        return self.initial_capital

@@ -1,0 +1,180 @@
+instruments:
+  # Core Liquid ETFs
+  - symbol: "BANKBEES.NS"
+    security_id: "INE694G01026"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^NSEBANK"
+    parity_ratio: 100.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Banking"
+    tags: ["core_etf", "liquid", "banking", "delivery"]
+
+  - symbol: "NIFTYBEES.NS"
+    security_id: "INE694G01018"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^NSEI"
+    parity_ratio: 100.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Broad Market"
+    tags: ["core_etf", "liquid", "broad_market", "delivery"]
+
+  - symbol: "GOLDBEES.NS"
+    security_id: "INE730I01014"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    parity_ratio: 1.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Commodity"
+    tags: ["commodity", "hedge", "liquid"]
+
+  - symbol: "ITBEES.NS"
+    security_id: "INE694G01034"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^CNXIT"
+    parity_ratio: 100.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Technology"
+    tags: ["sector_etf", "technology"]
+
+  # Top High-Beta Nifty 50 Equities
+  - symbol: "RELIANCE.NS"
+    security_id: "INE002A01018"
+    asset_class: "EQUITY"
+    exchange: "NSE"
+    currency: "INR"
+    lot_size: 1
+    tick_size: 0.05
+    sector: "Energy"
+    tags: ["nifty50", "heavyweight"]
+
+  - symbol: "HDFCBANK.NS"
+    security_id: "INE040A01034"
+    asset_class: "EQUITY"
+    exchange: "NSE"
+    currency: "INR"
+    lot_size: 1
+    tick_size: 0.05
+    sector: "Banking"
+    tags: ["nifty50", "banknifty", "banking"]
+
+  - symbol: "ICICIBANK.NS"
+    security_id: "INE090A01021"
+    asset_class: "EQUITY"
+    exchange: "NSE"
+    currency: "INR"
+    lot_size: 1
+    tick_size: 0.05
+    sector: "Banking"
+    tags: ["nifty50", "banknifty", "banking"]
+
+  - symbol: "INFY.NS"
+    security_id: "INE009A01021"
+    asset_class: "EQUITY"
+    exchange: "NSE"
+    currency: "INR"
+    lot_size: 1
+    tick_size: 0.05
+    sector: "Technology"
+    tags: ["nifty50", "technology"]
+
+  - symbol: "TCS.NS"
+    security_id: "INE467B01029"
+    asset_class: "EQUITY"
+    exchange: "NSE"
+    currency: "INR"
+    lot_size: 1
+    tick_size: 0.05
+    sector: "Technology"
+    tags: ["nifty50", "technology"]
+
+  # Reference Benchmarks
+  - symbol: "^NSEI"
+    security_id: "INDEX_NIFTY50"
+    asset_class: "INDEX"
+    exchange: "NSE"
+    currency: "INR"
+    lot_size: 1
+    tick_size: 0.05
+    tags: ["benchmark", "index"]
+
+  - symbol: "^NSEBANK"
+    security_id: "INDEX_BANKNIFTY"
+    asset_class: "INDEX"
+    exchange: "NSE"
+    currency: "INR"
+    lot_size: 1
+    tick_size: 0.05
+    tags: ["benchmark", "index"]
+
+  # Global Macro Drivers
+  - symbol: "^GSPC"
+    security_id: "INDEX_SP500"
+    asset_class: "MACRO"
+    exchange: "US"
+    currency: "USD"
+    tags: ["macro", "global"]
+
+  - symbol: "^VIX"
+    security_id: "INDEX_CBOE_VIX"
+    asset_class: "MACRO"
+    exchange: "US"
+    currency: "USD"
+    tags: ["macro", "volatility"]
+
+  - symbol: "INR=X"
+    security_id: "FX_USDINR"
+    asset_class: "MACRO"
+    exchange: "GLOBAL_24H"
+    currency: "INR"
+    tags: ["macro", "forex"]
+
+  - symbol: "BZ=F"
+    security_id: "FUT_BRENT"
+    asset_class: "MACRO"
+    exchange: "US"
+    currency: "USD"
+    tags: ["macro", "oil"]
+
+  - symbol: "^TNX"
+    security_id: "INDEX_US10Y"
+    asset_class: "MACRO"
+    exchange: "US"
+    currency: "USD"
+    tags: ["macro", "rates"]
+
+baskets:
+  core_etfs:
+    - "BANKBEES.NS"
+    - "NIFTYBEES.NS"
+  all_etfs:
+    - "BANKBEES.NS"
+    - "NIFTYBEES.NS"
+    - "GOLDBEES.NS"
+    - "ITBEES.NS"
+  nifty50_top5:
+    - "RELIANCE.NS"
+    - "HDFCBANK.NS"
+    - "ICICIBANK.NS"
+    - "INFY.NS"
+    - "TCS.NS"
+  banking_sector:
+    - "BANKBEES.NS"
+    - "HDFCBANK.NS"
+    - "ICICIBANK.NS"
+  macro_drivers:
+    - "^GSPC"
+    - "^VIX"
+    - "INR=X"
+    - "BZ=F"
+    - "^TNX"

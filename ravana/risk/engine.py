@@ -1,6 +1,7 @@
 """Institutional Portfolio Risk and Microstructure Allocation Engine."""
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import numpy as np
@@ -57,11 +58,11 @@ class PortfolioRiskEngine:
         # 3. Base Asset Weighting (HRP or Volatility Parity)
         raw_weights = self._compute_base_weights(symbols, returns_df)
 
-        # 4. Alpha Signal Blending
+        # 4. Alpha Signal Blending via Exponential Tilting
         if alpha_signals is not None:
             raw_weights = self._blend_with_alphas(symbols, raw_weights, alpha_signals)
 
-        # 5. Position Limit & Gross Exposure Clamping
+        # 5. Position Limit & Gross Exposure Clamping (Water-Filling)
         constrained_weights = self.gatekeeper.enforce_position_limits(raw_weights)
         scaled_weights = constrained_weights * dd_mult
 
@@ -74,13 +75,16 @@ class PortfolioRiskEngine:
         for i, sym in enumerate(symbols):
             px = current_prices.get(sym, 0.0)
             w = float(scaled_weights[i])
-            if px <= 0 or w <= 0:
+            if px <= 0 or w <= 0 or not np.isfinite(px):
                 continue
 
             notional = current_equity * w
             shares = int(notional // px)
+            sym_alpha = alpha_signals.get(sym, 0.0) if alpha_signals else 0.0
+            expected_alpha_bps = max(float(sym_alpha * 10000.0) if alpha_signals else 20.0, 20.0)
+
             is_valid, final_shares, _ = self.gatekeeper.filter_trade_viability(
-                price=px, shares=shares, expected_alpha_bps=10.0
+                price=px, shares=shares, expected_alpha_bps=expected_alpha_bps
             )
 
             if is_valid and final_shares > 0:
@@ -116,9 +120,11 @@ class PortfolioRiskEngine:
                 )
 
         if self.config.allocation_method == AllocationMethod.INVERSE_VOL and not returns_df.empty:
-            vol = returns_df[symbols].std().to_numpy()
-            inv_vol = 1.0 / np.maximum(1e-8, vol)
-            return inv_vol / np.sum(inv_vol)
+            valid_cols = [c for c in symbols if c in returns_df.columns]
+            if len(valid_cols) == len(symbols):
+                vol = returns_df[symbols].std().to_numpy()
+                inv_vol = 1.0 / np.maximum(1e-8, vol)
+                return inv_vol / np.sum(inv_vol)
 
         return np.full(len(symbols), 1.0 / len(symbols), dtype=np.float64)
 
@@ -126,19 +132,19 @@ class PortfolioRiskEngine:
     def _blend_with_alphas(
         symbols: List[str], base_weights: np.ndarray, alpha_signals: Dict[str, float]
     ) -> np.ndarray:
-        """Modulate base risk weights by directional positive alpha forecasts."""
-        multipliers = np.array([max(0.0, alpha_signals.get(s, 0.0)) for s in symbols], dtype=np.float64)
-        if np.sum(multipliers) > 0:
-            multipliers = multipliers / np.mean(multipliers)
-            blended = base_weights * multipliers
-            total = np.sum(blended)
-            return (blended / total) if total > 0 else base_weights
-        return base_weights
+        """Modulate base risk weights by directional alpha forecasts via exponential tilting."""
+        alphas = np.array([alpha_signals.get(s, 0.0) for s in symbols], dtype=np.float64)
+        kappa = 10.0
+        tilt = np.exp(kappa * (alphas - np.max(alphas)))
+        blended = base_weights * tilt
+        total = float(np.sum(blended))
+        return (blended / total) if total > 0 else base_weights
 
     @staticmethod
     def _empty_result(equity: float, state: DrawdownState, mult: float) -> AllocationResult:
+        safe_equity = equity if np.isfinite(equity) else 0.0
         return AllocationResult(
             target_weights={}, target_shares={}, target_notionals={},
             drawdown_state=state, drawdown_multiplier=mult,
-            cash_reserve_inr=round(equity, 2), total_allocated_inr=0.0,
+            cash_reserve_inr=round(safe_equity, 2), total_allocated_inr=0.0,
         )

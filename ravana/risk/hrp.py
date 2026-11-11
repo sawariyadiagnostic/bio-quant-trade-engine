@@ -26,18 +26,31 @@ class HierarchicalRiskParity:
         returns_matrix: np.ndarray,
         linkage_method: str = "ward",
         use_shrinkage: bool = True,
+        use_denoising: bool = True,
     ) -> np.ndarray:
         """Compute robust risk-parity weights for N asset return series."""
         if returns_matrix.ndim == 1 or returns_matrix.shape[1] <= 1:
             return np.ones(returns_matrix.shape[1] if returns_matrix.ndim > 1 else 1, dtype=np.float64)
 
         T, N = returns_matrix.shape
-        cov = cls._estimate_covariance(returns_matrix, use_shrinkage, T)
-        std = np.sqrt(np.maximum(1e-12, np.diag(cov)))
 
-        if np.any(std < 1e-8) or not np.all(np.isfinite(cov)):
+        # Raw volatility check on input series before any shrinkage inflation (VULN-01 fix)
+        raw_vol = np.std(returns_matrix, axis=0)
+        if np.any(raw_vol < 1e-8) or not np.all(np.isfinite(returns_matrix)):
             return np.full(N, 1.0 / N, dtype=np.float64)
 
+        cov = cls._estimate_covariance(returns_matrix, use_shrinkage, T)
+
+        # Raw diagonal check on covariance
+        raw_diag = np.diag(cov)
+        if np.any(raw_diag < 1e-8) or not np.all(np.isfinite(cov)):
+            return np.full(N, 1.0 / N, dtype=np.float64)
+
+        # Optional Marcenko-Pastur RMT covariance denoising
+        if use_denoising and T > N:
+            cov = cls.denoise_covariance_rmt(cov, T)
+
+        std = np.sqrt(np.maximum(1e-12, np.diag(cov)))
         inv_std = 1.0 / std
         corr = cov * np.outer(inv_std, inv_std)
         corr = np.nan_to_num(corr, nan=0.0)
@@ -62,6 +75,39 @@ class HierarchicalRiskParity:
 
         total_w = np.sum(final_weights)
         return (final_weights / total_w) if total_w > 0 else np.full(N, 1.0 / N, dtype=np.float64)
+
+    @classmethod
+    def denoise_covariance_rmt(cls, cov: np.ndarray, T: int, detone: bool = False) -> np.ndarray:
+        """Filter sampling noise from covariance matrix via Marcenko-Pastur RMT spectral cutoff."""
+        N = cov.shape[0]
+        if T <= N:
+            return cov
+
+        std = np.sqrt(np.diag(cov))
+        inv_std = 1.0 / np.maximum(1e-12, std)
+        corr = np.clip(cov * np.outer(inv_std, inv_std), -1.0, 1.0)
+        np.fill_diagonal(corr, 1.0)
+
+        e_val, e_vec = np.linalg.eigh(corr)
+        idx = np.argsort(e_val)[::-1]
+        e_val, e_vec = e_val[idx], e_vec[:, idx]
+
+        q = float(T) / float(N)
+        lambda_plus = (1.0 + np.sqrt(1.0 / q)) ** 2
+
+        noise_idx = e_val <= lambda_plus
+        if np.any(noise_idx):
+            e_val_denoised = e_val.copy()
+            e_val_denoised[noise_idx] = np.mean(e_val[noise_idx])
+            if detone and len(e_val_denoised) > 2:
+                e_val_denoised[0] = np.mean(e_val[noise_idx])
+
+            corr_denoised = np.dot(e_vec, np.dot(np.diag(e_val_denoised), e_vec.T))
+            diag_inv = 1.0 / np.sqrt(np.maximum(1e-12, np.diag(corr_denoised)))
+            corr_denoised = corr_denoised * np.outer(diag_inv, diag_inv)
+            np.fill_diagonal(corr_denoised, 1.0)
+            return corr_denoised * np.outer(std, std)
+        return cov
 
     @classmethod
     def _estimate_covariance(cls, mat: np.ndarray, use_shrinkage: bool, T: int) -> np.ndarray:
@@ -125,7 +171,8 @@ class HierarchicalRiskParity:
                 c1 = c_items[i + 1]
                 var0 = cls._get_cluster_var(cov, c0)
                 var1 = cls._get_cluster_var(cov, c1)
-                alpha = 1.0 - var0 / max(1e-8, (var0 + var1))
+                total_var = var0 + var1
+                alpha = 0.5 if total_var <= 1e-12 else 1.0 - (var0 / total_var)
                 w[c0] *= alpha
                 w[c1] *= (1.0 - alpha)
 

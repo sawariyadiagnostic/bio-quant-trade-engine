@@ -43,25 +43,36 @@ class MicrostructureSlippageModel:
             return ExecutionFill(0, 0.0, 0.0, False, False)
 
         # 1. Circuit Breaker / Freeze Detection (Zero liquidity)
-        if bar_high > 0 and bar_high == bar_low and bar_volume == 0:
+        if bar_high > 0 and bar_high == bar_low and (bar_volume is None or bar_volume <= 0 or math.isnan(bar_volume)):
             return ExecutionFill(0, 0.0, 0.0, is_circuit_locked=True, is_volume_capped=False)
 
         # 2. Volume Participation Cap
-        max_fillable = max(1, int(bar_volume * self.max_volume_participation)) if bar_volume > 0 else desired_shares
+        if bar_volume is None or math.isnan(bar_volume) or bar_volume <= 0:
+            return ExecutionFill(0, 0.0, 0.0, is_circuit_locked=False, is_volume_capped=True)
+
+        max_fillable = max(0, int(bar_volume * self.max_volume_participation))
         filled_shares = min(desired_shares, max_fillable)
         is_volume_capped = filled_shares < desired_shares
 
+        if filled_shares <= 0:
+            return ExecutionFill(0, 0.0, 0.0, is_circuit_locked=False, is_volume_capped=True)
+
         # 3. Spread and Almgren-Chriss Market Impact
         h_spread = half_spread_bps if half_spread_bps is not None else self.default_half_spread_bps
-        participation_ratio = filled_shares / max(1.0, bar_volume) if bar_volume > 0 else 0.05
+        participation_ratio = filled_shares / max(1.0, bar_volume)
         impact_bps = self.impact_gamma * math.sqrt(participation_ratio) * 100.0
         total_slippage_bps = h_spread + impact_bps
 
-        # 4. Slipped Execution Price
+        # 4. Slipped Execution Price (clamped to physical bar high/low)
         if side.upper() == "BUY":
-            exec_price = nominal_price * (1.0 + total_slippage_bps / 10000.0)
+            raw_exec_price = nominal_price * (1.0 + total_slippage_bps / 10000.0)
         else:
-            exec_price = nominal_price * (1.0 - total_slippage_bps / 10000.0)
+            raw_exec_price = nominal_price * (1.0 - total_slippage_bps / 10000.0)
+
+        if bar_high > 0 and bar_low > 0 and bar_high >= bar_low:
+            exec_price = max(bar_low, min(bar_high, raw_exec_price))
+        else:
+            exec_price = raw_exec_price
 
         return ExecutionFill(
             filled_shares=filled_shares,

@@ -37,6 +37,7 @@ class IndianFrictionModel:
         regime: TradingRegime = TradingRegime.OVERNIGHT,
         fixed_dp_fee_inr: float = 17.0,
         brokerage_per_order_inr: float = 0.0,
+        is_dp_eligible: bool = True,
     ) -> FrictionBreakdown:
         """Calculate complete line-item friction for a buy or sell transaction."""
         side = side.upper()
@@ -48,12 +49,13 @@ class IndianFrictionModel:
         is_buy = side == "BUY"
 
         stt = cls._calc_stt(turnover, is_buy, is_delivery, asset_type)
-        stamp_duty = cls._calc_stamp_duty(turnover, is_buy, is_delivery)
+        stamp_duty = cls._calc_stamp_duty(turnover, is_buy, is_delivery, asset_type)
         exch_fee = turnover * cls.EXCHANGE_TURNOVER_RATE
         sebi_fee = turnover * cls.SEBI_RATE
         brokerage = cls._calc_brokerage(turnover, is_delivery, brokerage_per_order_inr)
         gst = (brokerage + exch_fee + sebi_fee) * cls.GST_RATE
-        dp_fee = fixed_dp_fee_inr if (is_delivery and not is_buy) else 0.0
+        is_demat = asset_type in (AssetType.ETF, AssetType.EQUITY_STOCK)
+        dp_fee = fixed_dp_fee_inr if (is_delivery and not is_buy and is_demat and is_dp_eligible) else 0.0
 
         total_friction = stt + stamp_duty + exch_fee + sebi_fee + brokerage + gst + dp_fee
         effective_bps = (total_friction / turnover) * 10000.0
@@ -74,20 +76,28 @@ class IndianFrictionModel:
     @classmethod
     def _calc_stt(cls, turnover: float, is_buy: bool, is_delivery: bool, asset_type: AssetType) -> float:
         """Compute Securities Transaction Tax according to Central Board of Direct Taxes rules."""
+        if asset_type == AssetType.INDEX_FUTURE:
+            return turnover * 0.0002 if not is_buy else 0.0  # 0.02% on futures sell
         if is_delivery:
             if asset_type == AssetType.ETF:
-                return turnover * 0.00001 if not is_buy else 0.0  # 0.001% on sell only
+                return turnover * 0.00001 if not is_buy else 0.0  # 0.001% on ETF sell
             elif asset_type == AssetType.EQUITY_STOCK:
                 return turnover * 0.001                            # 0.1% on buy and sell
             return 0.0
         else:
-            return turnover * 0.00025 if not is_buy else 0.0      # 0.025% on intraday sell
+            if asset_type == AssetType.ETF:
+                return 0.0                                         # Statutory NIL for intraday ETF
+            return turnover * 0.00025 if not is_buy else 0.0      # 0.025% on intraday equity sell
 
     @classmethod
-    def _calc_stamp_duty(cls, turnover: float, is_buy: bool, is_delivery: bool) -> float:
+    def _calc_stamp_duty(
+        cls, turnover: float, is_buy: bool, is_delivery: bool, asset_type: AssetType = AssetType.ETF
+    ) -> float:
         """Stamp duty is levied only on buyers under the Indian Stamp Act."""
         if not is_buy:
             return 0.0
+        if asset_type == AssetType.INDEX_FUTURE:
+            return turnover * 0.00002                              # 0.002% on futures buy
         return turnover * 0.00015 if is_delivery else turnover * 0.00003
 
     @classmethod
@@ -95,7 +105,7 @@ class IndianFrictionModel:
         """Compute discount brokerage with standard ₹20 cap."""
         if is_delivery and per_order_cap == 0.0:
             return 0.0
-        return min(20.0, max(per_order_cap, turnover * 0.0005))
+        return min(per_order_cap, turnover * 0.0005)
 
     @staticmethod
     def _empty_breakdown() -> FrictionBreakdown:

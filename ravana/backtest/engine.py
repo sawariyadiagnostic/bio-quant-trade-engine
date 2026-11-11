@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
 
@@ -13,9 +13,9 @@ from ravana.backtest.orders import Order, OrderSide, OrderStatus, Position, Trad
 from ravana.backtest.slippage import MicrostructureSlippageModel
 
 
-@dataclass
+@dataclass(frozen=True)
 class BacktestResult:
-    """Comprehensive performance metrics, equity series, and trade ledger."""
+    """Rigorous audit-proof backtest run output."""
     equity_curve: pd.Series
     cash_curve: pd.Series
     drawdown_curve: pd.Series
@@ -25,32 +25,31 @@ class BacktestResult:
 
 
 class EventDrivenBacktester:
-    """Executes causal bar-by-bar matching with accurate statutory fees and slippage."""
+    """Causal, bar-by-bar backtest engine with exact Indian statutory frictions."""
 
     def __init__(self, config: Optional[BacktestConfig] = None) -> None:
         self.config = config or BacktestConfig()
         self.slippage_model = MicrostructureSlippageModel(
             max_volume_participation=self.config.max_volume_participation,
-            impact_gamma=self.config.impact_gamma,
+            default_half_spread_bps=self.config.default_half_spread_bps,
         )
 
     def run(
         self,
         df: pd.DataFrame,
         signals: pd.Series,
-        ticker: str = "ASSET",
+        ticker: str = "BANKBEES.NS",
         signal_threshold: float = 0.0,
     ) -> BacktestResult:
-        """Execute simulation across chronological bar series."""
+        """Execute causal event-driven backtest across given market bar DataFrame."""
         df = self._validate_and_prep_df(df)
-        signals = signals.reindex(df.index).fillna(0.0)
+        cash = float(self.config.initial_capital_inr)
+        position = Position(ticker, allow_shorting=self.config.allow_shorting)
 
-        cash = self.config.initial_capital
-        position = Position(ticker)
         trades: List[Trade] = []
         equity_records: List[float] = []
         cash_records: List[float] = []
-
+        debited_dates: Set[Tuple[str, str]] = set()
         pending_orders: List[Order] = []
 
         for i in range(len(df)):
@@ -58,11 +57,10 @@ class EventDrivenBacktester:
             ts: pd.Timestamp = df.index[i]
 
             # 1. Process Pending Orders causally at current bar Open
-            cash, filled_trades = self._process_pending_orders(
-                pending_orders, current_bar, ts, ticker, cash, position
+            cash, filled_trades, pending_orders = self._process_pending_orders(
+                pending_orders, current_bar, ts, ticker, cash, position, debited_dates
             )
             trades.extend(filled_trades)
-            pending_orders.clear()
 
             # 2. Mark-to-Market Equity
             close_px = float(current_bar["Close"])
@@ -78,18 +76,19 @@ class EventDrivenBacktester:
             if new_order:
                 pending_orders.append(new_order)
 
-        # Force liquidating any remaining position at end of backtest
+        # Force liquidating remaining inventory on backtest completion
         if position.shares > 0:
             final_bar = df.iloc[-1]
             cash, final_trade = self._force_close_position(final_bar, df.index[-1], ticker, cash, position)
             if final_trade:
                 trades.append(final_trade)
             equity_records[-1] = cash
+            cash_records[-1] = cash  # Synchronize cash ledger
 
         equity_s = pd.Series(equity_records, index=df.index, name="Equity")
         cash_s = pd.Series(cash_records, index=df.index, name="Cash")
         dd_s = self._compute_drawdown_series(equity_s)
-        metrics = self._compute_performance_metrics(equity_s, trades)
+        metrics = self._compute_performance_metrics(equity_s, trades, position)
 
         return BacktestResult(
             equity_curve=equity_s,
@@ -108,15 +107,22 @@ class EventDrivenBacktester:
         ticker: str,
         cash: float,
         position: Position,
-    ) -> Tuple[float, List[Trade]]:
-        """Fill orders against bar Open price with volume cap and slippage."""
+        debited_dates: Set[Tuple[str, str]],
+    ) -> Tuple[float, List[Trade], List[Order]]:
+        """Fill orders against bar Open price with volume cap, slippage, and pre-trade margin guard."""
         filled: List[Trade] = []
+        remaining_orders: List[Order] = []
         open_px = float(bar["Open"])
-        vol = float(bar.get("Volume", 1e6))
+        vol = float(bar.get("Volume", 0.0))
         hi = float(bar.get("High", open_px))
         lo = float(bar.get("Low", open_px))
+        date_key = (ticker, ts.strftime("%Y-%m-%d"))
 
         for ord in orders:
+            if ord.side == OrderSide.SELL and position.shares <= 0 and not self.config.allow_shorting:
+                ord.status = OrderStatus.REJECTED
+                continue
+
             side_str = "BUY" if ord.side == OrderSide.BUY else "SELL"
             fill = self.slippage_model.simulate_fill(
                 side=side_str,
@@ -127,24 +133,54 @@ class EventDrivenBacktester:
                 bar_low=lo,
             )
             if fill.filled_shares <= 0 or fill.is_circuit_locked:
+                ord.status = OrderStatus.PENDING
+                remaining_orders.append(ord)
                 continue
 
+            # CDSL DP charges applied at most once per symbol per settlement date on delivery sell
+            is_dp_eligible = False
+            if ord.side == OrderSide.SELL and self.config.regime in (TradingRegime.OVERNIGHT, TradingRegime.SWING):
+                if date_key not in debited_dates:
+                    is_dp_eligible = True
+
+            fill_shares = fill.filled_shares
             friction = IndianFrictionModel.calculate_friction(
                 side=side_str,
                 price=fill.executed_price,
-                shares=fill.filled_shares,
+                shares=fill_shares,
                 asset_type=self.config.asset_type,
                 regime=self.config.regime,
                 fixed_dp_fee_inr=self.config.fixed_dp_fee_inr,
                 brokerage_per_order_inr=self.config.brokerage_per_order_inr,
+                is_dp_eligible=is_dp_eligible,
             )
+
+            # Pre-trade cash check for BUY
+            if ord.side == OrderSide.BUY:
+                required_cost = (fill_shares * fill.executed_price) + friction.total_friction_inr
+                if required_cost > cash:
+                    max_affordable = int(max(0.0, cash - friction.total_friction_inr) // fill.executed_price)
+                    if max_affordable <= 0:
+                        ord.status = OrderStatus.REJECTED
+                        continue
+                    fill_shares = max_affordable
+                    friction = IndianFrictionModel.calculate_friction(
+                        side=side_str,
+                        price=fill.executed_price,
+                        shares=fill_shares,
+                        asset_type=self.config.asset_type,
+                        regime=self.config.regime,
+                        fixed_dp_fee_inr=self.config.fixed_dp_fee_inr,
+                        brokerage_per_order_inr=self.config.brokerage_per_order_inr,
+                        is_dp_eligible=False,
+                    )
 
             trade = Trade(
                 trade_id=f"T_{len(filled)}_{int(ts.timestamp())}",
                 timestamp=ts,
                 ticker=ticker,
                 side=ord.side,
-                shares=fill.filled_shares,
+                shares=fill_shares,
                 price=fill.executed_price,
                 slippage_bps=fill.slippage_bps,
                 friction=friction,
@@ -152,13 +188,22 @@ class EventDrivenBacktester:
             position.update_on_trade(trade)
 
             if ord.side == OrderSide.BUY:
-                cash -= (fill.filled_shares * fill.executed_price + friction.total_friction_inr)
+                cash -= (fill_shares * fill.executed_price + friction.total_friction_inr)
             else:
-                cash += (fill.filled_shares * fill.executed_price - friction.total_friction_inr)
+                cash += (fill_shares * fill.executed_price - friction.total_friction_inr)
+                if is_dp_eligible:
+                    debited_dates.add(date_key)
 
             filled.append(trade)
 
-        return cash, filled
+            if fill_shares < ord.shares:
+                ord.shares -= fill_shares
+                ord.status = OrderStatus.PARTIALLY_FILLED
+                remaining_orders.append(ord)
+            else:
+                ord.status = OrderStatus.FILLED
+
+        return cash, filled, remaining_orders
 
     def _evaluate_signals(
         self,
@@ -176,16 +221,15 @@ class EventDrivenBacktester:
 
         if self.config.regime == TradingRegime.OVERNIGHT:
             # Entry condition: Near market close (15:20-15:25) and positive signal
-            if t_str >= self.config.entry_cutoff_time and signal > threshold and position.shares == 0:
+            if (t_str >= self.config.entry_cutoff_time or t_str == "00:00") and signal > threshold and position.shares == 0:
                 shares = self._size_position(cash, close_px)
                 if shares > 0:
                     return Order(f"ORD_BUY_{ts.timestamp()}", ts, ticker, OrderSide.BUY, shares)
             # Exit condition: Morning open (09:15-09:20) and currently holding
-            elif t_str <= self.config.exit_cutoff_time and position.shares > 0:
+            elif (t_str <= self.config.exit_cutoff_time or t_str == "00:00") and position.shares > 0:
                 return Order(f"ORD_SELL_{ts.timestamp()}", ts, ticker, OrderSide.SELL, position.shares)
 
         elif self.config.regime == TradingRegime.INTRADAY_MIS:
-            # Force square-off before session end (15:15 IST)
             if t_str >= "15:15" and position.shares != 0:
                 side = OrderSide.SELL if position.shares > 0 else OrderSide.BUY
                 return Order(f"ORD_SQ_{ts.timestamp()}", ts, ticker, side, abs(position.shares))
@@ -206,25 +250,48 @@ class EventDrivenBacktester:
 
     def _size_position(self, cash: float, price: float) -> int:
         """Institutional capital allocation with friction reserve buffer."""
-        usable_cash = max(0.0, cash * 0.98)  # Reserve 2% for statutory friction & buffer
+        usable_cash = max(0.0, cash * 0.98)
         return int(usable_cash // price) if price > 0 else 0
 
     def _force_close_position(
         self, bar: pd.Series, ts: pd.Timestamp, ticker: str, cash: float, position: Position
     ) -> Tuple[float, Optional[Trade]]:
-        """Liquidate remaining inventory on backtest completion."""
+        """Liquidate remaining inventory on backtest completion with slippage and frictions."""
         close_px = float(bar["Close"])
+        vol = float(bar.get("Volume", 1e5))
+        hi = float(bar.get("High", close_px))
+        lo = float(bar.get("Low", close_px))
+
+        fill = self.slippage_model.simulate_fill(
+            side="SELL",
+            desired_shares=position.shares,
+            nominal_price=close_px,
+            bar_volume=max(vol, float(position.shares) * 20.0),
+            bar_high=hi,
+            bar_low=lo,
+        )
+        exec_price = fill.executed_price if fill.executed_price > 0 else close_px
         friction = IndianFrictionModel.calculate_friction(
-            side="SELL", price=close_px, shares=position.shares,
-            asset_type=self.config.asset_type, regime=self.config.regime,
+            side="SELL",
+            price=exec_price,
+            shares=position.shares,
+            asset_type=self.config.asset_type,
+            regime=self.config.regime,
             fixed_dp_fee_inr=self.config.fixed_dp_fee_inr,
+            brokerage_per_order_inr=self.config.brokerage_per_order_inr,
+            is_dp_eligible=True,
         )
         trade = Trade(
-            trade_id=f"T_FINAL_{int(ts.timestamp())}", timestamp=ts, ticker=ticker,
-            side=OrderSide.SELL, shares=position.shares, price=close_px,
-            slippage_bps=0.0, friction=friction
+            trade_id=f"T_FINAL_{int(ts.timestamp())}",
+            timestamp=ts,
+            ticker=ticker,
+            side=OrderSide.SELL,
+            shares=position.shares,
+            price=exec_price,
+            slippage_bps=fill.slippage_bps,
+            friction=friction,
         )
-        cash += (position.shares * close_px - friction.total_friction_inr)
+        cash += (position.shares * exec_price - friction.total_friction_inr)
         position.update_on_trade(trade)
         return cash, trade
 
@@ -242,7 +309,9 @@ class EventDrivenBacktester:
         return (equity - running_max) / running_max
 
     @staticmethod
-    def _compute_performance_metrics(equity: pd.Series, trades: List[Trade]) -> Dict[str, float]:
+    def _compute_performance_metrics(
+        equity: pd.Series, trades: List[Trade], position: Optional[Position] = None
+    ) -> Dict[str, float]:
         if len(equity) < 2:
             return {}
 
@@ -250,30 +319,41 @@ class EventDrivenBacktester:
         total_return = (equity.iloc[-1] / equity.iloc[0]) - 1.0
         n_periods = len(ret_series)
 
-        # Annualized metrics (assuming 5m intraday grid, 75 bars/day, 252 days/yr)
+        delta_seconds = (equity.index[-1] - equity.index[0]).total_seconds()
+        delta_days = max(1.0 / 24.0, delta_seconds / 86400.0)
+
         bars_per_yr = 252.0 * 75.0
-        cagr = ((1.0 + total_return) ** (bars_per_yr / max(1.0, float(n_periods)))) - 1.0 if total_return > -1.0 else -1.0
+        if delta_days < 7.0:
+            cagr = total_return
+        else:
+            ann_factor = 365.25 / delta_days
+            cagr = ((1.0 + total_return) ** ann_factor) - 1.0 if total_return > -1.0 else -1.0
+
         ann_vol = float(ret_series.std()) * math.sqrt(bars_per_yr) if ret_series.std() > 0 else 0.0
         sharpe = (float(ret_series.mean()) * bars_per_yr) / ann_vol if ann_vol > 0 else 0.0
 
-        # Downside vol & Sortino
-        downside = ret_series[ret_series < 0]
-        downside_std = float(downside.std()) * math.sqrt(bars_per_yr) if len(downside) > 1 else 1e-6
-        sortino = (float(ret_series.mean()) * bars_per_yr) / downside_std if downside_std > 0 else 0.0
+        neg_returns = np.minimum(0.0, ret_series.to_numpy())
+        downside_semi_variance = float(np.mean(neg_returns ** 2)) if n_periods > 0 else 0.0
+        downside_std = math.sqrt(downside_semi_variance) * math.sqrt(bars_per_yr) if downside_semi_variance > 0 else 1e-6
+        sortino = (float(ret_series.mean()) * bars_per_yr) / downside_std if downside_std > 1e-5 else 0.0
 
-        # Drawdowns
         running_max = equity.cummax()
         dd = (equity - running_max) / running_max
         max_dd = float(abs(dd.min()))
 
-        # Friction totals
         total_fees = sum(t.friction.total_friction_inr for t in trades)
         total_dp = sum(t.friction.dp_charges_inr for t in trades)
 
-        # Trade stats
-        sells = [t for t in trades if t.side == OrderSide.SELL]
-        win_count = sum(1 for i in range(1, len(trades), 2) if trades[i].price > trades[i-1].price)
-        win_rate = (win_count / len(sells)) if sells else 0.0
+        if position and position.closed_trades:
+            rt_trades = position.closed_trades
+            win_count = sum(1 for t in rt_trades if t.is_win)
+            win_rate = (win_count / len(rt_trades)) * 100.0
+            total_closed = len(rt_trades)
+        else:
+            sells = [t for t in trades if t.side == OrderSide.SELL]
+            win_count = sum(1 for i in range(1, len(trades), 2) if trades[i].price > trades[i-1].price) if len(trades) >= 2 else 0
+            win_rate = (win_count / len(sells)) * 100.0 if sells else 0.0
+            total_closed = len(sells)
 
         return {
             "initial_capital": round(float(equity.iloc[0]), 2),
@@ -285,7 +365,8 @@ class EventDrivenBacktester:
             "sortino_ratio": round(sortino, 2),
             "max_drawdown_pct": round(max_dd * 100.0, 2),
             "total_trades": len(trades),
+            "round_trip_trades": total_closed,
             "total_fees_inr": round(total_fees, 2),
             "total_dp_fees_inr": round(total_dp, 2),
-            "win_rate_pct": round(win_rate * 100.0, 2),
+            "win_rate_pct": round(win_rate, 2),
         }
