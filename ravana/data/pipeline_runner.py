@@ -60,6 +60,10 @@ class BatchPipelineRunner:
         for d in [self.m3_dir, self.m4_dir, self.m5_dir, self.m7_dir, self.m8_dir, self.m9_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
+    def _upsert(self, path: Path, df: pd.DataFrame) -> Dict[str, Any]:
+        """Convenience atomic upsert allowing backward-compatible schema expansion."""
+        return self.lake_manager.upsert_engine.upsert(path, df, allow_schema_evolution=True)
+
     def ingest_and_persist_m3(self) -> Dict[str, Any]:
         """Fetch primary ETF pairs and global macro drivers and persist to Bronze Tier."""
         manifest: Dict[str, Any] = {"intraday": {}, "daily": {}, "macro": {}}
@@ -70,13 +74,13 @@ class BatchPipelineRunner:
             ds = self.loader.ingest_etf(ticker=ticker, interval="5m", period=period, include_macro=False)
             base = sanitize_filename(ticker)
             fpath = self.m3_dir / "intraday_5m" / f"{base}.parquet"
-            self.lake_manager.upsert_engine.upsert(fpath, ds.data)
+            self._upsert(fpath, ds.data)
             manifest["intraday"][ticker] = make_meta(ticker, ds.data, fpath)
 
             if ds.benchmark_data is not None and not ds.benchmark_data.empty and ds.benchmark_ticker:
                 bench_base = sanitize_filename(ds.benchmark_ticker)
                 bench_path = self.m3_dir / "intraday_5m" / f"{bench_base}.parquet"
-                self.lake_manager.upsert_engine.upsert(bench_path, ds.benchmark_data)
+                self._upsert(bench_path, ds.benchmark_data)
                 manifest["intraday"][ds.benchmark_ticker] = make_meta(
                     ds.benchmark_ticker, ds.benchmark_data, bench_path
                 )
@@ -87,7 +91,7 @@ class BatchPipelineRunner:
             df = self._ingest_ticker(ticker, interval="1d", period="2y")
             base = sanitize_filename(ticker)
             fpath = self.m3_dir / "daily_1d" / f"{base}.parquet"
-            self.lake_manager.upsert_engine.upsert(fpath, df)
+            self._upsert(fpath, df)
             manifest["daily"][ticker] = make_meta(ticker, df, fpath)
 
         # 3. Global Macro Drivers (Daily 2y)
@@ -96,7 +100,7 @@ class BatchPipelineRunner:
             df = self._ingest_ticker(ticker, interval="1d", period="2y")
             base = sanitize_filename(ticker)
             fpath = self.m3_dir / "daily_1d" / f"{base}.parquet"
-            self.lake_manager.upsert_engine.upsert(fpath, df)
+            self._upsert(fpath, df)
             manifest["macro"][ticker] = make_meta(ticker, df, fpath)
 
         manifest_path = self.m3_dir / "m3_manifest.json"
@@ -133,7 +137,9 @@ class BatchPipelineRunner:
                 m_ds = IngestedDataset(ticker=m_tick, interval="1d", exchange=m_cfg.exchange, data=m_df)
                 cleaned = self.cleaner.clean(m_ds)
                 clean_p = self.m4_dir / "daily_1d" / f"{m_base}_clean.parquet"
-                self.lake_manager.upsert_engine.upsert(clean_p, cleaned.data)
+                self.lake_manager.upsert_engine.upsert(
+                    clean_p, cleaned.data, allow_schema_evolution=True
+                )
                 reports["daily_1d"][m_tick] = {"raw_bars": len(m_df), "cleaned_bars": cleaned.bar_count}
 
         report_path = self.m4_dir / "m4_quality_reports.json"
@@ -183,14 +189,14 @@ class BatchPipelineRunner:
             target_dir.mkdir(parents=True, exist_ok=True)
 
             fpath = target_dir / f"{base}_{tf}.parquet"
-            self.lake_manager.upsert_engine.upsert(fpath, df)
+            self._upsert(fpath, df)
             meta["timeframes"][tf] = make_meta(cleaned.ticker, df, fpath)
 
         for tf in self.resampler.config.intraday_intervals:
             if tf in res_ds.spread_timeframes:
                 s_df = res_ds.spread_timeframes[tf]
                 s_path = target_dir / f"{base}_spread_{tf}.parquet"
-                self.lake_manager.upsert_engine.upsert(s_path, s_df)
+                self._upsert(s_path, s_df)
 
         return meta
 
@@ -211,7 +217,7 @@ class BatchPipelineRunner:
                 df, freq=freq, require_closed_period=self.resampler.config.require_closed_period
             )
             fpath = self.m5_dir / f"macro_{tf}" / f"{base}_{tf}.parquet"
-            self.lake_manager.upsert_engine.upsert(fpath, res_df)
+            self._upsert(fpath, res_df)
             meta["timeframes"][tf] = make_meta(ticker, res_df, fpath)
 
         return meta
@@ -295,25 +301,25 @@ class BatchPipelineRunner:
 
         # Save Clean Primary
         clean_path = self.m4_dir / subfolder / f"{base}_clean.parquet"
-        self.lake_manager.upsert_engine.upsert(clean_path, cleaned.data)
+        self._upsert(clean_path, cleaned.data)
 
         # Save Tracking Spread Analytics
         if cleaned.spread_data is not None and not cleaned.spread_data.empty:
             spread_path = self.m4_dir / subfolder / f"{base}_spread.parquet"
-            self.lake_manager.upsert_engine.upsert(spread_path, cleaned.spread_data)
+            self._upsert(spread_path, cleaned.spread_data)
 
         # Save Clean Benchmark if present
         if cleaned.benchmark_data is not None and not cleaned.benchmark_data.empty and dataset.benchmark_ticker:
             bench_base = sanitize_filename(dataset.benchmark_ticker)
             bench_clean_path = self.m4_dir / subfolder / f"{bench_base}_clean.parquet"
-            self.lake_manager.upsert_engine.upsert(bench_clean_path, cleaned.benchmark_data)
+            self._upsert(bench_clean_path, cleaned.benchmark_data)
 
         # Save Clean Macro drivers if present
         if cleaned.macro_data:
             for m_tick, m_df in cleaned.macro_data.items():
                 m_base = sanitize_filename(m_tick)
                 m_clean_path = self.m4_dir / "daily_1d" / f"{m_base}_clean.parquet"
-                self.lake_manager.upsert_engine.upsert(m_clean_path, m_df)
+                self._upsert(m_clean_path, m_df)
 
         return {
             "ticker": dataset.ticker,
@@ -362,7 +368,7 @@ class BatchPipelineRunner:
             df_enriched = enrich_intraday_for_m7(base, df_clean, self.m4_dir)
             feat_df = engine.compute_feature_matrix(df_enriched, symbol=base)
             out_path = self.m7_dir / "intraday_5m" / f"{base}_features.parquet"
-            self.lake_manager.upsert_engine.upsert(out_path, feat_df)
+            self._upsert(out_path, feat_df)
             manifest["features"][base] = make_meta(ticker, feat_df, out_path)
             etf_dfs[base] = df_enriched
 
@@ -390,7 +396,7 @@ class BatchPipelineRunner:
             df_clean = pd.read_parquet(clean_path)
             target_df = builder.build_targets(df_clean)
             out_path = self.m8_dir / "intraday_5m" / f"{base}_targets.parquet"
-            self.lake_manager.upsert_engine.upsert(out_path, target_df)
+            self._upsert(out_path, target_df)
             manifest["targets"][base] = make_meta(ticker, target_df, out_path)
 
         return manifest

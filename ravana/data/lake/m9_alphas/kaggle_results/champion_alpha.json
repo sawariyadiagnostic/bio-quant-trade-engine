@@ -1,0 +1,26 @@
+{
+  "ticker": "BANKBEES.NS",
+  "status": "CHAMPION_FOUND",
+  "formula_str": "Add(Sub(TsDelay(TsMin(TsMin(VOLATILITY_20))), TsDelta(Mul(Sub(ATR_14_NORM, LOG_RET_5), TsMin(LOG_RET_5)))), Mul(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20)))))",
+  "node_count": 39,
+  "metrics": {
+    "ic": 0.0757,
+    "sharpe": 8.31,
+    "dsr": 439.2,
+    "turnover": 0.1237,
+    "mdd": 0.0065,
+    "fitness": 0.8419
+  },
+  "composite_fitness": 0.7639,
+  "generations_run": 15,
+  "population_size": 500,
+  "hardware": {
+    "device": "cuda:0",
+    "cuda_available": true,
+    "gpu_name": "Tesla T4",
+    "peak_vram_mb": 1.34,
+    "eval_count": 7500,
+    "elapsed_seconds": 14.31,
+    "throughput_evals_per_sec": 524.2
+  }
+}

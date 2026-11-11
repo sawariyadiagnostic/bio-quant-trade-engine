@@ -1,6 +1,7 @@
 """Incremental upsert engine with schema drift protection, snapshots, and Win32 atomic swap."""
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import time
@@ -9,6 +10,8 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from ravana.data.storage.config import StorageConfig
+
+logger = logging.getLogger(__name__)
 
 
 class SchemaEvolutionError(Exception):
@@ -30,7 +33,12 @@ class IncrementalUpsertEngine:
         self.enable_snapshots = enable_snapshots
         self.max_snapshots = max_snapshots
 
-    def upsert(self, target_path: Path | str, incoming_df: pd.DataFrame) -> Dict[str, Any]:
+    def upsert(
+        self,
+        target_path: Path | str,
+        incoming_df: pd.DataFrame,
+        allow_schema_evolution: bool = False,
+    ) -> Dict[str, Any]:
         """Perform deterministic atomic upsert with schema guards and snapshot retention."""
         path = Path(target_path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -46,7 +54,7 @@ class IncrementalUpsertEngine:
         if path.exists():
             existing_df = pd.read_parquet(path)
             initial_bars = len(existing_df)
-            self._validate_schema_compatibility(existing_df, clean_incoming)
+            self._validate_schema_compatibility(existing_df, clean_incoming, allow_schema_evolution)
             clean_incoming = self._harmonize_timezones(existing_df, clean_incoming)
 
             collisions = len(existing_df.index.intersection(clean_incoming.index))
@@ -77,9 +85,18 @@ class IncrementalUpsertEngine:
         return df
 
     @staticmethod
-    def _validate_schema_compatibility(existing: pd.DataFrame, incoming: pd.DataFrame) -> None:
+    def _validate_schema_compatibility(
+        existing: pd.DataFrame, incoming: pd.DataFrame, allow_evolution: bool = False
+    ) -> None:
         """Enforce strict column schema matching to prevent silent NaN injection."""
         if set(existing.columns) != set(incoming.columns):
+            if allow_evolution:
+                logger.info(
+                    "Schema evolution permitted: existing %s -> incoming %s",
+                    sorted(existing.columns),
+                    sorted(incoming.columns),
+                )
+                return
             missing = set(existing.columns) - set(incoming.columns)
             extra = set(incoming.columns) - set(existing.columns)
             raise SchemaEvolutionError(

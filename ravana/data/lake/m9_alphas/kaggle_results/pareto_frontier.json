@@ -1,0 +1,146 @@
+[
+  {
+    "formula": "Add(Sub(TsDelay(TsMin(TsMin(VOLATILITY_20))), TsDelta(Mul(Sub(ATR_14_NORM, LOG_RET_5), TsMin(LOG_RET_5)))), Mul(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20)))))",
+    "metrics": {
+      "ic": 0.0757,
+      "sharpe": 8.31,
+      "dsr": 439.2,
+      "turnover": 0.1237,
+      "mdd": 0.0065,
+      "fitness": 0.8419
+    },
+    "nodes": 39
+  },
+  {
+    "formula": "Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Mul(TsMax(TsMax(TsMin(PARKINSON_VOL_20))), Add(TsMax(Sub(TsRank(MACRO_USDINR_RET_1), Add(SPREAD_ZSCORE_20, ADF_STAT_60))), TsMin(Mul(RSI_14, TsDelta(MACRO_VIX_LEVEL))))))), Mul(TsRank(TsMin(VWAP_DRIFT)), Mul(Mul(MACRO_VIX_LEVEL, SPREAD_DELTA_5), TsMax(TsDelay(ADF_STAT_60))))), TsDelay(TsMin(TsMin(VOLATILITY_20)))), TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20))))",
+    "metrics": {
+      "ic": 0.2071,
+      "sharpe": 8.51,
+      "dsr": 452.91,
+      "turnover": 0.2444,
+      "mdd": 0.0091,
+      "fitness": 0.8962
+    },
+    "nodes": 84
+  },
+  {
+    "formula": "Add(Mul(Add(Mul(Sub(Mul(GARMAN_KLASS_VOL_20, GARMAN_KLASS_VOL_20), TsMin(MACD_DIFF_NORM)), TsMin(BOLLINGER_BAND_PCT_20)), TsDelay(TsMin(TsMin(VOLATILITY_20)))), Add(TsMax(Mul(PARKINSON_VOL_20, BOLLINGER_BAND_PCT_20)), Mul(TsRank(TsZScore(Sub(MACRO_USDINR_RET_1, SPREAD_BPS))), TsMax(TsDelta(VWAP_DRIFT))))), Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Mul(TsMax(TsMax(TsMin(PARKINSON_VOL_20))), Add(TsMax(Sub(TsRank(MACRO_USDINR_RET_1), Add(SPREAD_ZSCORE_20, ADF_STAT_60))), TsMin(Mul(RSI_14, TsDelta(MACRO_VIX_LEVEL))))))), Mul(TsRank(TsMin(VWAP_DRIFT)), Mul(Mul(MACRO_VIX_LEVEL, SPREAD_DELTA_5), TsMax(TsDelay(ADF_STAT_60))))), TsDelay(TsMin(TsMin(VOLATILITY_20)))), TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20)))))",
+    "metrics": {
+      "ic": 0.207,
+      "sharpe": 8.51,
+      "dsr": 452.91,
+      "turnover": 0.2436,
+      "mdd": 0.0091,
+      "fitness": 0.8963
+    },
+    "nodes": 114
+  },
+  {
+    "formula": "Add(Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Mul(TsMax(TsMax(TsMin(PARKINSON_VOL_20))), Add(TsMax(Sub(TsRank(MACRO_USDINR_RET_1), Add(SPREAD_ZSCORE_20, ADF_STAT_60))), TsMin(Mul(RSI_14, TsDelta(MACRO_VIX_LEVEL))))))), Mul(TsRank(TsMin(VWAP_DRIFT)), Mul(Mul(MACRO_VIX_LEVEL, SPREAD_DELTA_5), TsMax(TsDelay(ADF_STAT_60))))), TsDelay(TsMin(TsMin(VOLATILITY_20)))), TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20)))), Sub(Add(Mul(Sub(Mul(GARMAN_KLASS_VOL_20, GARMAN_KLASS_VOL_20), TsMin(MACD_DIFF_NORM)), TsMin(BOLLINGER_BAND_PCT_20)), TsDelay(TsMin(TsMin(VOLATILITY_20)))), Mul(TsDelay(TsMax(TsMin(PARKINSON_VOL_20))), TsMin(TsMax(LOG_RET_1)))))",
+    "metrics": {
+      "ic": 0.1728,
+      "sharpe": 8.38,
+      "dsr": 443.9,
+      "turnover": 0.1535,
+      "mdd": 0.0091,
+      "fitness": 0.8828
+    },
+    "nodes": 108
+  },
+  {
+    "formula": "Add(Sub(Add(Mul(Sub(Mul(GARMAN_KLASS_VOL_20, GARMAN_KLASS_VOL_20), TsMin(MACD_DIFF_NORM)), TsMin(BOLLINGER_BAND_PCT_20)), TsDelay(TsMin(TsMin(VOLATILITY_20)))), Mul(TsDelay(TsMax(TsMin(PARKINSON_VOL_20))), TsMin(TsMax(LOG_RET_1)))), Mul(Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), TsMin(Add(TsMax(LOG_RET_20), TsMax(LOG_RET_5)))), TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20)))))",
+    "metrics": {
+      "ic": 0.0704,
+      "sharpe": 7.53,
+      "dsr": 386.63,
+      "turnover": 0.1141,
+      "mdd": 0.0068,
+      "fitness": 0.7634
+    },
+    "nodes": 57
+  },
+  {
+    "formula": "Add(TsMax(TsMin(PARKINSON_VOL_20)), TsDelay(TsMax(TsMin(PARKINSON_VOL_20))))",
+    "metrics": {
+      "ic": 0.0307,
+      "sharpe": 6.45,
+      "dsr": 313.19,
+      "turnover": 0.0293,
+      "mdd": 0.0138,
+      "fitness": 0.6507
+    },
+    "nodes": 8
+  },
+  {
+    "formula": "Add(TsDelay(TsMax(TsMin(PARKINSON_VOL_20))), TsMax(TsMin(PARKINSON_VOL_20)))",
+    "metrics": {
+      "ic": 0.0307,
+      "sharpe": 6.45,
+      "dsr": 313.19,
+      "turnover": 0.0293,
+      "mdd": 0.0138,
+      "fitness": 0.6507
+    },
+    "nodes": 8
+  },
+  {
+    "formula": "Add(Mul(Sub(Mul(GARMAN_KLASS_VOL_20, GARMAN_KLASS_VOL_20), TsMin(MACD_DIFF_NORM)), TsMin(BOLLINGER_BAND_PCT_20)), TsDelay(TsMin(TsMin(VOLATILITY_20))))",
+    "metrics": {
+      "ic": 0.0389,
+      "sharpe": 6.53,
+      "dsr": 318.74,
+      "turnover": 0.0407,
+      "mdd": 0.0138,
+      "fitness": 0.6604
+    },
+    "nodes": 14
+  },
+  {
+    "formula": "TsDelay(TsMin(TsMin(VOLATILITY_20)))",
+    "metrics": {
+      "ic": 0.0426,
+      "sharpe": 6.25,
+      "dsr": 299.93,
+      "turnover": 0.0197,
+      "mdd": 0.0138,
+      "fitness": 0.6372
+    },
+    "nodes": 4
+  },
+  {
+    "formula": "Mul(TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20))), TsMin(Add(GARMAN_KLASS_VOL_20, TsDelay(PARKINSON_VOL_20))))",
+    "metrics": {
+      "ic": 0.0385,
+      "sharpe": 6.33,
+      "dsr": 305.52,
+      "turnover": 0.0197,
+      "mdd": 0.0138,
+      "fitness": 0.6439
+    },
+    "nodes": 10
+  },
+  {
+    "formula": "Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Mul(TsMax(TsMax(TsMin(PARKINSON_VOL_20))), Add(TsMax(Sub(TsRank(MACRO_USDINR_RET_1), Add(SPREAD_ZSCORE_20, ADF_STAT_60))), TsMin(Mul(RSI_14, TsDelta(MACRO_VIX_LEVEL))))))), Mul(TsRank(TsMin(VWAP_DRIFT)), Mul(Mul(MACRO_VIX_LEVEL, SPREAD_DELTA_5), TsMax(TsDelay(ADF_STAT_60))))), TsDelay(TsMin(TsMin(VOLATILITY_20))))",
+    "metrics": {
+      "ic": 0.2265,
+      "sharpe": 7.28,
+      "dsr": 369.44,
+      "turnover": 0.261,
+      "mdd": 0.0057,
+      "fitness": 0.7786
+    },
+    "nodes": 79
+  },
+  {
+    "formula": "Add(Mul(Mul(TsDelay(TsMax(TsMin(PARKINSON_VOL_20))), TsMin(TsMax(LOG_RET_1))), Add(TsMin(TsDelay(TsDelay(ATR_14_NORM))), Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Mul(TsMax(TsMax(TsMin(PARKINSON_VOL_20))), Add(TsMax(Sub(TsRank(MACRO_USDINR_RET_1), Add(SPREAD_ZSCORE_20, ADF_STAT_60))), TsMin(Mul(RSI_14, TsDelta(MACRO_VIX_LEVEL)))))))), Add(Mul(Add(Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Add(Add(Mul(Add(TsRank(TsDelay(TsDelay(VWAP_DRIFT))), TsMin(TsMax(LOG_RET_1))), TsRank(TsMax(ADF_STAT_60))), Add(TsMin(Sub(MACRO_VIX_RET_1, VWAP_DRIFT)), TsDelay(TsMin(ATR_14_NORM)))), Mul(TsMax(TsMax(TsMin(PARKINSON_VOL_20))), Add(TsMax(Sub(TsRank(MACRO_USDINR_RET_1), Add(SPREAD_ZSCORE_20, ADF_STAT_60))), TsMin(Mul(RSI_14, TsDelta(MACRO_VIX_LEVEL))))))), Mul(TsRank(TsMin(VWAP_DRIFT)), Mul(Mul(MACRO_VIX_LEVEL, SPREAD_DELTA_5), TsMax(TsDelay(ADF_STAT_60))))), TsDelay(TsMin(TsMin(VOLATILITY_20)))), TsMax(TsMin(TsMin(GARMAN_KLASS_VOL_20)))))",
+    "metrics": {
+      "ic": 0.2071,
+      "sharpe": 8.51,
+      "dsr": 452.91,
+      "turnover": 0.2444,
+      "mdd": 0.0091,
+      "fitness": 0.8962
+    },
+    "nodes": 139
+  }
+]
