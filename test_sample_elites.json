@@ -1,0 +1,56 @@
+{
+  "ticker": "BANKBEES",
+  "lookback": "5y",
+  "exported_at": "2026-11-08 12:00:00 UTC",
+  "total_elites": 4,
+  "elites": [
+    {
+      "formula_str": "SUB(RSI_14, 0.50)",
+      "sortino": 2.8,
+      "fitness": 3.1,
+      "net_return_pct": 145.2,
+      "cagr_pct": 29.1,
+      "max_drawdown": 0.042,
+      "win_rate": 62.5,
+      "trades_count": 110,
+      "row": 2,
+      "col": 4
+    },
+    {
+      "formula_str": "EMA_10(Vol_Price_Flow)",
+      "sortino": 2.4,
+      "fitness": 2.6,
+      "net_return_pct": 112.0,
+      "cagr_pct": 24.2,
+      "max_drawdown": 0.051,
+      "win_rate": 58.0,
+      "trades_count": 95,
+      "row": 3,
+      "col": 5
+    },
+    {
+      "formula_str": "ADD(Close_Adj, Open)",
+      "sortino": 1.2,
+      "fitness": 1.1,
+      "net_return_pct": 30.0,
+      "cagr_pct": 8.0,
+      "max_drawdown": 0.18,
+      "win_rate": 48.0,
+      "trades_count": 40,
+      "row": 1,
+      "col": 1
+    },
+    {
+      "formula_str": "MUL(RSI_14, 5.0)",
+      "sortino": 3.5,
+      "fitness": 3.8,
+      "net_return_pct": 210.0,
+      "cagr_pct": 38.0,
+      "max_drawdown": 0.09,
+      "win_rate": 65.0,
+      "trades_count": 150,
+      "row": 5,
+      "col": 7
+    }
+  ]
+}
