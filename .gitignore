@@ -63,3 +63,6 @@ desktop.ini
 scratch/
 tmp/
 temp/
+graphify-out/
+.kaggle/
+
