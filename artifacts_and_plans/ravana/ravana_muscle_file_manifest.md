@@ -386,9 +386,10 @@ flowchart TD
 | File | Type | Functional Role |
 | :--- | :--- | :--- |
 | [`router.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/execution/router.py) | Engine | Order routing state machine, slippage audit reconciliation, and broker gateway adapter |
-| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/execution/__init__.py) | Module | Package export boundary exposing `BrokerOrderRouter`, `PaperBrokerGateway`, `RoutingReceipt` |
+| [`shoonya_adapter.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/execution/shoonya_adapter.py) | Adapter | Institutional Finvasia Shoonya (Noren API) gateway with headless TOTP 2FA, token bucket rate limiter, session auto-recovery, and panic liquidation |
+| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/execution/__init__.py) | Module | Package export boundary exposing `BrokerOrderRouter`, `BrokerGateway`, `PaperBrokerGateway`, `ShoonyaBrokerGateway`, `ShoonyaGatewayConfig`, `RoutingReceipt` |
 
-* **Dedicated Test File:** [`test_phase5_6_7_chain.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_phase5_6_7_chain.py)
+* **Dedicated Test Files:** [`test_phase5_6_7_chain.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_phase5_6_7_chain.py), [`test_shoonya_adapter.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_shoonya_adapter.py)
 
 ---
 
@@ -488,6 +489,7 @@ Currently **204/204 tests pass** with zero failures:
 [Phase 6 & 7] test_phase5_6_7_chain.py                -->  6 tests OK
 [Universe]    test_universe_registry.py               -->  5 tests OK
 [Phase A & B] test_multi_horizon_and_portfolio.py    --> 17 tests OK
+[Muscle 19]   test_shoonya_adapter.py                 --> 17 tests OK
 --------------------------------------------------------------------------
-TOTAL: 204 TESTS (100% GREEN in ~32.4s)
+TOTAL: 221 TESTS (100% GREEN in ~15.4s)
 ```

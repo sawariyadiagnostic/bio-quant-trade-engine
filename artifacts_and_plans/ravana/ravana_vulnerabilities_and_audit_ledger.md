@@ -269,6 +269,23 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 
 ---
 
+### 22. Broker Mismatch & Exchange Cancellation Status Normalization
+* **Impacted Module:** Muscle 19 (`ravana/execution/shoonya_adapter.py`, `ravana/execution/router.py`, `ravana/risk/circuit_breaker.py`)
+* **Category:** Live Execution Gateway & Microstructure
+* **Severity:** **HIGH**
+* **Description:** The system had defaulted to generic Zerodha Kite routing concepts despite having a complete, zero-brokerage Shoonya (Finvasia Noren API) infrastructure in the codebase. Furthermore, terminal order status checks in execution polling strictly looked for `"CANCELED"`, causing orders cancelled by Finvasia (spelled with British double-L `"CANCELLED"`) to busy-wait until polling timeout.
+* **Remediation Specification:**
+  - Implemented `ShoonyaBrokerGateway` in `ravana/execution/shoonya_adapter.py` subclassing `ravana.execution.router.BrokerGateway`.
+  - Added headless RFC 6238 TOTP authentication via `pyotp` with 4-second epoch boundary guard to eliminate race conditions.
+  - Added `TokenBucketRateLimiter` pacing outbound requests to $\le 8.0$ req/s (125ms delay) with exponential backoff on HTTP 429.
+  - Added thread-safe auto-relogin retry logic upon encountering `Session Expired`.
+  - Hardened fill polling to immediately recognize terminal statuses: `("REJECTED", "CANCELED", "CANCELLED")`.
+  - Wired Muscle 18 circuit breaker emergency interlocks (`cancel_all_orders` and `liquidate_positions`).
+  - Full test suite verified across 17 comprehensive unit/integration tests in `test_shoonya_adapter.py`.
+* **Status:** **RESOLVED & VERIFIED**.
+
+---
+
 ## Chronological Audit Log
 
 | Date | Phase | Module(s) | Finding | Resolution Status |
@@ -281,3 +298,4 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 | **2026-11-15** | Phase A & B | M1, M2, M8, M11 | Multi-horizon targets, intraday friction, signal reversal, cross-sectional ops | Resolved & verified across 201 unit tests. |
 | **2026-11-15** | Dynamic Parity & Sector Expansion | M3, M4, M1, M8 | Dynamic rolling parity ratio, Sector BeES mapping, non-degenerate CS fallback | Resolved & verified across 202 unit tests (100% green). |
 | **2026-11-15** | Intraday Windows & Clock Features | M7, M1 | 26 stationary features, session clock, morning overflow, afternoon bond, opening range drift | Resolved & verified across 204 unit tests (100% green). |
+| **2026-11-15** | Shoonya Noren Broker Gateway | M19, M18, M11 | Zero-brokerage Finvasia adapter, TOTP epoch buffer, token bucket pacing, cancel status normalization | Resolved & verified across 221 unit tests (100% green). |
