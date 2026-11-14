@@ -21,23 +21,30 @@ class TestCrossSectionalPrimitives(unittest.TestCase):
     """Test suite for vectorized PyTorch cross-sectional operators."""
 
     def test_cs_rank_1d_and_2d(self):
-        """1D and 2D single-asset tensors must return full tensor of 0.5."""
+        """1D and 2D single-asset tensors gracefully fall back to ts_rank_20 (non-degenerate)."""
         t_1d = torch.randn(50)
         res_1d = cs_rank(t_1d)
-        self.assertTrue(torch.all(res_1d == 0.5))
         self.assertEqual(res_1d.shape, t_1d.shape)
+        self.assertTrue(torch.all(torch.isfinite(res_1d)))
+        self.assertTrue(torch.all(res_1d >= 0.0) and torch.all(res_1d <= 1.0))
+        # Non-degenerate variance: should not be flat 0.5
+        self.assertGreater(float(torch.std(res_1d)), 0.05)
 
         t_2d = torch.randn(50, 10)
         res_2d = cs_rank(t_2d)
-        self.assertTrue(torch.all(res_2d == 0.5))
         self.assertEqual(res_2d.shape, t_2d.shape)
+        self.assertTrue(torch.all(torch.isfinite(res_2d)))
+        self.assertTrue(torch.all(res_2d >= 0.0) and torch.all(res_2d <= 1.0))
+        self.assertGreater(float(torch.std(res_2d)), 0.05)
 
     def test_cs_rank_3d_single_asset(self):
-        """3D tensor with B == 1 (single asset) must return full tensor of 0.5."""
+        """3D tensor with B == 1 (single asset) falls back to ts_rank_20."""
         t_3d_single = torch.randn(1, 40, 5)
         res = cs_rank(t_3d_single)
-        self.assertTrue(torch.all(res == 0.5))
         self.assertEqual(res.shape, (1, 40, 5))
+        self.assertTrue(torch.all(torch.isfinite(res)))
+        self.assertTrue(torch.all(res >= 0.0) and torch.all(res <= 1.0))
+        self.assertGreater(float(torch.std(res)), 0.05)
 
     def test_cs_rank_3d_multi_asset(self):
         """3D tensor with B > 1 ranks across dim 0 into [0.0, 1.0]."""
@@ -59,23 +66,29 @@ class TestCrossSectionalPrimitives(unittest.TestCase):
         self.assertTrue(torch.all(res <= 1.0))
 
     def test_cs_zscore_1d_and_2d(self):
-        """1D and 2D single-asset tensors must return zeros_like."""
+        """1D and 2D single-asset tensors gracefully fall back to ts_zscore_20 (non-degenerate)."""
         t_1d = torch.randn(50)
         res_1d = cs_zscore(t_1d)
-        self.assertTrue(torch.all(res_1d == 0.0))
         self.assertEqual(res_1d.shape, t_1d.shape)
+        self.assertTrue(torch.all(torch.isfinite(res_1d)))
+        self.assertTrue(torch.all(res_1d >= -4.0) and torch.all(res_1d <= 4.0))
+        self.assertGreater(float(torch.std(res_1d)), 0.1)
 
         t_2d = torch.randn(50, 10)
         res_2d = cs_zscore(t_2d)
-        self.assertTrue(torch.all(res_2d == 0.0))
         self.assertEqual(res_2d.shape, t_2d.shape)
+        self.assertTrue(torch.all(torch.isfinite(res_2d)))
+        self.assertTrue(torch.all(res_2d >= -4.0) and torch.all(res_2d <= 4.0))
+        self.assertGreater(float(torch.std(res_2d)), 0.1)
 
     def test_cs_zscore_3d_single_asset(self):
-        """3D tensor with B == 1 must return zeros_like."""
+        """3D tensor with B == 1 gracefully falls back to ts_zscore_20."""
         t_3d_single = torch.randn(1, 40, 5)
         res = cs_zscore(t_3d_single)
-        self.assertTrue(torch.all(res == 0.0))
         self.assertEqual(res.shape, (1, 40, 5))
+        self.assertTrue(torch.all(torch.isfinite(res)))
+        self.assertTrue(torch.all(res >= -4.0) and torch.all(res <= 4.0))
+        self.assertGreater(float(torch.std(res)), 0.1)
 
     def test_cs_zscore_3d_multi_asset(self):
         """3D tensor with B > 1 computes standardized z-score across dim 0."""

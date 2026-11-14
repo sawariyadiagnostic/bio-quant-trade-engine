@@ -108,7 +108,7 @@ class TestMultiHorizonTargetBuilder(unittest.TestCase):
 
         session_dates = self.df.index.normalize()
         friction_model = IntradayFrictionModel(
-            variable_bps=0.9,
+            variable_bps=cfg.intraday_variable_bps,
             slippage_bps=cfg.slippage_bps,
             default_capital_inr=cfg.capital_inr,
             min_capital_inr=cfg.min_capital_inr,
@@ -366,21 +366,33 @@ class TestCrossSectionalOperators(unittest.TestCase):
             self.assertAlmostEqual(float(slice_vals[2]), 1.0, places=5)
 
     def test_single_asset_fallback_without_exception(self) -> None:
-        """Verify single asset 1D, 2D, or 3D [B=1] falls back to 0.5 rank and 0.0 z-score."""
+        """Verify single asset 1D, 2D, or 3D [B=1] falls back to ts_rank_20 and ts_zscore_20."""
         # 1D [T=50]
         x_1d = torch.randn(50)
-        self.assertTrue(torch.all(cs_rank(x_1d) == 0.5))
-        self.assertTrue(torch.all(cs_zscore(x_1d) == 0.0))
+        r_1d = cs_rank(x_1d)
+        z_1d = cs_zscore(x_1d)
+        self.assertTrue(torch.all(torch.isfinite(r_1d)))
+        self.assertTrue(torch.all(r_1d >= 0.0) and torch.all(r_1d <= 1.0))
+        self.assertTrue(torch.all(torch.isfinite(z_1d)))
+        self.assertTrue(torch.all(z_1d >= -4.0) and torch.all(z_1d <= 4.0))
 
         # 2D [T=50, K=5]
         x_2d = torch.randn(50, 5)
-        self.assertTrue(torch.all(cs_rank(x_2d) == 0.5))
-        self.assertTrue(torch.all(cs_zscore(x_2d) == 0.0))
+        r_2d = cs_rank(x_2d)
+        z_2d = cs_zscore(x_2d)
+        self.assertTrue(torch.all(torch.isfinite(r_2d)))
+        self.assertTrue(torch.all(r_2d >= 0.0) and torch.all(r_2d <= 1.0))
+        self.assertTrue(torch.all(torch.isfinite(z_2d)))
+        self.assertTrue(torch.all(z_2d >= -4.0) and torch.all(z_2d <= 4.0))
 
         # 3D [B=1, T=50, K=5]
         x_3d_single = torch.randn(1, 50, 5)
-        self.assertTrue(torch.all(cs_rank(x_3d_single) == 0.5))
-        self.assertTrue(torch.all(cs_zscore(x_3d_single) == 0.0))
+        r_3d = cs_rank(x_3d_single)
+        z_3d = cs_zscore(x_3d_single)
+        self.assertTrue(torch.all(torch.isfinite(r_3d)))
+        self.assertTrue(torch.all(r_3d >= 0.0) and torch.all(r_3d <= 1.0))
+        self.assertTrue(torch.all(torch.isfinite(z_3d)))
+        self.assertTrue(torch.all(z_3d >= -4.0) and torch.all(z_3d <= 4.0))
 
     def test_nan_and_extreme_inputs_safety(self) -> None:
         """Verify robust clamping and NaN neutralization in cross-sectional primitives."""

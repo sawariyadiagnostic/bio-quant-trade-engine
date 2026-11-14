@@ -19,13 +19,16 @@ class TargetConfig:
     # Horizon and operational parameters
     horizon: TargetHorizon = TargetHorizon.OVERNIGHT  # default OVERNIGHT for 100% backward compatibility
     forward_bars: int = 6  # for INTRADAY_N_BARS (default 6 bars = 30 min on 5m)
+    intraday_forward_bars: int = 6  # alias for forward_bars
     intraday_cutoff_time: str = "14:45"  # Quarantine window to prevent intraday crossing 15:15
     holding_days: int = 3  # for MULTI_DAY_SWING
+    swing_forward_sessions: int = 3  # alias for holding_days
 
     # Account sizing and friction parameters
     capital_inr: float = 200000.0  # Institutional min capital gate: Rs. 2,00,000
     min_capital_inr: float = 200000.0
-    variable_bps: float = 2.0  # Brokerage, STT, exchange turnover: 2.0 bps (0.02%)
+    variable_bps: float = 2.0  # Delivery variable: Brokerage, STT, turnover: 2.0 bps (0.02%)
+    intraday_variable_bps: float = 0.85  # Intraday variable: 0.85 bps (no STT, lower turnover, zero DP fee)
     slippage_bps: float = 0.0  # Half-spread & execution slippage: 0.0 bps default
     dp_fee_inr: float = 17.0  # CDSL flat DP debit fee: Rs. 17.00 per sell delivery
 
@@ -36,3 +39,15 @@ class TargetConfig:
     entry_bar_offset_from_end: int = 0  # 0 = very last bar of session (15:20-15:25)
     exit_bar_offset_from_start: int = 0  # 0 = very first bar of next session (09:15-09:20)
     use_next_open_as_exit: bool = True  # True: exit at 09:15 Open auction fill
+
+    def __post_init__(self) -> None:
+        """Harmonize parameter aliases."""
+        if self.intraday_forward_bars != 6 and self.forward_bars == 6:
+            self.forward_bars = self.intraday_forward_bars
+        elif self.forward_bars != 6 and self.intraday_forward_bars == 6:
+            self.intraday_forward_bars = self.forward_bars
+
+        if self.swing_forward_sessions != 3 and self.holding_days == 3:
+            self.holding_days = self.swing_forward_sessions
+        elif self.holding_days != 3 and self.swing_forward_sessions == 3:
+            self.swing_forward_sessions = self.holding_days

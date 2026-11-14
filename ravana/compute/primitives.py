@@ -343,13 +343,14 @@ def ts_argmin(x: torch.Tensor, window: int = 10) -> torch.Tensor:
 def cs_rank(x: torch.Tensor) -> torch.Tensor:
     """Cross-sectional percentile ranking across the batch/asset dimension (dim 0) at each timestamp.
 
-    If tensor is 2D [T, K] or 1D [T], or if B == 1 (single asset), return full tensor of 0.5 (neutral median rank).
-    If tensor is 3D [B, T, K]:
+    If tensor is 2D [T, K] or 1D [T], or if B == 1 (single asset), fall back to ts_rank_20(x)
+    so single-asset symbolic search retains non-degenerate variance.
+    If tensor is 3D [B, T, K] with B > 1:
     Use torch.argsort(torch.argsort(x, dim=0), dim=0).to(x.dtype) / max(1.0, float(B - 1)).
     Clamped to [0.0, 1.0], nan_to_num with nan=0.5.
     """
     if x.ndim < 3 or x.shape[0] <= 1:
-        return torch.full_like(x, 0.5)
+        return ts_rank_20(x)
     B = x.shape[0]
     ranks = torch.argsort(torch.argsort(x, dim=0), dim=0).to(x.dtype) / max(1.0, float(B - 1))
     res = torch.clamp(ranks, min=0.0, max=1.0)
@@ -359,14 +360,15 @@ def cs_rank(x: torch.Tensor) -> torch.Tensor:
 def cs_zscore(x: torch.Tensor) -> torch.Tensor:
     """Cross-sectional z-score standardization across dim 0 at each timestamp.
 
-    If B == 1 or 1D/2D, return zeros_like(x).
-    If 3D [B, T, K]:
+    If B == 1 or 1D/2D, fall back to ts_zscore_20(x)
+    so single-asset symbolic search retains non-degenerate variance.
+    If 3D [B, T, K] with B > 1:
     Compute mean = torch.mean(x, dim=0, keepdim=True), std = torch.std(x, dim=0, keepdim=True).
     z = (x - mean) / torch.clamp(std, min=1e-6).
     Clamp to [-3.0, 3.0], nan_to_num with nan=0.0.
     """
     if x.ndim < 3 or x.shape[0] <= 1:
-        return torch.zeros_like(x)
+        return ts_zscore_20(x)
     mean = torch.mean(x, dim=0, keepdim=True)
     std = torch.std(x, dim=0, keepdim=True)
     z = (x - mean) / torch.clamp(std, min=1e-6)

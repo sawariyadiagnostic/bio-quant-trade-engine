@@ -26,7 +26,7 @@ class OvernightTargetBuilder:
             min_capital_inr=self.config.min_capital_inr,
         )
         self.intraday_friction_model = IntradayFrictionModel(
-            variable_bps=0.9,
+            variable_bps=self.config.intraday_variable_bps,
             slippage_bps=self.config.slippage_bps,
             default_capital_inr=self.config.capital_inr,
             min_capital_inr=self.config.min_capital_inr,

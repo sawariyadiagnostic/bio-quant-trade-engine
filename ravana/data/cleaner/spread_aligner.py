@@ -5,12 +5,6 @@ from typing import Optional, Union
 import numpy as np
 import pandas as pd
 
-# Standard creation-unit benchmark parity ratios
-KNOWN_ETF_RATIOS = {
-    "BANKBEES.NS": 100.0,
-    "NIFTYBEES.NS": 100.0,
-}
-
 
 class ETFBUSpreadAligner:
     """Computes tracking spread, basis (in bps), rolling beta, and z-score between an ETF and its benchmark.
@@ -38,7 +32,7 @@ class ETFBUSpreadAligner:
         Args:
             etf_df: Cleaned ETF DataFrame with DatetimeIndex and Close column.
             benchmark_df: Cleaned Benchmark DataFrame with DatetimeIndex and Close column.
-            ticker: Optional ticker symbol to look up official creation-unit ratio.
+            ticker: Optional ticker symbol.
             
         Returns:
             DataFrame containing aligned prices, basis in bps, z-score, beta, and correlation.
@@ -76,19 +70,18 @@ class ETFBUSpreadAligner:
     def _resolve_multiplier(
         self, idx_close: pd.Series, etf_close: pd.Series, ticker: Optional[str] = None
     ) -> pd.Series:
-        """Resolve multiplier using contract specification or point-in-time expanding median."""
+        """Resolve multiplier using contract specification or strictly causal rolling/expanding median."""
         if self.contract_multiplier is not None and self.contract_multiplier > 0:
             return pd.Series(self.contract_multiplier, index=etf_close.index)
 
-        t_norm = ticker.upper() if ticker else ""
-        if t_norm in KNOWN_ETF_RATIOS:
-            return pd.Series(KNOWN_ETF_RATIOS[t_norm], index=etf_close.index)
-
-        # Strictly causal expanding median lagged by 1 bar to prevent future information leakage
+        # Strictly causal ratio lagged by 1 bar to prevent future information leakage
         raw_ratios = (idx_close / np.maximum(0.01, etf_close)).shift(1)
-        expanding_mult = raw_ratios.expanding(min_periods=5).median()
-        first_valid = expanding_mult.dropna().iloc[0] if not expanding_mult.dropna().empty else 1.0
-        return expanding_mult.fillna(first_valid).round(2)
+        parity_window = max(self.rolling_window * 5, 150)
+        rolling_mult = raw_ratios.rolling(parity_window, min_periods=5).median()
+        expanding_mult = raw_ratios.expanding(min_periods=1).median()
+        combined = rolling_mult.fillna(expanding_mult)
+        first_valid = combined.dropna().iloc[0] if not combined.dropna().empty else 1.0
+        return combined.fillna(first_valid).round(2)
 
     def _compute_rolling_signals(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute causal rolling basis z-score, rolling beta, and rolling correlation."""

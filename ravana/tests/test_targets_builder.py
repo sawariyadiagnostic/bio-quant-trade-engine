@@ -237,8 +237,8 @@ class TestOvernightTargetBuilder(unittest.TestCase):
         self.assertEqual(targets["is_entry_bar"].iloc[0], 1)
         self.assertEqual(targets["calendar_hold_days"].iloc[0], 0)
         self.assertAlmostEqual(targets["gross_return"].iloc[0], 0.02, places=5)
-        # Net return after 0.9 bps drag (0.00009): 0.02 - 0.00009 = 0.01991
-        self.assertAlmostEqual(targets["net_return"].iloc[0], 0.01991, places=5)
+        # Net return after 0.85 bps drag (0.000085): 0.02 - 0.000085 = 0.019915
+        self.assertAlmostEqual(targets["net_return"].iloc[0], 0.019915, places=5)
         self.assertEqual(targets["binary_label"].iloc[0], 1)
         self.assertEqual(targets["sample_weight"].iloc[0], 1.0)
 

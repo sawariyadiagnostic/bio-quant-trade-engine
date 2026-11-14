@@ -170,6 +170,33 @@ class TestDataQualityEngine(unittest.TestCase):
         self.assertTrue(np.isfinite(spread_df["Rolling_Correlation"].values).all())
         self.assertTrue(np.isfinite(spread_df["Rolling_Beta"].values).all())
 
+    def test_dynamic_parity_ratio_no_hardcoded_100(self) -> None:
+        """Verify dynamic parity ratio cleanly tracks empirical ratio for BANKBEES (~88) and ITBEES (~954)."""
+        np.random.seed(42)
+        aligner = ETFBUSpreadAligner(rolling_window=30)
+
+        # Realistic BANKBEES: Index ~52000, ETF tracking ~88.14 with small noise
+        idx_bank_c = 52000.0 + np.cumsum(np.random.normal(0, 10.0, len(self.full_times)))
+        etf_bank_c = (idx_bank_c / 88.14) * (1.0 + np.random.normal(0, 0.0005, len(self.full_times)))
+        df_bank_etf = pd.DataFrame({"Close": etf_bank_c}, index=self.full_times)
+        df_bank_idx = pd.DataFrame({"Close": idx_bank_c}, index=self.full_times)
+
+        spread_bank = aligner.align(df_bank_etf, df_bank_idx, ticker="BANKBEES.NS")
+        self.assertIsNotNone(spread_bank)
+        self.assertAlmostEqual(spread_bank["Multiplier"].iloc[-1], 88.14, delta=0.5)
+        self.assertLess(abs(spread_bank["Basis_Bps"].iloc[-1]), 25.0)
+
+        # Realistic ITBEES: Index ~42000, ETF tracking ~954.55 with small noise
+        idx_it_c = 42000.0 + np.cumsum(np.random.normal(0, 10.0, len(self.full_times)))
+        etf_it_c = (idx_it_c / 954.55) * (1.0 + np.random.normal(0, 0.0005, len(self.full_times)))
+        df_it_etf = pd.DataFrame({"Close": etf_it_c}, index=self.full_times)
+        df_it_idx = pd.DataFrame({"Close": idx_it_c}, index=self.full_times)
+
+        spread_it = aligner.align(df_it_etf, df_it_idx, ticker="ITBEES.NS")
+        self.assertIsNotNone(spread_it)
+        self.assertAlmostEqual(spread_it["Multiplier"].iloc[-1], 954.55, delta=5.0)
+        self.assertLess(abs(spread_it["Basis_Bps"].iloc[-1]), 25.0)
+
     def test_data_cleaning_engine_full_pipeline(self) -> None:
         """Verify DataCleaningEngine transforms IngestedDataset into CleanedDataset contract with zero NaNs."""
         df_etf = self._make_intraday_bar(self.full_times, base_price=510.0)

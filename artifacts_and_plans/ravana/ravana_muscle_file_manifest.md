@@ -463,7 +463,7 @@ flowchart TD
 ## Test Suite Summary
 
 Every muscle is verified by dedicated unit tests in [`ravana/tests/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests).
-Currently **201/201 tests pass** with zero failures:
+Currently **202/202 tests pass** with zero failures:
 
 ```
 [Muscle 1]    test_formula_ast.py                     --> 18 tests OK
@@ -473,7 +473,7 @@ Currently **201/201 tests pass** with zero failures:
 [Muscle 1+2]  test_muscle1_muscle2_integration.py    -->  4 tests OK
 [Muscle 1+2]  test_cross_sectional.py                --> 19 tests OK
 [Muscle 3]    test_data_ingestion.py                  --> 14 tests OK
-[Muscle 4]    test_data_cleaner.py                    --> 12 tests OK
+[Muscle 4]    test_data_cleaner.py                    --> 13 tests OK
 [Muscle 5]    test_data_resampler.py                  --> 12 tests OK
 [Muscle 6]    test_data_storage.py                    --> 10 tests OK
 [Muscle 6]    test_lake_diff.py                       -->  4 tests OK
@@ -489,5 +489,5 @@ Currently **201/201 tests pass** with zero failures:
 [Universe]    test_universe_registry.py               -->  5 tests OK
 [Phase A & B] test_multi_horizon_and_portfolio.py    --> 17 tests OK
 --------------------------------------------------------------------------
-TOTAL: 201 TESTS (100% GREEN in ~25.8s)
+TOTAL: 202 TESTS (100% GREEN in ~16.1s)
 ```

@@ -6,14 +6,39 @@ from enum import Enum
 from typing import List, Optional
 
 # Standard Institutional Universes
-CORE_ETF_UNIVERSE: List[str] = ["BANKBEES.NS", "NIFTYBEES.NS"]
+CORE_ETF_UNIVERSE: List[str] = [
+    "BANKBEES.NS",
+    "NIFTYBEES.NS",
+    "ITBEES.NS",
+    "PHARMABEES.NS",
+    "PSUBNKBEES.NS",
+    "JUNIORBEES.NS",
+    "AUTOBEES.NS",
+    "CPSEETF.NS",
+    "GOLDBEES.NS",
+]
 GLOBAL_MACRO_UNIVERSE: List[str] = ["^GSPC", "^VIX", "INR=X", "BZ=F", "^TNX"]
-DOMESTIC_MACRO_UNIVERSE: List[str] = ["^NSEBANK", "^NSEI", "^INDIAVIX"]
+DOMESTIC_MACRO_UNIVERSE: List[str] = [
+    "^NSEBANK",
+    "^NSEI",
+    "^CNXIT",
+    "^CNXPHARMA",
+    "^CNXPSUBANK",
+    "^NSMIDCP",
+    "^CNXAUTO",
+    "^INDIAVIX",
+]
 
 # Native ETF-to-Underlying Benchmark Index Mapping
 ETF_BENCHMARK_MAP: dict[str, str] = {
     "BANKBEES.NS": "^NSEBANK",
     "NIFTYBEES.NS": "^NSEI",
+    "ITBEES.NS": "^CNXIT",
+    "PHARMABEES.NS": "^CNXPHARMA",
+    "PSUBNKBEES.NS": "^CNXPSUBANK",
+    "JUNIORBEES.NS": "^NSMIDCP",
+    "AUTOBEES.NS": "^CNXAUTO",
+    "CPSEETF.NS": "^NSEI",
     "GOLDBEES.NS": "GC=F",
 }
 

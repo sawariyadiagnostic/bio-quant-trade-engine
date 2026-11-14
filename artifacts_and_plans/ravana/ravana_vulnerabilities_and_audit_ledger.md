@@ -214,12 +214,40 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 * **Impacted Module:** Muscle 1 & 2 (`ravana/compute/primitives.py`, `tensor_evaluator.py`, `ravana/domain/formula_ast.py`)
 * **Category:** Mathematical Robustness
 * **Severity:** **MEDIUM**
-* **Description:** Applying cross-sectional operators (`CS_RANK`, `CS_ZSCORE`) to single-asset portfolios (1D `[T]`, 2D `[T, K]`, or 3D with $B=1$) would cause zero-division or dimensional index errors if not handled gracefully.
+* **Description:** Applying cross-sectional operators (`CS_RANK`, `CS_ZSCORE`) to single-asset portfolios (1D `[T]`, 2D `[T, K]`, or 3D with $B=1$) previously returned flat constant `0.5` or `0.0`, rendering any generated alpha with cross-sectional operators zero-variance and dead during single-asset symbolic search.
 * **Remediation Specification:**
-  - In `cs_rank`, return neutral median percentile `0.5` when $B=1$ or tensor is 1D/2D.
-  - In `cs_zscore`, return zeros `0.0` when $B=1$ or tensor is 1D/2D.
-  - For 3D multi-asset tensors $[B, T, K]$, compute double argsort rank across dim 0 clamped to $[0.0, 1.0]$ and z-score clamped to $[-3.0, 3.0]$.
-  - Expanded Indian asset catalog to top 10 liquid ETFs (`BANKBEES.NS`, `NIFTYBEES.NS`, `ITBEES.NS`, `GOLDBEES.NS`, `SILVERBEES.NS`, `PHARMABEES.NS`, `AUTOBEES.NS`, `JUNIORBEES.NS`, `PSUBNKBEES.NS`, `CPSEETF.NS`).
+  - In `cs_rank`, gracefully fall back to `ts_rank_20(x)` when $B=1$ or tensor is 1D/2D, preserving valid bounded variance $[0.0, 1.0]$.
+  - In `cs_zscore`, gracefully fall back to `ts_zscore_20(x)` when $B=1$ or tensor is 1D/2D, preserving standardized variance in $[-4.0, 4.0]$.
+  - For 3D multi-asset tensors $[B, T, K]$ with $B > 1$, rank and standardize strictly across dim 0.
+* **Status:** **RESOLVED & VERIFIED**.
+
+---
+
+### 19. Hardcoded `100.0` Parity Ratio Basis Distortion
+* **Impacted Module:** Muscle 4 (`ravana/data/cleaner/spread_aligner.py`)
+* **Category:** Data Integrity / Microstructure Distortion
+* **Severity:** **HIGH**
+* **Description:** Hardcoded `KNOWN_ETF_RATIOS = {"BANKBEES.NS": 100.0, "NIFTYBEES.NS": 100.0}` created artificial basis offsets over 20 years of tracking divergence (e.g. `^NSEBANK` ~52,000 vs `BANKBEES` ~590 gives ratio $\approx 88.13$, creating a $+1,346$ bps permanent error at 100.0). For Sector BeES like `ITBEES` (ratio $\approx 954$), tracking was completely unusable.
+* **Remediation Specification:**
+  - Removed static `KNOWN_ETF_RATIOS`.
+  - Implemented strictly causal rolling/expanding median parity ratio:
+    `raw_ratios = (idx_close / np.maximum(0.01, etf_close)).shift(1)`
+    `rolling_mult = raw_ratios.rolling(parity_window, min_periods=5).median()`
+    `expanding_mult = raw_ratios.expanding(min_periods=1).median()`
+  - Self-calibrates without lookahead bias across all Sector BeES and index splits.
+* **Status:** **RESOLVED & VERIFIED**.
+
+---
+
+### 20. Sector BeES Universe & Benchmark Index Linkage
+* **Impacted Module:** Muscle 3 (`ravana/data/ingestion/config.py`)
+* **Category:** Asset Universe Expansion
+* **Severity:** **LOW / ENHANCEMENT**
+* **Description:** Ingestion module previously restricted to `BANKBEES.NS` and `NIFTYBEES.NS`, omitting the full liquid Indian Sector BeES complex and their corresponding benchmark indices.
+* **Remediation Specification:**
+  - Expanded `CORE_ETF_UNIVERSE` to include 9 liquid ETFs: `BANKBEES.NS`, `NIFTYBEES.NS`, `ITBEES.NS`, `PHARMABEES.NS`, `PSUBNKBEES.NS`, `JUNIORBEES.NS`, `AUTOBEES.NS`, `CPSEETF.NS`, `GOLDBEES.NS`.
+  - Expanded `DOMESTIC_MACRO_UNIVERSE` to include benchmark indices: `^NSEBANK`, `^NSEI`, `^CNXIT`, `^CNXPHARMA`, `^CNXPSUBANK`, `^NSMIDCP`, `^CNXAUTO`, `^INDIAVIX`.
+  - Configured `ETF_BENCHMARK_MAP` connecting each sector ETF directly to its underlying NSE index.
 * **Status:** **RESOLVED & VERIFIED**.
 
 ---
@@ -233,4 +261,5 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 | **2026-11-14** | M1–12 Audit | M1, M4, M5, M7, M8, M11, M12 | 10 system-wide bugs (overnight timing, slice cache, flat RSI, SVD) | Resolved with `test_audit_remediation.py` & 150 green tests. |
 | **2026-11-14** | Phase 6–7 | M17, M18, M19, M20 | Small-sample PSI instability, naked shorting risks, lot sizes | Cataloged in this ledger; hardened in implementation. |
 | **2026-11-14** | Forensic Review | M1, M4, M8, M9, M11, M13, M16 | US Macro 10.5h leak, M8/M11 timing, WF session chunking, MC daily | Resolved & verified across all 156 unit tests. |
-| **2026-11-15** | Phase A & B | M1, M2, M8, M11 | Multi-horizon targets, intraday friction, signal reversal, cross-sectional ops | Resolved & verified across all 201 unit tests (100% green). |
+| **2026-11-15** | Phase A & B | M1, M2, M8, M11 | Multi-horizon targets, intraday friction, signal reversal, cross-sectional ops | Resolved & verified across 201 unit tests. |
+| **2026-11-15** | Dynamic Parity & Sector Expansion | M3, M4, M1, M8 | Dynamic rolling parity ratio, Sector BeES mapping, non-degenerate CS fallback | Resolved & verified across 202 unit tests (100% green). |
