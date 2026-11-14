@@ -1,7 +1,9 @@
 """Feature Matrix Engine for Muscle 7.
 
-Computes 21 institutional stationary features across price, volatility,
-volume, tracking spread cointegration, and macro drivers. Generates 2D matrices
+Computes 26 institutional stationary features across price, volatility,
+volume, tracking spread cointegration, macro/bond drivers, and intraday
+session-clock windows (Morning 09:15-10:30 Overflow, Afternoon 14:00-14:40 Bond Window,
+and Opening Range Breakout Drift). Generates 2D matrices
 and 3D tensors compatible with Muscle 2 Tensor Engine.
 """
 
@@ -42,7 +44,7 @@ class FeatureMatrixEngine:
     def compute_feature_matrix(
         self, df: pd.DataFrame, symbol: Optional[str] = None
     ) -> pd.DataFrame:
-        """Extract all 21 stationary features from a clean market bar DataFrame."""
+        """Extract all 26 stationary features from a clean market bar DataFrame."""
         features: Dict[str, pd.Series] = {}
 
         # 1. Price Returns
@@ -53,7 +55,8 @@ class FeatureMatrixEngine:
 
         # 2. Volatility & Range
         h, l, o = df["High"], df["Low"], df["Open"]
-        features[FeatureName.ATR_14_NORM.value] = normalized_atr(h, l, c, self.config.atr_window)
+        atr_norm = normalized_atr(h, l, c, self.config.atr_window)
+        features[FeatureName.ATR_14_NORM.value] = atr_norm
         features[FeatureName.VOLATILITY_20.value] = realized_volatility(
             c, self.config.volatility_window
         )
@@ -84,11 +87,15 @@ class FeatureMatrixEngine:
         # 5. Tracking Spread & Cointegration
         self._compute_spread_features(df, features)
 
-        # 6. Global Macro Drivers
+        # 6. Global Macro & Bond Yield Drivers
         self._compute_macro_features(df, features)
 
+        # 7. Intraday Session Clock & Opening Range Windows
+        self._compute_intraday_clock_features(df, atr_norm, features)
+
         matrix = pd.DataFrame(features, index=df.index)
-        return self._sanitize_matrix(matrix)
+        active = [col for col in self.config.active_features if col in matrix.columns]
+        return self._sanitize_matrix(matrix[active])
 
     def _compute_spread_features(
         self, df: pd.DataFrame, features: Dict[str, pd.Series]
@@ -160,6 +167,73 @@ class FeatureMatrixEngine:
             features[FeatureName.MACRO_SP500_RET_1.value] = (
                 log_returns(sp500, 1) if sp500 is not None else pd.Series(0.0, index=df.index)
             )
+
+        # 10Y Bond Yield Return (^TNX)
+        yield_ret = self._find_column(df, ["Macro_YIELD_RET", "Macro_TNX_RET", "TNX_RET", "US10Y_RET"])
+        if yield_ret is not None:
+            features[FeatureName.MACRO_YIELD_RET_1.value] = yield_ret.fillna(0.0)
+        else:
+            tnx = self._find_column(df, ["Macro_TNX", "^TNX", "US10Y", "Macro_YIELD"])
+            features[FeatureName.MACRO_YIELD_RET_1.value] = (
+                log_returns(tnx, 1) if tnx is not None else pd.Series(0.0, index=df.index)
+            )
+
+    def _compute_intraday_clock_features(
+        self,
+        df: pd.DataFrame,
+        atr_norm: pd.Series,
+        features: Dict[str, pd.Series],
+    ) -> None:
+        """Compute stationary session-clock windows and causal Opening Range breakout drift."""
+        idx = df.index
+        if not isinstance(idx, pd.DatetimeIndex):
+            for k in (
+                FeatureName.SESSION_CLOCK_NORM.value,
+                FeatureName.MORNING_OVERFLOW_WINDOW.value,
+                FeatureName.AFTERNOON_BOND_WINDOW.value,
+                FeatureName.OPENING_RANGE_DRIFT.value,
+            ):
+                features[k] = pd.Series(0.0, index=idx)
+            return
+
+        mins_from_midnight = idx.hour * 60.0 + idx.minute
+        # NSE regular session: 09:15 (555 mins) to 15:25 (925 mins) -> midpoint = 740, half-span = 185 mins
+        clock_norm = np.clip((mins_from_midnight - 740.0) / 185.0, -1.0, 1.0)
+        if (mins_from_midnight == 0).all():
+            clock_norm = np.zeros(len(idx), dtype=np.float64)
+
+        morning_flag = np.where((mins_from_midnight >= 555.0) & (mins_from_midnight <= 630.0), 1.0, 0.0)
+        afternoon_flag = np.where(
+            (mins_from_midnight >= 835.0) & (mins_from_midnight <= 880.0),
+            1.0,
+            np.where((mins_from_midnight >= 895.0) & (mins_from_midnight <= 915.0), -1.0, 0.0),
+        )
+
+        features[FeatureName.SESSION_CLOCK_NORM.value] = pd.Series(clock_norm, index=idx)
+        features[FeatureName.MORNING_OVERFLOW_WINDOW.value] = pd.Series(morning_flag, index=idx)
+        features[FeatureName.AFTERNOON_BOND_WINDOW.value] = pd.Series(afternoon_flag, index=idx)
+
+        # Causal Opening Range midpoint: expanding High/Low over first K bars of each session
+        session_dates = idx.normalize()
+        bar_num_in_day = df.groupby(session_dates).cumcount()
+        or_bars = max(1, self.config.opening_range_bars)
+
+        or_high_seed = df["High"].where(bar_num_in_day < or_bars, np.nan)
+        or_low_seed = df["Low"].where(bar_num_in_day < or_bars, np.nan)
+
+        session_or_high = or_high_seed.groupby(session_dates).ffill()
+        session_or_low = or_low_seed.groupby(session_dates).ffill()
+        exp_high = df["High"].groupby(session_dates).cummax()
+        exp_low = df["Low"].groupby(session_dates).cummin()
+
+        eff_high = session_or_high.fillna(exp_high)
+        eff_low = session_or_low.fillna(exp_low)
+        or_mid = 0.5 * (eff_high + eff_low)
+
+        raw_drift = (df["Close"] - or_mid) / np.maximum(1e-4, df["Close"])
+        safe_atr = np.maximum(1e-4, atr_norm)
+        or_drift = (raw_drift / safe_atr).fillna(0.0).clip(-5.0, 5.0)
+        features[FeatureName.OPENING_RANGE_DRIFT.value] = or_drift
 
     @staticmethod
     def _compute_session_vwap(df: pd.DataFrame) -> pd.Series:

@@ -3,7 +3,7 @@
 Exports:
 - FeatureMatrixEngine: Main orchestrator for 2D matrices and 3D tensors.
 - FeatureConfig: Hyperparameter and lookback window configuration.
-- FeatureRegistry: Registry and definitions of 21 stationary features.
+- FeatureRegistry: Registry and definitions of 26 stationary features.
 - FeatureName: Enum of feature column identifiers.
 - RollingADF: Augmented Dickey-Fuller rolling stationarity t-statistic estimator.
 - RollingOUHalfLife: Ornstein-Uhlenbeck rolling mean-reversion half-life estimator.

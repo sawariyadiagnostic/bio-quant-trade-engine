@@ -152,7 +152,7 @@ flowchart TD
 
 ### Muscle 7: Market Vocabulary Feature Matrix Engine
 * **Root Directory:** [`ravana/features/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/features)
-* **Core Responsibilities:** 21 standardized stationary feature transformations, ADF stationarity testing, Ornstein-Uhlenbeck (OU) half-life calculation, and $[T \times K]$ / $[B, T, K]$ tensor materialization.
+* **Core Responsibilities:** 26 standardized stationary feature transformations (including session clock progress, morning overflow, afternoon bond window, opening range breakout drift, and bond yield returns), ADF stationarity testing, Ornstein-Uhlenbeck (OU) half-life calculation, and $[T \times K]$ / $[B, T, K]$ tensor materialization.
 
 | File | Type | Functional Role |
 | :--- | :--- | :--- |
@@ -463,7 +463,7 @@ flowchart TD
 ## Test Suite Summary
 
 Every muscle is verified by dedicated unit tests in [`ravana/tests/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests).
-Currently **202/202 tests pass** with zero failures:
+Currently **204/204 tests pass** with zero failures:
 
 ```
 [Muscle 1]    test_formula_ast.py                     --> 18 tests OK
@@ -474,10 +474,10 @@ Currently **202/202 tests pass** with zero failures:
 [Muscle 1+2]  test_cross_sectional.py                --> 19 tests OK
 [Muscle 3]    test_data_ingestion.py                  --> 14 tests OK
 [Muscle 4]    test_data_cleaner.py                    --> 13 tests OK
-[Muscle 5]    test_data_resampler.py                  --> 12 tests OK
+[Muscle 5]    test_data_resampler.py                  --> 15 tests OK
 [Muscle 6]    test_data_storage.py                    --> 10 tests OK
 [Muscle 6]    test_lake_diff.py                       -->  4 tests OK
-[Muscle 7]    test_features_matrix.py                 -->  8 tests OK
+[Muscle 7]    test_features_matrix.py                 --> 10 tests OK
 [Muscle 8]    test_targets_builder.py                 --> 10 tests OK
 [Muscle 9]    test_genetic_evolution.py               -->  6 tests OK
 [Muscle 10]   test_fitness_engine.py                  -->  6 tests OK
@@ -489,5 +489,5 @@ Currently **202/202 tests pass** with zero failures:
 [Universe]    test_universe_registry.py               -->  5 tests OK
 [Phase A & B] test_multi_horizon_and_portfolio.py    --> 17 tests OK
 --------------------------------------------------------------------------
-TOTAL: 202 TESTS (100% GREEN in ~16.1s)
+TOTAL: 204 TESTS (100% GREEN in ~32.4s)
 ```

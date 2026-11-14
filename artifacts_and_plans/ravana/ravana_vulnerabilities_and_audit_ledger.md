@@ -252,6 +252,23 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 
 ---
 
+### 21. Clock-Blindness in Muscle 7 Feature Matrix
+* **Impacted Module:** Muscle 7 (`ravana/features/config.py`, `matrix_engine.py`) & Muscle 1 (`ravana/domain/formula_ast.py`)
+* **Category:** Microstructure & Temporal Feature Representation
+* **Severity:** **HIGH**
+* **Description:** All 21 features in Muscle 7 were purely rolling statistical filters without any session-time awareness or opening-range reference. Symbolic alphas in Muscle 9 could not distinguish 09:20 (Morning Overflow) or 14:05 (Bond Window) from 12:30 (mid-day lull), and could not measure opening range breakouts or avoid the 15:00-15:15 retail MIS forced liquidation dump.
+* **Remediation Specification:**
+  - Expanded feature set from 21 to 26 stationary features.
+  - Added `MACRO_YIELD_RET_1`: 1-bar return in 10Y Bond Yield (`^TNX`).
+  - Added `SESSION_CLOCK_NORM`: normalized session progress in $[-1.0, +1.0]$.
+  - Added `MORNING_OVERFLOW_WINDOW`: binary flag for `09:15-10:30` IST morning digestion wave.
+  - Added `AFTERNOON_BOND_WINDOW`: `+1.0` during `13:55-14:40` IST bond/European window, `-1.0` during `14:55-15:15` retail MIS auto-square-off dump, `0.0` otherwise.
+  - Added `OPENING_RANGE_DRIFT`: ATR-normalized breakout drift from `09:15-09:45` opening range midpoint.
+  - Added all 5 features to `FEATURE_DIMENSIONS` in `formula_ast.py` as `DIMENSIONLESS`.
+* **Status:** **RESOLVED & VERIFIED**.
+
+---
+
 ## Chronological Audit Log
 
 | Date | Phase | Module(s) | Finding | Resolution Status |
@@ -263,3 +280,4 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 | **2026-11-14** | Forensic Review | M1, M4, M8, M9, M11, M13, M16 | US Macro 10.5h leak, M8/M11 timing, WF session chunking, MC daily | Resolved & verified across all 156 unit tests. |
 | **2026-11-15** | Phase A & B | M1, M2, M8, M11 | Multi-horizon targets, intraday friction, signal reversal, cross-sectional ops | Resolved & verified across 201 unit tests. |
 | **2026-11-15** | Dynamic Parity & Sector Expansion | M3, M4, M1, M8 | Dynamic rolling parity ratio, Sector BeES mapping, non-degenerate CS fallback | Resolved & verified across 202 unit tests (100% green). |
+| **2026-11-15** | Intraday Windows & Clock Features | M7, M1 | 26 stationary features, session clock, morning overflow, afternoon bond, opening range drift | Resolved & verified across 204 unit tests (100% green). |

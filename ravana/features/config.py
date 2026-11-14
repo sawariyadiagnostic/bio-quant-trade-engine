@@ -1,6 +1,7 @@
 """Configuration and Feature Registry for Muscle 7 Feature Matrix Engine.
 
-Defines the 21 standardized stationary market vocabulary features,
+Defines the 26 standardized stationary market vocabulary features (including
+intraday session-clock windows, opening-range breakout drift, and bond yield drivers),
 their mathematical descriptions, rolling windows, and normalization rules.
 """
 
@@ -10,7 +11,7 @@ from typing import Dict, List, Optional
 
 
 class FeatureName(str, Enum):
-    """Canonical registry of the 21 institutional stationary features."""
+    """Canonical registry of the 26 institutional stationary features."""
 
     # Price Returns (Stationary)
     LOG_RET_1 = "LOG_RET_1"
@@ -44,10 +45,17 @@ class FeatureName(str, Enum):
     MACRO_VIX_RET_1 = "MACRO_VIX_RET_1"
     MACRO_USDINR_RET_1 = "MACRO_USDINR_RET_1"
     MACRO_SP500_RET_1 = "MACRO_SP500_RET_1"
+    MACRO_YIELD_RET_1 = "MACRO_YIELD_RET_1"
+
+    # Intraday Session Clock & Structural Regime Windows
+    SESSION_CLOCK_NORM = "SESSION_CLOCK_NORM"
+    MORNING_OVERFLOW_WINDOW = "MORNING_OVERFLOW_WINDOW"
+    AFTERNOON_BOND_WINDOW = "AFTERNOON_BOND_WINDOW"
+    OPENING_RANGE_DRIFT = "OPENING_RANGE_DRIFT"
 
 
 class FeatureRegistry:
-    """Provides metadata and discovery for all 21 stationary features."""
+    """Provides metadata and discovery for all 26 stationary features."""
 
     _DESCRIPTIONS: Dict[str, str] = {
         FeatureName.LOG_RET_1.value: "1-bar logarithmic return ln(Close_t / Close_{t-1})",
@@ -71,11 +79,16 @@ class FeatureRegistry:
         FeatureName.MACRO_VIX_RET_1.value: "1-bar percentage change in VIX volatility index",
         FeatureName.MACRO_USDINR_RET_1.value: "1-bar return in USD/INR currency driver",
         FeatureName.MACRO_SP500_RET_1.value: "1-bar return in S&P 500 global benchmark",
+        FeatureName.MACRO_YIELD_RET_1.value: "1-bar return in 10Y Treasury/Sovereign Bond Yield (^TNX)",
+        FeatureName.SESSION_CLOCK_NORM.value: "Normalized NSE session progress in [-1.0 (09:15), +1.0 (15:25)]",
+        FeatureName.MORNING_OVERFLOW_WINDOW.value: "1.0 during 09:15-10:30 IST Morning Overflow window, 0.0 otherwise",
+        FeatureName.AFTERNOON_BOND_WINDOW.value: "+1.0 during 13:55-14:40 Bond/Europe window, -1.0 during 14:55-15:15 MIS dump",
+        FeatureName.OPENING_RANGE_DRIFT.value: "ATR-normalized breakout drift from 09:15-09:45 Opening Range midpoint",
     }
 
     @classmethod
     def all_features(cls) -> List[str]:
-        """Return list of all 21 registered feature names."""
+        """Return list of all 26 registered feature names."""
         return [f.value for f in FeatureName]
 
     @classmethod
@@ -112,6 +125,7 @@ class FeatureConfig:
     ou_window: int = 60
     ou_min_half_life: float = 1.0
     ou_max_half_life: float = 252.0
+    opening_range_bars: int = 6  # First 6 x 5m bars = 09:15 to 09:45 IST
 
     # Macro baseline level for normalization
     vix_baseline: float = 15.0

@@ -156,17 +156,18 @@ class TestFeatureMatrixEngine(unittest.TestCase):
                 "Macro_VIX": np.full(n, 14.5) + np.random.normal(0, 0.2, n),
                 "Macro_USDINR": np.full(n, 84.0) + np.random.normal(0, 0.1, n),
                 "Macro_SP500": np.full(n, 5800.0) + np.random.normal(0, 5.0, n),
+                "Macro_TNX": np.full(n, 4.40) + np.random.normal(0, 0.02, n),
             },
             index=dates,
         )
 
-    def test_21_stationary_features_presence(self) -> None:
-        """Verify engine computes all 21 registered stationary features without NaNs."""
+    def test_26_stationary_features_presence(self) -> None:
+        """Verify engine computes all 26 registered stationary features without NaNs."""
         engine = FeatureMatrixEngine(FeatureConfig())
         matrix = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
 
         expected_features = FeatureRegistry.all_features()
-        self.assertEqual(len(expected_features), 21)
+        self.assertEqual(len(expected_features), 26)
 
         for feat in expected_features:
             self.assertIn(feat, matrix.columns, f"Feature {feat} missing from matrix output")
@@ -177,7 +178,7 @@ class TestFeatureMatrixEngine(unittest.TestCase):
         self.assertEqual(len(matrix), len(self.df))
 
     def test_multi_asset_3d_tensor_dispatch(self) -> None:
-        """Verify compute_multi_asset_tensor produces [B, T, K] float32 tensor."""
+        """Verify compute_multi_asset_tensor produces [B, T, K] float32 tensor with 26 features."""
         engine = FeatureMatrixEngine(FeatureConfig())
         df2 = self.df.copy()
         df2["Close"] = df2["Close"] * 1.5
@@ -187,11 +188,40 @@ class TestFeatureMatrixEngine(unittest.TestCase):
 
         self.assertIsInstance(tensor, torch.Tensor)
         self.assertEqual(tensor.dtype, torch.float32)
-        self.assertEqual(tensor.shape, (2, len(self.df), 21))
+        self.assertEqual(tensor.shape, (2, len(self.df), 26))
         self.assertEqual(symbols, ["BANKBEES", "NIFTYBEES"])
-        self.assertEqual(len(features), 21)
+        self.assertEqual(len(features), 26)
         self.assertEqual(len(time_index), len(self.df))
         self.assertTrue(torch.isfinite(tensor).all())
+
+    def test_intraday_clock_windows_time_alignment(self) -> None:
+        """Verify session-clock windows accurately tag morning overflow, afternoon bond, and MIS dump."""
+        engine = FeatureMatrixEngine(FeatureConfig())
+        matrix = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
+
+        # 09:15 bar: clock ~ -1.0, morning_window == 1.0, bond_window == 0.0
+        self.assertAlmostEqual(matrix["SESSION_CLOCK_NORM"].iloc[0], -1.0, delta=0.05)
+        self.assertEqual(matrix["MORNING_OVERFLOW_WINDOW"].iloc[0], 1.0)
+        self.assertEqual(matrix["AFTERNOON_BOND_WINDOW"].iloc[0], 0.0)
+
+        # Check bounds
+        self.assertTrue((matrix["SESSION_CLOCK_NORM"] >= -1.0).all())
+        self.assertTrue((matrix["SESSION_CLOCK_NORM"] <= 1.0).all())
+        self.assertTrue(set(matrix["MORNING_OVERFLOW_WINDOW"].unique()).issubset({0.0, 1.0}))
+        self.assertTrue(set(matrix["AFTERNOON_BOND_WINDOW"].unique()).issubset({-1.0, 0.0, 1.0}))
+        self.assertTrue((matrix["OPENING_RANGE_DRIFT"] >= -5.0).all())
+        self.assertTrue((matrix["OPENING_RANGE_DRIFT"] <= 5.0).all())
+
+    def test_macro_yield_return_fallback(self) -> None:
+        """Verify MACRO_YIELD_RET_1 computes properly and falls back to zeros when missing."""
+        engine = FeatureMatrixEngine(FeatureConfig())
+        matrix_with_yield = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
+        self.assertTrue(np.all(np.isfinite(matrix_with_yield["MACRO_YIELD_RET_1"])))
+
+        # Remove yield column
+        df_no_yield = self.df.drop(columns=["Macro_TNX"])
+        matrix_no_yield = engine.compute_feature_matrix(df_no_yield, symbol="BANKBEES")
+        self.assertTrue((matrix_no_yield["MACRO_YIELD_RET_1"] == 0.0).all())
 
     def test_causality_zero_lookahead_invariant(self) -> None:
         """Verify modifying bar t > 80 has zero impact on feature values at t <= 80."""
@@ -234,7 +264,7 @@ class TestFeatureMatrixEngine(unittest.TestCase):
         matrix = engine.compute_feature_matrix(silver_df, symbol="BANKBEES")
 
         self.assertEqual(len(matrix), len(silver_df))
-        self.assertEqual(len(matrix.columns), 21)
+        self.assertEqual(len(matrix.columns), 26)
         self.assertFalse(matrix.isna().any().any())
         self.assertTrue(np.all(np.isfinite(matrix.values)))
 

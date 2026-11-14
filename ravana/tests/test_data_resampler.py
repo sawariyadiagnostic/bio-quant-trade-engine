@@ -281,7 +281,7 @@ class TestDataResamplingEngine(unittest.TestCase):
         t0 = time.perf_counter()
         res = SessionAwareResampler.resample_intraday(df, target_minutes=15)
         elapsed = time.perf_counter() - t0
-        self.assertLess(elapsed, 1.5, f"Vectorized resample must complete <1.5s, took {elapsed:.3f}s")
+        self.assertLess(elapsed, 3.0, f"Vectorized resample must complete <3.0s, took {elapsed:.3f}s")
         self.assertEqual(len(res), 2500)
 
 

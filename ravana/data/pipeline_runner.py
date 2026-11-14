@@ -357,7 +357,7 @@ class BatchPipelineRunner:
         return audit
 
     def compute_and_persist_m7(self) -> Dict[str, Any]:
-        """Compute 21 stationary features for ETFs and multi-asset 3D tensor."""
+        """Compute 26 stationary features for ETFs and multi-asset 3D tensor."""
         manifest: Dict[str, Any] = {"features": {}}
         engine = FeatureMatrixEngine(FeatureConfig())
         etf_dfs: Dict[str, pd.DataFrame] = {}
