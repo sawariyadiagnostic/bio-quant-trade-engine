@@ -29,6 +29,9 @@ class StorageConfig:
             "m8": "m8_targets",
             "targets": "m8_targets",
             "m8_targets": "m8_targets",
+            "m13": "m13_validation",
+            "validation": "m13_validation",
+            "m13_validation": "m13_validation",
         }
     )
     symbol_aliases: Dict[str, str] = field(

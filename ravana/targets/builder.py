@@ -20,6 +20,7 @@ class OvernightTargetBuilder:
         self.config = config or TargetConfig()
         self.friction_model = DeliveryFrictionModel(
             variable_bps=self.config.variable_bps,
+            slippage_bps=self.config.slippage_bps,
             flat_dp_charge_inr=self.config.dp_fee_inr,
             default_capital_inr=self.config.capital_inr,
             min_capital_inr=self.config.min_capital_inr,

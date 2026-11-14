@@ -15,6 +15,11 @@ class RiskGatekeeper:
         self.peak_equity = 0.0
         self.state = DrawdownState.NORMAL
 
+    def reset(self, peak_equity: float = 0.0) -> None:
+        """Reset internal state and peak equity high-water mark."""
+        self.peak_equity = peak_equity
+        self.state = DrawdownState.NORMAL
+
     def validate_account_capital(self, current_equity: float) -> Tuple[bool, str]:
         """Enforce ₹2,00,000 minimum capital viability gate to prevent statutory fee erosion."""
         if not np.isfinite(current_equity) or current_equity < self.config.min_capital_gate:

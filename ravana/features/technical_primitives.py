@@ -116,6 +116,9 @@ def relative_strength_index(close: pd.Series, window: int = 14) -> pd.Series:
     rsi = 100.0 - (100.0 / (1.0 + rs))
     # Normalize from [0, 100] to [-1.0, 1.0]
     norm_rsi = (rsi - 50.0) / 50.0
+    # When both avg_gain and avg_loss are zero (flat price), RSI is neutral (0.0)
+    flat_mask = (avg_gain.fillna(0.0) < 1e-8) & (avg_loss.fillna(0.0) < 1e-8)
+    norm_rsi = norm_rsi.mask(flat_mask, 0.0)
     return norm_rsi.fillna(0.0).clip(-1.0, 1.0)
 
 

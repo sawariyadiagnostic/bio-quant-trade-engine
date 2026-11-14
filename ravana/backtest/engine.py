@@ -56,6 +56,18 @@ class EventDrivenBacktester:
             current_bar = df.iloc[i]
             ts: pd.Timestamp = df.index[i]
 
+            # Auto-schedule 09:15 opening auction exit when carrying an overnight position into a new day
+            if (
+                i > 0
+                and self.config.regime == TradingRegime.OVERNIGHT
+                and ts.date() > df.index[i - 1].date()
+                and position.shares > 0
+                and not any(o.side == OrderSide.SELL for o in pending_orders)
+            ):
+                pending_orders.insert(
+                    0, Order(f"ORD_OVN_EXIT_{ts.timestamp()}", ts, ticker, OrderSide.SELL, position.shares)
+                )
+
             # 1. Process Pending Orders causally at current bar Open
             cash, filled_trades, pending_orders = self._process_pending_orders(
                 pending_orders, current_bar, ts, ticker, cash, position, debited_dates
@@ -322,7 +334,14 @@ class EventDrivenBacktester:
         delta_seconds = (equity.index[-1] - equity.index[0]).total_seconds()
         delta_days = max(1.0 / 24.0, delta_seconds / 86400.0)
 
-        bars_per_yr = 252.0 * 75.0
+        # Dynamically infer bars per trading day from index median spacing
+        diffs = equity.index.to_series().diff().dropna()
+        med_sec = float(diffs.median().total_seconds()) if not diffs.empty else 300.0
+        if med_sec >= 43200.0:  # Daily or higher
+            bars_per_yr = 252.0
+        else:
+            bars_per_day = max(1.0, round(22500.0 / max(60.0, med_sec)))  # 22,500s = 375 min NSE session
+            bars_per_yr = 252.0 * bars_per_day
         if delta_days < 7.0:
             cagr = total_return
         else:

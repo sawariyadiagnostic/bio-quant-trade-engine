@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-import numpy as np
 
 from ravana.domain.formula_ast import ASTNode
 
@@ -19,8 +18,10 @@ class EvolutionConfig:
     mutation_prob: float = 0.3
     crossover_prob: float = 0.6
     elitism_count: int = 2
-    max_depth: int = 5
-    parsimony_penalty: float = 0.001
+    max_depth: int = 4
+    max_nodes: int = 15  # Hard cap preventing 39-node overfitting bloat
+    max_clone_correlation: float = 0.85  # Phenotypic diversity gate against incestuous frontiers
+    parsimony_penalty: float = 0.002
     champion_hurdle: float = 0.02
     feature_names: List[str] = field(default_factory=list)
     random_seed: Optional[int] = 42
@@ -43,17 +44,7 @@ class Individual:
 
     def node_count(self) -> int:
         """Calculate total number of AST nodes (tree parsimony size)."""
-        count = 1
-        for child in self.tree.children:
-            count += self._count_nodes(child)
-        return count
-
-    def _count_nodes(self, node: ASTNode) -> int:
-        """Recursive helper for node counting."""
-        c = 1
-        for child in node.children:
-            c += self._count_nodes(child)
-        return c
+        return self.tree.size()
 
 
 @dataclass
@@ -65,3 +56,4 @@ class EvolutionResult:
     final_population: List[Individual]
     generation_history: List[Dict[str, Any]]
     graveyard_count: int
+    total_trials_evaluated: int = 0

@@ -50,6 +50,7 @@ class BatchPipelineRunner:
         self.m7_dir = self.lake_root / "m7_features"
         self.m8_dir = self.lake_root / "m8_targets"
         self.m9_dir = self.lake_root / "m9_alphas"
+        self.m13_dir = self.lake_root / "m13_validation"
         self.storage_config = StorageConfig(self.lake_root)
         self.lake_manager = LakeManager(self.storage_config)
         self.loader = MarketDataLoader()
@@ -57,7 +58,7 @@ class BatchPipelineRunner:
         self.resampler = ResamplingEngine(ResamplerConfig())
 
         # Ensure directory structures exist
-        for d in [self.m3_dir, self.m4_dir, self.m5_dir, self.m7_dir, self.m8_dir, self.m9_dir]:
+        for d in [self.m3_dir, self.m4_dir, self.m5_dir, self.m7_dir, self.m8_dir, self.m9_dir, self.m13_dir]:
             d.mkdir(parents=True, exist_ok=True)
 
     def _upsert(self, path: Path, df: pd.DataFrame) -> Dict[str, Any]:
@@ -195,7 +196,9 @@ class BatchPipelineRunner:
         for tf in self.resampler.config.intraday_intervals:
             if tf in res_ds.spread_timeframes:
                 s_df = res_ds.spread_timeframes[tf]
-                s_path = target_dir / f"{base}_spread_{tf}.parquet"
+                spread_dir = self.m5_dir / f"intraday_{tf}"
+                spread_dir.mkdir(parents=True, exist_ok=True)
+                s_path = spread_dir / f"{base}_spread_{tf}.parquet"
                 self._upsert(s_path, s_df)
 
         return meta
@@ -437,6 +440,35 @@ class BatchPipelineRunner:
 
         return manifest
 
+    def validate_and_persist_m13(self) -> Dict[str, Any]:
+        """Validate candidate formulas using Phase 5 (Muscles 13-16) validation pipeline."""
+        from ravana.validation import ValidationPipeline
+        manifest: Dict[str, Any] = {"certificates": {}}
+        pipeline = ValidationPipeline()
+
+        for ticker in ["BANKBEES.NS", "NIFTYBEES.NS"]:
+            base = sanitize_filename(ticker)
+            f_path = self.m7_dir / "intraday_5m" / f"{base}_features.parquet"
+            t_path = self.m8_dir / "intraday_5m" / f"{base}_targets.parquet"
+            if not f_path.exists() or not t_path.exists():
+                continue
+            f_df = pd.read_parquet(f_path)
+            t_df = pd.read_parquet(t_path)
+
+            from ravana.evolution import EvolutionConfig, GeneticAlphaEngine
+            cfg = EvolutionConfig(population_size=16, max_generations=2, random_seed=42)
+            engine = GeneticAlphaEngine(cfg)
+            evo_res = engine.evolve(f_df, t_df)
+
+            cert = pipeline.certify_evolution_result(ticker, evo_res, f_df, t_df)
+            manifest["certificates"][base] = cert.to_dict()
+
+            cert_path = self.m13_dir / f"{base}_validation_certificate.json"
+            with open(cert_path, "w", encoding="utf-8") as f:
+                json.dump(cert.to_dict(), f, indent=2)
+
+        return manifest
+
     def execute_all(self) -> Dict[str, Any]:
         """Execute full end-to-end ingestion, cleaning, feature engineering, and genetic evolution."""
         logger.info("Executing Muscle 3 Ingestion...")
@@ -451,6 +483,8 @@ class BatchPipelineRunner:
         m8_res = self.compute_and_persist_m8()
         logger.info("Executing Muscle 9 Genetic Alpha Evolution...")
         m9_res = self.compute_and_persist_m9()
+        logger.info("Executing Muscle 13-16 Validation Pipeline...")
+        m13_res = self.validate_and_persist_m13()
         logger.info("Auditing Lake Integrity...")
         audit = self.verify_lake()
         return {
@@ -460,6 +494,7 @@ class BatchPipelineRunner:
             "m7_manifest": m7_res,
             "m8_manifest": m8_res,
             "m9_manifest": m9_res,
+            "m13_manifest": m13_res,
             "audit": audit,
         }
 

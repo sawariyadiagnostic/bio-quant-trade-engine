@@ -72,6 +72,8 @@ def compute_dsr(
     num_trials: int = 100,
     variance_of_trials: float = 0.5,
     rf_per_period: float = 0.0,
+    periods_per_year: float = 252.0,
+    is_variance_annualized: bool = True,
 ) -> float:
     """Compute the Deflated Sharpe Ratio (DSR) deflating for multiple testing and non-normality."""
     valid = returns[np.isfinite(returns)]
@@ -83,7 +85,12 @@ def compute_dsr(
         return 0.0
 
     sample_sharpe = (mean - rf_per_period) / std
-    expected_max_sr = expected_maximum_sharpe(num_trials, variance_of_trials)
+    var_per_period = (
+        variance_of_trials / max(1.0, periods_per_year)
+        if is_variance_annualized
+        else variance_of_trials
+    )
+    expected_max_sr = expected_maximum_sharpe(num_trials, var_per_period)
 
     return compute_psr(
         sharpe_hat=sample_sharpe,

@@ -66,6 +66,27 @@ def compute_strategy_returns(
     return np.nan_to_num(strat_ret, nan=0.0)
 
 
+def compute_oos_strategy_returns(
+    oos_signal: np.ndarray,
+    oos_target: np.ndarray,
+    train_mean: float,
+    train_std: float,
+    long_only: bool = True,
+) -> np.ndarray:
+    """Compute strictly Out-of-Sample strategy returns using frozen In-Sample (mean, std)."""
+    valid = np.isfinite(oos_signal) & np.isfinite(oos_target)
+    s = np.zeros_like(oos_signal, dtype=np.float64)
+    s[valid] = oos_signal[valid]
+
+    safe_std = max(float(train_std), 1e-6) if np.isfinite(train_std) else 1.0
+    safe_mean = float(train_mean) if np.isfinite(train_mean) else 0.0
+    z = (s - safe_mean) / safe_std
+
+    pos = np.clip(z, 0.0, 1.0) if long_only else np.clip(z, -1.0, 1.0)
+    strat_ret = pos * oos_target
+    return np.nan_to_num(strat_ret, nan=0.0)
+
+
 def compute_annualized_sharpe(
     returns: np.ndarray, rf_annual: float = 0.065, periods_per_year: float = 252.0
 ) -> float:

@@ -121,7 +121,9 @@ class DataCleaningEngine:
 
             m_copy = m_df.copy()
             if (m_copy.index.time == pd.Timestamp("00:00:00").time()).all():
-                m_copy.index = m_copy.index + pd.Timedelta(hours=23, minutes=59, seconds=59)
+                # Seal daily macro bars at 16:00 local exchange close so US close (16:00 EST/EDT = 01:30/02:30 IST)
+                # is causally available before the 09:15 IST NSE market open.
+                m_copy.index = m_copy.index + pd.Timedelta(hours=16)
 
             if m_copy.index.tz != target_index.tz:
                 if m_copy.index.tz is None and target_index.tz is not None:

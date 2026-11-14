@@ -39,6 +39,18 @@ flowchart TD
         M11 <--> M12
     end
 
+    subgraph P5["Phase 5: Statistical Validation & Guard"]
+        M13["Muscle 13: Walk-Forward Cross-Validation"]
+        M14["Muscle 14: Combinatorial Purged CV & PBO"]
+        M15["Muscle 15: Deflated Sharpe & MinTRL Guard"]
+        M16["Muscle 16: Block-Bootstrap Monte Carlo"]
+        VAL["ValidationPipeline Sentry"]
+        M13 --> VAL
+        M14 --> VAL
+        M15 --> VAL
+        M16 --> VAL
+    end
+
     subgraph AUX["Auxiliary & Platform"]
         UNIV["Dynamic Universe Master"]
         DAG["Reactive DAG Orchestration"]
@@ -49,12 +61,15 @@ flowchart TD
     M6 --> M7
     M6 --> M8
     P3 --> P4
+    P3 --> P5
+    P5 --> P4
     UNIV -.-> M3
     UNIV -.-> M12
     DAG -.-> P1
     DAG -.-> P2
     DAG -.-> P3
     DAG -.-> P4
+    DAG -.-> P5
 ```
 
 ---
@@ -278,6 +293,55 @@ flowchart TD
 
 ---
 
+## Phase 5: Statistical Validation & Anti-Overfitting Sentry
+
+### Muscle 13: Causal Walk-Forward Cross-Validation
+* **Root Directory:** [`ravana/validation/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation)
+* **Core Responsibilities:** Anchored and rolling time-series out-of-sample splits, dynamic holding horizon embargo/purging, 60-bar continuous causal rolling warmup, and frozen in-sample $(\mu_{\text{train}}, \sigma_{\text{train}})$ standardization via `compute_oos_strategy_returns`.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`walk_forward.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation/walk_forward.py) | Engine | Time-series fold generator, causal rolling AST warmup, and OOS equity aggregator |
+
+### Muscle 14: Combinatorial Purged Cross-Validation & PBO
+* **Root Directory:** [`ravana/validation/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation)
+* **Core Responsibilities:** $C(N, k)$ combinatorial train/test group splitting, forward/backward purging, Probability of Backtest Overfitting (PBO), and rank-degradation distribution analysis.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`cpcv.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation/cpcv.py) | Engine | Combinatorial fold partitioning, purged/embargoed test slices, and population PBO evaluator |
+
+### Muscle 15: Deflated Sharpe & MinTRL Overfitting Guard
+* **Root Directory:** [`ravana/validation/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation)
+* **Core Responsibilities:** Institutional Bailey & López de Prado (2014) DSR certification, empirical population variance tracking, Minimum Track Record Length (MinTRL) enforcement, and hard hurdle gatekeeping.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`dsr_guard.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation/dsr_guard.py) | Math | Exact DSR test statistic, asymptotic MinTRL threshold calculator, and pass/fail certifier |
+
+### Muscle 16: Circular Block-Bootstrap Monte Carlo Stress Testing
+* **Root Directory:** [`ravana/validation/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation)
+* **Core Responsibilities:** Circular block bootstrap preserving intraday autocorrelation, annualized CAGR/volatility distribution sampling, 4% caution and 8% ruin probability stress bounds.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`monte_carlo.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation/monte_carlo.py) | Simulation | Politis-Romano circular block resampling, VaR/CVaR tails, and ruin probability calculator |
+
+### Master Validation Pipeline & Schema Contracts
+* **Root Directory:** [`ravana/validation/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation)
+* **Core Responsibilities:** Orchestrates M13 $\to$ M14 $\to$ M15 $\to$ M16 into a single unified `ValidationCertificate` with zero-leakage gatekeeping.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`pipeline.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation/pipeline.py) | Coordinator | Master end-to-end certification pipeline generating unified audit certificates |
+| [`config.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation/config.py) | Config | Strongly-typed dataclass contracts for all folds, results, thresholds, and reports |
+| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/validation/__init__.py) | Module | Package export boundary |
+
+* **Data Lake Store:** [`ravana/data/lake/m13_validation/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/data/lake/m13_validation) (`validation_certificates/`)
+* **Dedicated Test File:** [`test_validation_engine.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_validation_engine.py)
+
+---
+
 ## Auxiliary Subsystems & Infrastructure
 
 ### Dynamic Universe Selection & Security Master (Muscle 1 Auxiliary)
@@ -335,26 +399,28 @@ flowchart TD
 ## Test Suite Summary
 
 Every muscle is verified by dedicated unit tests in [`ravana/tests/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests).
-Currently **133/133 tests pass** with zero failures:
+Currently **140/140 tests pass** with zero failures:
 
 ```
-[Muscle 1]  test_formula_ast.py                     --> 18 tests OK
-[Muscle 2]  test_tensor_evaluator.py                --> 15 tests OK
-[Muscle 2]  test_compute_dispatcher.py             -->  6 tests OK
-[Muscle 2]  test_kaggle_runner.py                  -->  5 tests OK
+[Muscle 1]   test_formula_ast.py                     --> 18 tests OK
+[Muscle 2]   test_tensor_evaluator.py                --> 15 tests OK
+[Muscle 2]   test_compute_dispatcher.py             -->  6 tests OK
+[Muscle 2]   test_kaggle_runner.py                  -->  5 tests OK
 [Muscle 1+2] test_muscle1_muscle2_integration.py    -->  4 tests OK
-[Muscle 3]  test_data_ingestion.py                  --> 14 tests OK
-[Muscle 4]  test_data_cleaner.py                    --> 12 tests OK
-[Muscle 5]  test_data_resampler.py                  --> 12 tests OK
-[Muscle 6]  test_data_storage.py                    --> 10 tests OK
-[Muscle 6]  test_lake_diff.py                       -->  4 tests OK
-[Muscle 7]  test_features_matrix.py                 -->  8 tests OK
-[Muscle 8]  test_targets_builder.py                 -->  8 tests OK
-[Muscle 9]  test_genetic_evolution.py               -->  6 tests OK
-[Muscle 10] test_fitness_engine.py                  -->  6 tests OK
-[Muscle 11] test_backtest_engine.py                -->  7 tests OK
-[Muscle 12] test_risk_engine.py                    --> 11 tests OK
-[Universe]  test_universe_registry.py               -->  5 tests OK
+[Muscle 3]   test_data_ingestion.py                  --> 14 tests OK
+[Muscle 4]   test_data_cleaner.py                    --> 12 tests OK
+[Muscle 5]   test_data_resampler.py                  --> 12 tests OK
+[Muscle 6]   test_data_storage.py                    --> 10 tests OK
+[Muscle 6]   test_lake_diff.py                       -->  4 tests OK
+[Muscle 7]   test_features_matrix.py                 -->  8 tests OK
+[Muscle 8]   test_targets_builder.py                 -->  8 tests OK
+[Muscle 9]   test_genetic_evolution.py               -->  6 tests OK
+[Muscle 10]  test_fitness_engine.py                  -->  6 tests OK
+[Muscle 11]  test_backtest_engine.py                 -->  7 tests OK
+[Muscle 12]  test_risk_engine.py                     --> 11 tests OK
+[Phase 5]    test_validation_engine.py               -->  7 tests OK
+[Audit M1-12] test_audit_remediation.py              --> 10 tests OK
+[Universe]   test_universe_registry.py               -->  5 tests OK
 --------------------------------------------------------------------------
-TOTAL: 133 TESTS (100% GREEN)
+TOTAL: 150 TESTS (100% GREEN)
 ```

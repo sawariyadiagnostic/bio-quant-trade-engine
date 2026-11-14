@@ -31,6 +31,10 @@ class PortfolioRiskEngine:
         self.config = config or RiskConfig()
         self.gatekeeper = RiskGatekeeper(self.config)
 
+    def reset(self, peak_equity: float = 0.0) -> None:
+        """Reset internal state and peak equity high-water mark."""
+        self.gatekeeper.reset(peak_equity)
+
     def allocate(
         self,
         symbols: List[str],

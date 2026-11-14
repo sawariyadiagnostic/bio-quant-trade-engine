@@ -16,7 +16,7 @@ from ravana.data.storage.diff import LakeDiffInspector
 logger = logging.getLogger(__name__)
 
 # Topological order of pipeline execution stages
-PIPELINE_STAGES: List[str] = ["m3", "m4", "m5", "m7", "m8", "m9"]
+PIPELINE_STAGES: List[str] = ["m3", "m4", "m5", "m7", "m8", "m9", "m13"]
 
 STAGE_DEPENDENCIES: Dict[str, List[str]] = {
     "m3": [],
@@ -25,6 +25,7 @@ STAGE_DEPENDENCIES: Dict[str, List[str]] = {
     "m7": ["m4", "m5"],
     "m8": ["m4"],
     "m9": ["m7", "m8"],
+    "m13": ["m7", "m8", "m9"],
 }
 
 
@@ -53,6 +54,7 @@ class PipelineDAG:
             "m7": self.runner.m7_dir,
             "m8": self.runner.m8_dir,
             "m9": self.runner.lake_root / "m9_alphas",
+            "m13": self.runner.m13_dir,
         }
         target_dir = dir_map.get(stage)
         if target_dir and target_dir.exists():
@@ -71,6 +73,7 @@ class PipelineDAG:
             "m7": self.runner.compute_and_persist_m7,
             "m8": self.runner.compute_and_persist_m8,
             "m9": self.runner.compute_and_persist_m9,
+            "m13": self.runner.validate_and_persist_m13,
         }
 
         for st in stages_to_run:

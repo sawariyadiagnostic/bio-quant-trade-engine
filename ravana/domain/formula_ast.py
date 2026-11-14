@@ -61,9 +61,36 @@ FEATURE_DIMENSIONS: Dict[str, FeatureDimension] = {
     "SP500_Ret": FeatureDimension.DIMENSIONLESS,
     "ADR_Ret": FeatureDimension.DIMENSIONLESS,
     "Global_Confluence": FeatureDimension.DIMENSIONLESS,
+    # Muscle 7 Stationary Vocabulary (21 Features)
+    "LOG_RET_1": FeatureDimension.DIMENSIONLESS,
+    "LOG_RET_5": FeatureDimension.DIMENSIONLESS,
+    "LOG_RET_20": FeatureDimension.DIMENSIONLESS,
+    "ATR_14_NORM": FeatureDimension.DIMENSIONLESS,
+    "VOLATILITY_20": FeatureDimension.DIMENSIONLESS,
+    "PARKINSON_VOL_20": FeatureDimension.DIMENSIONLESS,
+    "GARMAN_KLASS_VOL_20": FeatureDimension.DIMENSIONLESS,
+    "VOLUME_ZSCORE_LAGGED": FeatureDimension.DIMENSIONLESS,
+    "VWAP_DRIFT": FeatureDimension.DIMENSIONLESS,
+    "BOLLINGER_BAND_PCT_20": FeatureDimension.DIMENSIONLESS,
+    "MACD_DIFF_NORM": FeatureDimension.DIMENSIONLESS,
+    "SPREAD_BPS": FeatureDimension.DIMENSIONLESS,
+    "SPREAD_ZSCORE_20": FeatureDimension.DIMENSIONLESS,
+    "SPREAD_DELTA_5": FeatureDimension.DIMENSIONLESS,
+    "ADF_STAT_60": FeatureDimension.DIMENSIONLESS,
+    "OU_HALF_LIFE_60": FeatureDimension.DIMENSIONLESS,
+    "MACRO_VIX_LEVEL": FeatureDimension.DIMENSIONLESS,
+    "MACRO_VIX_RET_1": FeatureDimension.DIMENSIONLESS,
+    "MACRO_USDINR_RET_1": FeatureDimension.DIMENSIONLESS,
+    "MACRO_SP500_RET_1": FeatureDimension.DIMENSIONLESS,
 }
 
-STANDARD_FEATURES: List[str] = list(FEATURE_DIMENSIONS.keys())
+STANDARD_FEATURES: List[str] = [
+    "Open", "High", "Low", "Close", "Close_Adj", "Volume",
+    "Spread", "Vol_ZScore", "Vol_Price_Flow", "True_Range",
+    "TR_Expansion", "EMA_Slope", "Dist_EMA20", "Dist_VWAP",
+    "Downside_Vol_Ratio", "RSI_14", "Parkinson_Vol", "Garman_Klass_Vol",
+    "SP500_Ret", "ADR_Ret", "Global_Confluence",
+]
 
 
 @dataclass
@@ -333,11 +360,13 @@ class ASTEvaluator:
     @staticmethod
     def _eval_feature(node: ASTNode, df: pd.DataFrame, n: int) -> np.ndarray:
         cache = df.attrs.get("_col_arrays")
-        if cache is None:
+        if cache is None or cache.get("_len") != n or cache.get("_df_id") != id(df):
             cache = {
                 c: np.nan_to_num(df[c].to_numpy(dtype=np.float64), nan=0.0, posinf=1.0, neginf=-1.0)
                 for c in df.columns
             }
+            cache["_len"] = n
+            cache["_df_id"] = id(df)
             df.attrs["_col_arrays"] = cache
         if node.val in cache:
             return cache[node.val]
@@ -417,9 +446,9 @@ class ASTEvaluator:
             return _fast_ts_decay_linear(child, w=10)
         s = pd.Series(child)
         if node.op == "TS_DELAY_1":
-            return s.shift(1).fillna(0.0).to_numpy()
+            return s.shift(1).bfill().fillna(0.0).to_numpy()
         elif node.op == "TS_DELAY_5":
-            return s.shift(5).fillna(0.0).to_numpy()
+            return s.shift(5).bfill().fillna(0.0).to_numpy()
         elif node.op == "DELTA_5":
             res = s.diff(5).fillna(0.0).to_numpy()
         elif node.op == "EMA_10":

@@ -11,6 +11,7 @@ class TargetConfig:
     capital_inr: float = 200000.0  # Institutional min capital gate: Rs. 2,00,000
     min_capital_inr: float = 200000.0
     variable_bps: float = 2.0  # Brokerage, STT, exchange turnover: 2.0 bps (0.02%)
+    slippage_bps: float = 0.0  # Half-spread & execution slippage: 0.0 bps default
     dp_fee_inr: float = 17.0  # CDSL flat DP debit fee: Rs. 17.00 per sell delivery
 
     # Labeling hurdle

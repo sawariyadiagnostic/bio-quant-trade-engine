@@ -1,12 +1,12 @@
 """Dimensional Tree Generator and Genetic Search Operators for Formula ASTs.
 
-Enforces dimensional soundness across AST tree generation, point/subtree mutation,
-and genetic crossover, preventing physical incompatibilities (e.g., adding Price to Volume).
+Enforces dimensional soundness and active feature vocabulary constraints across AST
+tree generation, point/subtree mutation, non-destructive bloat pruning, and crossover.
 """
 from __future__ import annotations
 
 import random
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from ravana.domain.formula_ast import (
     ASTNode,
@@ -47,17 +47,31 @@ class TreeGenerator:
         return FeatureDimension.DIMENSIONLESS
 
     @staticmethod
-    def _leaf_node(target_dimension: FeatureDimension, method: str) -> ASTNode:
-        """Helper to create a terminal leaf node matching target dimension."""
-        matching_feats = [
-            f for f, dim in FEATURE_DIMENSIONS.items()
-            if dim == target_dimension
-        ]
-        if target_dimension == FeatureDimension.DIMENSIONLESS and random.random() < 0.25:
+    def _leaf_node(
+        target_dimension: FeatureDimension,
+        allowed_features: Optional[Sequence[str]] = None,
+    ) -> ASTNode:
+        """Create a terminal leaf node matching target dimension and active vocabulary."""
+        if allowed_features is not None:
+            matching_feats = [
+                f for f in allowed_features
+                if FEATURE_DIMENSIONS.get(f, FeatureDimension.DIMENSIONLESS) == target_dimension
+            ]
+            if not matching_feats and target_dimension == FeatureDimension.DIMENSIONLESS:
+                matching_feats = list(allowed_features)
+        else:
+            matching_feats = [
+                f for f, dim in FEATURE_DIMENSIONS.items()
+                if dim == target_dimension
+            ]
+
+        if target_dimension == FeatureDimension.DIMENSIONLESS and random.random() < 0.20:
             const_val = str(round(random.uniform(-2.0, 2.0), 2))
             return ASTNode("CONST", const_val)
         if matching_feats:
             return ASTNode("FEATURE", random.choice(matching_feats))
+        if allowed_features:
+            return ASTNode("FEATURE", random.choice(list(allowed_features)))
         return ASTNode("CONST", "1.0")
 
     @classmethod
@@ -65,11 +79,12 @@ class TreeGenerator:
         cls,
         max_depth: int = 4,
         target_dimension: FeatureDimension = FeatureDimension.DIMENSIONLESS,
-        method: str = "grow"
+        method: str = "grow",
+        allowed_features: Optional[Sequence[str]] = None,
     ) -> ASTNode:
-        """Generates an AST tree guaranteed to conform to target dimension."""
+        """Generates an AST tree guaranteed to conform to target dimension and vocabulary."""
         if max_depth <= 1 or (method == "grow" and random.random() < 0.35):
-            return cls._leaf_node(target_dimension, method)
+            return cls._leaf_node(target_dimension, allowed_features)
 
         if target_dimension == FeatureDimension.DIMENSIONLESS:
             op_choices = (
@@ -80,32 +95,43 @@ class TreeGenerator:
         else:
             op = random.choice(("ADD", "SUB", "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_STD_20", "TS_MEDIAN_10"))
 
-        return cls._build_operator_node(op, max_depth, target_dimension, method)
+        return cls._build_operator_node(op, max_depth, target_dimension, method, allowed_features)
 
     @classmethod
     def _build_operator_node(
-        cls, op: str, max_depth: int, target_dim: FeatureDimension, method: str
+        cls,
+        op: str,
+        max_depth: int,
+        target_dim: FeatureDimension,
+        method: str,
+        allowed_features: Optional[Sequence[str]] = None,
     ) -> ASTNode:
         """Dispatches operator-specific child tree generation."""
         if op == "BLEND":
-            cond = cls.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
-            a = cls.generate(max_depth - 1, target_dim, method)
-            b = cls.generate(max_depth - 1, target_dim, method)
+            cond = cls.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method, allowed_features)
+            a = cls.generate(max_depth - 1, target_dim, method, allowed_features)
+            b = cls.generate(max_depth - 1, target_dim, method, allowed_features)
             return ASTNode("BLEND", children=[cond, a, b])
 
         if op in OPERATORS_BINARY_ROLLING:
-            a = cls.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
-            b = cls.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method)
+            a = cls.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method, allowed_features)
+            b = cls.generate(max_depth - 1, FeatureDimension.DIMENSIONLESS, method, allowed_features)
             return ASTNode(op, children=[a, b])
 
         if op in OPERATORS_BINARY_ARITHMETIC:
             if op == "DIV_SAFE":
-                dim_choice = random.choice([FeatureDimension.PRICE, FeatureDimension.DIMENSIONLESS])
-                left = cls.generate(max_depth - 1, dim_choice, method)
-                right = cls.generate(max_depth - 1, dim_choice, method)
+                has_price = allowed_features is None or any(
+                    FEATURE_DIMENSIONS.get(f) == FeatureDimension.PRICE for f in allowed_features
+                )
+                dim_choice = (
+                    random.choice([FeatureDimension.PRICE, FeatureDimension.DIMENSIONLESS])
+                    if has_price else FeatureDimension.DIMENSIONLESS
+                )
+                left = cls.generate(max_depth - 1, dim_choice, method, allowed_features)
+                right = cls.generate(max_depth - 1, dim_choice, method, allowed_features)
                 return ASTNode("DIV_SAFE", children=[left, right])
-            left = cls.generate(max_depth - 1, target_dim, method)
-            right = cls.generate(max_depth - 1, target_dim, method)
+            left = cls.generate(max_depth - 1, target_dim, method, allowed_features)
+            right = cls.generate(max_depth - 1, target_dim, method, allowed_features)
             return ASTNode(op, children=[left, right])
 
         child_dim = (
@@ -113,34 +139,92 @@ class TreeGenerator:
             if op in ("TS_ZSCORE_20", "SIGMOID", "TANH", "TS_ARGMAX_10", "TS_ARGMIN_10")
             else target_dim
         )
-        child = cls.generate(max_depth - 1, child_dim, method)
+        child = cls.generate(max_depth - 1, child_dim, method, allowed_features)
         return ASTNode(op, children=[child])
+
+    @classmethod
+    def prune_to_limits(
+        cls,
+        tree: ASTNode,
+        max_depth: int = 4,
+        max_nodes: int = 15,
+        allowed_features: Optional[Sequence[str]] = None,
+    ) -> ASTNode:
+        """Non-destructively prunes deep internal branches while preserving root structure."""
+        root = tree.clone().simplify()
+        root = cls._trim_depth(root, max_depth, allowed_features).simplify()
+
+        attempts = 0
+        while root.size() > max_nodes and attempts < 30:
+            attempts += 1
+            # Find internal nodes whose children are all leaves (deepest collapsible twigs)
+            twigs = [
+                n for n in root.get_all_subnodes()
+                if n is not root and n.children and all(not c.children for c in n.children)
+            ]
+            if not twigs:
+                break
+            victim = random.choice(twigs)
+            feat_children = [c for c in victim.children if c.op == "FEATURE"]
+            replacement = random.choice(feat_children) if feat_children else victim.children[0]
+            victim.op, victim.val, victim.children = replacement.op, replacement.val, []
+            root = root.simplify()
+
+        return root
+
+    @classmethod
+    def _trim_depth(
+        cls,
+        node: ASTNode,
+        remaining_depth: int,
+        allowed_features: Optional[Sequence[str]] = None,
+    ) -> ASTNode:
+        if remaining_depth <= 1 or not node.children:
+            if not node.children:
+                return node
+            feat_leaves = [n for n in node.get_all_subnodes() if n.op == "FEATURE"]
+            if feat_leaves:
+                chosen = random.choice(feat_leaves)
+                return ASTNode("FEATURE", chosen.val)
+            return cls._leaf_node(cls.infer_dimension(node), allowed_features)
+        node.children = [cls._trim_depth(c, remaining_depth - 1, allowed_features) for c in node.children]
+        return node
 
 
 class GeneticMutator:
-    """Applies point and subtree mutations respecting dimensional soundness."""
+    """Applies point and subtree mutations respecting dimensional soundness and active vocabulary."""
 
     @staticmethod
-    def mutate_subtree(tree: ASTNode, max_depth: int = 3) -> ASTNode:
+    def mutate_subtree(
+        tree: ASTNode,
+        max_depth: int = 3,
+        allowed_features: Optional[Sequence[str]] = None,
+    ) -> ASTNode:
         """Replaces a randomly selected subtree with a newly generated dimensional branch."""
         cloned = tree.clone()
         all_nodes = cloned.get_all_subnodes()
         target = random.choice(all_nodes)
         target_dim = TreeGenerator.infer_dimension(target)
-        sub = TreeGenerator.generate(max_depth, target_dim)
+        sub = TreeGenerator.generate(max_depth, target_dim, allowed_features=allowed_features)
         target.op, target.val, target.children = sub.op, sub.val, sub.children
         return cloned.simplify()
 
     @staticmethod
-    def mutate_point(tree: ASTNode) -> ASTNode:
-        """Mutates a single node operator or feature without breaking arity."""
+    def mutate_point(
+        tree: ASTNode,
+        allowed_features: Optional[Sequence[str]] = None,
+    ) -> ASTNode:
+        """Mutates a single node operator or feature without breaking arity or vocabulary."""
         cloned = tree.clone()
         target = random.choice(cloned.get_all_subnodes())
         if target.op == "FEATURE":
-            current_dim = FEATURE_DIMENSIONS.get(target.val, FeatureDimension.DIMENSIONLESS)
-            candidates = [f for f, d in FEATURE_DIMENSIONS.items() if d == current_dim]
-            if candidates:
-                target.val = random.choice(candidates)
+            if allowed_features:
+                target.val = random.choice(list(allowed_features))
+            else:
+                current_dim = FEATURE_DIMENSIONS.get(target.val, FeatureDimension.DIMENSIONLESS)
+                candidates = [f for f, d in FEATURE_DIMENSIONS.items() if d == current_dim]
+                if candidates:
+                    target.val = random.choice(candidates)
         elif target.op == "CONST":
             target.val = str(round(random.uniform(-2.0, 2.0), 2))
         elif target.op in OPERATORS_BINARY_ARITHMETIC:

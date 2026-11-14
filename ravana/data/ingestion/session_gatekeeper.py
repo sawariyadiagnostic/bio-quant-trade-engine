@@ -4,7 +4,7 @@ Enforces institutional market hours, handles special weekend trading sessions
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 import pandas as pd
 
 # Registry of official NSE special sessions outside normal Monday-Friday 09:15-15:30
@@ -43,6 +43,11 @@ class NSESessionGatekeeper:
 
     KNOWN_SPECIAL_SESSIONS = KNOWN_SPECIAL_SESSIONS
     KNOWN_NSE_HOLIDAYS = KNOWN_NSE_HOLIDAYS
+
+    @classmethod
+    def register_holidays(cls, holidays: Iterable[str]) -> None:
+        """Register additional exchange holiday dates (YYYY-MM-DD)."""
+        cls.KNOWN_NSE_HOLIDAYS.update(holidays)
 
     def __init__(
         self,

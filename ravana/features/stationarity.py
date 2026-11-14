@@ -18,7 +18,9 @@ class RollingADF:
         self.max_lags = max(0, min(max_lags, 2))
 
     def compute(self, series: pd.Series) -> pd.Series:
-        """Calculate rolling ADF t-statistic over specified lookback window."""
+        """Calculate rolling ADF t-statistic over specified lookback window using batched linear algebra."""
+        from numpy.lib.stride_tricks import sliding_window_view
+
         values = series.to_numpy(dtype=np.float64)
         n = len(values)
         out = np.zeros(n, dtype=np.float64)
@@ -26,13 +28,44 @@ class RollingADF:
         if n < self.window:
             return pd.Series(out, index=series.index, name="ADF_STAT")
 
-        # Roll through causal windows
-        for t in range(self.window - 1, n):
-            sub = values[t - self.window + 1 : t + 1]
-            out[t] = self._estimate_adf_t_stat(sub)
+        windows = sliding_window_view(values, window_shape=self.window)  # shape: [M, W]
+        dy = np.diff(windows, axis=1)                                    # shape: [M, W-1]
+        y_lag = windows[:, :-1]                                          # shape: [M, W-1]
+        m_wins, k = dy.shape
 
-        # Causal warmup: initial bars prior to full lookback window remain neutral 0.0
-        # Zero backward filling ensures strict temporal causality.
+        if self.max_lags == 1 and k > 2:
+            dy_lag = dy[:, :-1]
+            y_vec = dy[:, 1:]
+            y_prev = y_lag[:, 1:]
+            ones = np.ones_like(y_prev)
+            x_mat = np.stack([ones, y_prev, dy_lag], axis=-1)            # shape: [M, K', 3]
+        else:
+            ones = np.ones_like(y_lag)
+            x_mat = np.stack([ones, y_lag], axis=-1)                     # shape: [M, K', 2]
+            y_vec = dy
+
+        n_obs, p = x_mat.shape[1], x_mat.shape[2]
+        dof = max(1, n_obs - p)
+
+        xtx = np.einsum("mki,mkj->mij", x_mat, x_mat)                    # shape: [M, P, P]
+        traces = np.trace(xtx, axis1=1, axis2=2)
+        ridges = 1e-8 * np.maximum(1.0, traces)[:, None, None] * np.eye(p)[None, :, :]
+        xtx_reg = xtx + ridges
+        xty = np.einsum("mki,mk->mi", x_mat, y_vec)                      # shape: [M, P]
+
+        try:
+            beta = np.linalg.solve(xtx_reg, xty[..., None]).squeeze(-1)  # shape: [M, P]
+            y_hat = np.einsum("mki,mi->mk", x_mat, beta)
+            residuals = y_vec - y_hat
+            sigma2 = np.sum(residuals ** 2, axis=1) / dof
+            inv_xtx = np.linalg.inv(xtx_reg)
+            se_beta = np.sqrt(np.maximum(1e-12, sigma2 * inv_xtx[:, 1, 1]))
+            t_stats = np.clip(beta[:, 1] / se_beta, -20.0, 20.0)
+            out[self.window - 1 :] = np.nan_to_num(t_stats, nan=0.0)
+        except (np.linalg.LinAlgError, ValueError):
+            for t in range(self.window - 1, n):
+                out[t] = self._estimate_adf_t_stat(values[t - self.window + 1 : t + 1])
+
         return pd.Series(out, index=series.index, name="ADF_STAT")
 
     def _estimate_adf_t_stat(self, sub: np.ndarray) -> float:
