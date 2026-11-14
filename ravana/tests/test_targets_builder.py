@@ -12,9 +12,9 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from ravana.targets.config import TargetConfig
-from ravana.targets.costs import DeliveryFrictionModel
-from ravana.targets.builder import OvernightTargetBuilder
+from ravana.targets.config import TargetConfig, TargetHorizon
+from ravana.targets.costs import DeliveryFrictionModel, IntradayFrictionModel
+from ravana.targets.builder import MultiHorizonTargetBuilder, OvernightTargetBuilder
 
 
 class TestDeliveryFrictionModel(unittest.TestCase):
@@ -49,6 +49,32 @@ class TestDeliveryFrictionModel(unittest.TestCase):
         model = DeliveryFrictionModel(min_capital_inr=200000.0)
         self.assertTrue(model.is_capital_viable(250000.0))
         self.assertFalse(model.is_capital_viable(150000.0))
+
+
+class TestIntradayFrictionModel(unittest.TestCase):
+    """Test statutory intraday friction and zero DP debit charge model."""
+
+    def test_intraday_etf_drag(self) -> None:
+        """Verify ETF intraday drag is exactly 0.9 bps with 0 STT and 0 DP charge."""
+        model = IntradayFrictionModel(variable_bps=0.9, is_etf=True)
+        drag_bps = model.compute_total_drag_bps(capital_inr=100000.0)
+        self.assertAlmostEqual(drag_bps, 0.9, places=6)
+
+        # Net return after 0.9 bps drag: 0.01 - 0.00009 = 0.00991
+        net_ret = model.apply_friction(gross_return=0.01, capital_inr=100000.0)
+        self.assertAlmostEqual(net_ret, 0.01 - 0.00009, places=6)
+
+    def test_intraday_equity_drag(self) -> None:
+        """Verify equity stock intraday drag is 3.4 bps (0.9 variable + 2.5 bps sell STT)."""
+        model = IntradayFrictionModel(variable_bps=0.9, is_etf=False)
+        drag_bps = model.compute_total_drag_bps(capital_inr=200000.0)
+        self.assertAlmostEqual(drag_bps, 3.4, places=6)
+
+    def test_intraday_capital_gate(self) -> None:
+        """Verify institutional capital gate for intraday trading."""
+        model = IntradayFrictionModel(min_capital_inr=200000.0)
+        self.assertTrue(model.is_capital_viable(200000.0))
+        self.assertFalse(model.is_capital_viable(100000.0))
 
 
 class TestOvernightTargetBuilder(unittest.TestCase):
@@ -187,6 +213,68 @@ class TestOvernightTargetBuilder(unittest.TestCase):
         targets = builder.build_targets(df_short)
         self.assertEqual(len(targets), 76)
         self.assertFalse(targets.isna().any().any())
+
+    def test_multi_horizon_alias(self) -> None:
+        """Verify MultiHorizonTargetBuilder is an alias for OvernightTargetBuilder."""
+        self.assertIs(MultiHorizonTargetBuilder, OvernightTargetBuilder)
+
+    def test_intraday_n_bars_targets(self) -> None:
+        """Verify INTRADAY_N_BARS extracts causal forward returns within the same session."""
+        cfg = TargetConfig(
+            horizon=TargetHorizon.INTRADAY_N_BARS,
+            forward_bars=6,
+            intraday_cutoff_time="14:45",
+        )
+        builder = MultiHorizonTargetBuilder(cfg)
+
+        # Set specific price move at bar 7 (exit for bar 0)
+        df_custom = self.df.copy()
+        df_custom.loc[df_custom.index[7], "Open"] = 102.0  # +2% jump from bar 1 Open (100.0)
+
+        targets = builder.build_targets(df_custom)
+
+        # Bar 0 (09:15): Entry at bar 1 Open (100.0), exit at bar 7 Open (102.0)
+        self.assertEqual(targets["is_entry_bar"].iloc[0], 1)
+        self.assertEqual(targets["calendar_hold_days"].iloc[0], 0)
+        self.assertAlmostEqual(targets["gross_return"].iloc[0], 0.02, places=5)
+        # Net return after 0.9 bps drag (0.00009): 0.02 - 0.00009 = 0.01991
+        self.assertAlmostEqual(targets["net_return"].iloc[0], 0.01991, places=5)
+        self.assertEqual(targets["binary_label"].iloc[0], 1)
+        self.assertEqual(targets["sample_weight"].iloc[0], 1.0)
+
+        # Bars strictly past 14:45 should NOT be entry bars
+        for idx, ts in enumerate(df_custom.index):
+            if ts.strftime("%H:%M") > "14:45":
+                self.assertEqual(targets["is_entry_bar"].iloc[idx], 0)
+                self.assertEqual(targets["sample_weight"].iloc[idx], 0.0)
+
+    def test_multi_day_swing_targets(self) -> None:
+        """Verify MULTI_DAY_SWING extracts forward returns across holding_days sessions."""
+        days = [f"2026-01-{d:02d}" for d in range(5, 10)]  # 5 sessions (Mon-Fri)
+        all_dates = []
+        for d_str in days:
+            all_dates.extend(pd.date_range(f"{d_str} 09:15", f"{d_str} 15:25", freq="5min", tz="Asia/Kolkata"))
+
+        df_swing = pd.DataFrame(
+            {
+                "Open": np.full(len(all_dates), 100.0),
+                "High": np.full(len(all_dates), 100.5),
+                "Low": np.full(len(all_dates), 99.5),
+                "Close": np.full(len(all_dates), 100.0),
+                "Volume": np.full(len(all_dates), 1000.0),
+            },
+            index=pd.DatetimeIndex(all_dates),
+        )
+
+        cfg = TargetConfig(horizon=TargetHorizon.MULTI_DAY_SWING, holding_days=3)
+        builder = MultiHorizonTargetBuilder(cfg)
+        targets = builder.build_targets(df_swing)
+
+        # Over 5 days with holding_days=3, valid entry sessions are session 0 and session 1 (2 entries)
+        self.assertEqual(targets["is_entry_bar"].sum(), 2)
+        # Entry bar in session 0 should hold across 3 days
+        session_0_entry = np.where(targets["is_entry_bar"] == 1)[0][0]
+        self.assertGreaterEqual(targets["calendar_hold_days"].iloc[session_0_entry], 3)
 
 
 if __name__ == "__main__":

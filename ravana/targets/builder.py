@@ -1,20 +1,20 @@
-"""Overnight Target Builder for Muscle 8.
+"""Multi-Horizon Target Builder for Muscle 8.
 
-Extracts forward overnight returns (Session Close -> Next Session Open),
-deducts delivery frictions and flat CDSL DP debit fees, and generates
-continuous targets, binary hurdle classifications, and sample weighting masks.
+Extracts forward returns across diverse investment horizons (Overnight,
+Intraday N-bars, and Multi-Day Swing), deducts applicable statutory frictions,
+and generates continuous targets, binary hurdle classifications, and sample weighting masks.
 """
 
 from typing import Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from ravana.targets.config import TargetConfig
-from ravana.targets.costs import DeliveryFrictionModel
+from ravana.targets.config import TargetConfig, TargetHorizon
+from ravana.targets.costs import DeliveryFrictionModel, IntradayFrictionModel
 
 
 class OvernightTargetBuilder:
-    """Builds causal forward overnight economic target contracts."""
+    """Builds causal forward economic target contracts across multiple horizons."""
 
     def __init__(self, config: Optional[TargetConfig] = None) -> None:
         self.config = config or TargetConfig()
@@ -25,9 +25,15 @@ class OvernightTargetBuilder:
             default_capital_inr=self.config.capital_inr,
             min_capital_inr=self.config.min_capital_inr,
         )
+        self.intraday_friction_model = IntradayFrictionModel(
+            variable_bps=0.9,
+            slippage_bps=self.config.slippage_bps,
+            default_capital_inr=self.config.capital_inr,
+            min_capital_inr=self.config.min_capital_inr,
+        )
 
     def build_targets(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Compute forward overnight returns and labels for input bar DataFrame."""
+        """Compute forward returns and labels for input bar DataFrame."""
         if not isinstance(df.index, pd.DatetimeIndex):
             raise ValueError("DataFrame index must be a DatetimeIndex")
 
@@ -44,21 +50,109 @@ class OvernightTargetBuilder:
                 df.index, gross_returns, net_returns, binary_labels, is_entry_bar, sample_weights, calendar_days
             )
 
-        # Group by normalized date to identify distinct trading sessions
         session_dates = df.index.normalize()
         unique_sessions = np.unique(session_dates)
-
         hurdle_frac = self.config.hurdle_bps / 10000.0
 
-        for s_idx in range(len(unique_sessions) - 1):
+        if self.config.horizon == TargetHorizon.INTRADAY_N_BARS:
+            self._build_intraday_targets(
+                df, session_dates, gross_returns, net_returns, binary_labels,
+                is_entry_bar, sample_weights, calendar_days, hurdle_frac
+            )
+        elif self.config.horizon == TargetHorizon.MULTI_DAY_SWING:
+            self._build_session_pair_targets(
+                df, session_dates, unique_sessions, max(1, self.config.holding_days),
+                gross_returns, net_returns, binary_labels, is_entry_bar,
+                sample_weights, calendar_days, hurdle_frac
+            )
+        else:  # TargetHorizon.OVERNIGHT default
+            self._build_session_pair_targets(
+                df, session_dates, unique_sessions, 1,
+                gross_returns, net_returns, binary_labels, is_entry_bar,
+                sample_weights, calendar_days, hurdle_frac
+            )
+
+        return self._build_result_df(
+            df.index, gross_returns, net_returns, binary_labels, is_entry_bar, sample_weights, calendar_days
+        )
+
+    def _build_intraday_targets(
+        self,
+        df: pd.DataFrame,
+        session_dates: pd.DatetimeIndex,
+        gross_returns: np.ndarray,
+        net_returns: np.ndarray,
+        binary_labels: np.ndarray,
+        is_entry_bar: np.ndarray,
+        sample_weights: np.ndarray,
+        calendar_days: np.ndarray,
+        hurdle_frac: float,
+    ) -> None:
+        """Compute forward intraday N-bar returns and labels within single sessions."""
+        k = self.config.forward_bars
+        n = len(df)
+        cutoff = self.config.intraday_cutoff_time
+
+        for i in range(n):
+            if i + 1 + k >= n:
+                break
+
+            bar_time = df.index[i].strftime("%H:%M")
+            if bar_time > cutoff:
+                continue
+
+            if session_dates[i + 1] != session_dates[i + 1 + k]:
+                continue
+
+            entry_exec_price = float(df["Open"].iloc[i + 1])
+            exit_price = float(df["Open"].iloc[i + 1 + k])
+
+            if (
+                not np.isfinite(entry_exec_price)
+                or not np.isfinite(exit_price)
+                or entry_exec_price <= 0.0
+                or exit_price <= 0.0
+            ):
+                continue
+
+            gross_ret = (exit_price - entry_exec_price) / entry_exec_price
+            net_ret = self.intraday_friction_model.apply_friction(gross_ret, self.config.capital_inr)
+
+            gross_returns[i] = gross_ret
+            net_returns[i] = net_ret
+            binary_labels[i] = 1 if net_ret >= hurdle_frac else 0
+            is_entry_bar[i] = 1
+            sample_weights[i] = 1.0
+            calendar_days[i] = 0
+
+    def _build_session_pair_targets(
+        self,
+        df: pd.DataFrame,
+        session_dates: pd.DatetimeIndex,
+        unique_sessions: np.ndarray,
+        session_step: int,
+        gross_returns: np.ndarray,
+        net_returns: np.ndarray,
+        binary_labels: np.ndarray,
+        is_entry_bar: np.ndarray,
+        sample_weights: np.ndarray,
+        calendar_days: np.ndarray,
+        hurdle_frac: float,
+    ) -> None:
+        """Compute forward session-pair returns across specified session interval."""
+        for s_idx in range(len(unique_sessions) - session_step):
             curr_date = unique_sessions[s_idx]
-            next_date = unique_sessions[s_idx + 1]
+            next_date = unique_sessions[s_idx + session_step]
 
             entry_idx, exit_idx = self._get_session_pair_indices(session_dates, curr_date, next_date)
             if entry_idx is None or exit_idx is None:
                 continue
 
-            if self.config.entry_bar_offset_from_end > 0 and entry_idx + 1 < len(df) and session_dates[entry_idx + 1] == curr_date:
+            if (
+                self.config.entry_bar_offset_from_end > 0
+                and entry_idx + 1 < len(df)
+                and session_dates[entry_idx + 1] == curr_date
+            ):
                 entry_exec_price = float(df["Open"].iloc[entry_idx + 1])
             else:
                 entry_exec_price = float(df["Close"].iloc[entry_idx])
@@ -69,7 +163,12 @@ class OvernightTargetBuilder:
                 else float(df["Close"].iloc[exit_idx])
             )
 
-            if not np.isfinite(entry_exec_price) or not np.isfinite(exit_price) or entry_exec_price <= 0.0 or exit_price <= 0.0:
+            if (
+                not np.isfinite(entry_exec_price)
+                or not np.isfinite(exit_price)
+                or entry_exec_price <= 0.0
+                or exit_price <= 0.0
+            ):
                 continue
 
             gross_ret = (exit_price - entry_exec_price) / entry_exec_price
@@ -82,10 +181,6 @@ class OvernightTargetBuilder:
             is_entry_bar[entry_idx] = 1
             sample_weights[entry_idx] = 1.0
             calendar_days[entry_idx] = days_held
-
-        return self._build_result_df(
-            df.index, gross_returns, net_returns, binary_labels, is_entry_bar, sample_weights, calendar_days
-        )
 
     def _get_session_pair_indices(
         self, session_dates: pd.DatetimeIndex, curr_date: pd.Timestamp, next_date: pd.Timestamp
@@ -125,3 +220,6 @@ class OvernightTargetBuilder:
             },
             index=index,
         )
+
+
+MultiHorizonTargetBuilder = OvernightTargetBuilder

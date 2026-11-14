@@ -12,6 +12,7 @@ from .formula_ast import (
     ASTNode,
     OPERATORS_BINARY_ARITHMETIC,
     OPERATORS_BINARY_ROLLING,
+    OPERATORS_CROSS_SECTIONAL,
     OPERATORS_UNARY,
     OPERATORS_ROLLING_UNARY,
     OPERATORS_TERNARY,
@@ -109,7 +110,7 @@ class FormulaParser:
                             FormulaParser.parse(sub_args[1], _depth + 1)
                         ]
                     )
-            if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY):
+            if op_name in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY + OPERATORS_CROSS_SECTIONAL):
                 return ASTNode(
                     op=op_name,
                     children=[FormulaParser.parse(m.group(2), _depth + 1)]

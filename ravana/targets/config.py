@@ -1,11 +1,26 @@
-"""Configuration for Muscle 8 Overnight Target & Objective Builder."""
+"""Configuration for Muscle 8 Multi-Horizon Target & Objective Builder."""
 
 from dataclasses import dataclass
+from enum import Enum
+
+
+class TargetHorizon(str, Enum):
+    """Target horizon classification."""
+
+    OVERNIGHT = "OVERNIGHT"
+    INTRADAY_N_BARS = "INTRADAY_N_BARS"
+    MULTI_DAY_SWING = "MULTI_DAY_SWING"
 
 
 @dataclass
 class TargetConfig:
-    """Configuration parameters for overnight target extraction and friction deduction."""
+    """Configuration parameters for multi-horizon target extraction and friction deduction."""
+
+    # Horizon and operational parameters
+    horizon: TargetHorizon = TargetHorizon.OVERNIGHT  # default OVERNIGHT for 100% backward compatibility
+    forward_bars: int = 6  # for INTRADAY_N_BARS (default 6 bars = 30 min on 5m)
+    intraday_cutoff_time: str = "14:45"  # Quarantine window to prevent intraday crossing 15:15
+    holding_days: int = 3  # for MULTI_DAY_SWING
 
     # Account sizing and friction parameters
     capital_inr: float = 200000.0  # Institutional min capital gate: Rs. 2,00,000

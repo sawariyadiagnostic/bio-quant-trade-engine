@@ -21,19 +21,8 @@ instruments:
     parity_ratio: 100.0
     lot_size: 1
     tick_size: 0.01
-    sector: "Broad Market"
-    tags: ["core_etf", "liquid", "broad_market", "delivery"]
-
-  - symbol: "GOLDBEES.NS"
-    security_id: "INE730I01014"
-    asset_class: "ETF"
-    exchange: "NSE"
-    currency: "INR"
-    parity_ratio: 1.0
-    lot_size: 1
-    tick_size: 0.01
-    sector: "Commodity"
-    tags: ["commodity", "hedge", "liquid"]
+    sector: "Broad Market Nifty 50"
+    tags: ["core_etf", "liquid", "broad_market", "nifty50", "delivery"]
 
   - symbol: "ITBEES.NS"
     security_id: "INE694G01034"
@@ -45,7 +34,89 @@ instruments:
     lot_size: 1
     tick_size: 0.01
     sector: "Technology"
-    tags: ["sector_etf", "technology"]
+    tags: ["sector_etf", "technology", "liquid"]
+
+  - symbol: "GOLDBEES.NS"
+    security_id: "INE730I01014"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    parity_ratio: 1.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Commodity Gold"
+    tags: ["commodity", "hedge", "gold", "liquid"]
+
+  - symbol: "SILVERBEES.NS"
+    security_id: "INF204KB18I5"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    parity_ratio: 1.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Commodity Silver"
+    tags: ["commodity", "hedge", "silver", "liquid"]
+
+  - symbol: "PHARMABEES.NS"
+    security_id: "INF204KB14L0"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^CNXPHARMA"
+    parity_ratio: 100.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Healthcare"
+    tags: ["sector_etf", "healthcare", "pharma", "liquid"]
+
+  - symbol: "AUTOBEES.NS"
+    security_id: "INF204KB16N6"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^CNXAUTO"
+    parity_ratio: 100.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Automobile"
+    tags: ["sector_etf", "auto", "automobile", "liquid"]
+
+  - symbol: "JUNIORBEES.NS"
+    security_id: "INF732E01037"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^NSENEXT50"
+    parity_ratio: 100.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Next 50"
+    tags: ["core_etf", "broad_market", "next50", "liquid"]
+
+  - symbol: "PSUBNKBEES.NS"
+    security_id: "INF204K01720"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^CNXPSUBANK"
+    parity_ratio: 100.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "PSU Banks"
+    tags: ["sector_etf", "banking", "psubank", "liquid"]
+
+  - symbol: "CPSEETF.NS"
+    security_id: "INF582M01011"
+    asset_class: "ETF"
+    exchange: "NSE"
+    currency: "INR"
+    underlying_symbol: "^CPSE"
+    parity_ratio: 1.0
+    lot_size: 1
+    tick_size: 0.01
+    sector: "Public Sector Undertakings"
+    tags: ["thematic_etf", "psu", "cpse", "liquid"]
 
   # Top High-Beta Nifty 50 Equities
   - symbol: "RELIANCE.NS"
@@ -160,8 +231,14 @@ baskets:
   all_etfs:
     - "BANKBEES.NS"
     - "NIFTYBEES.NS"
-    - "GOLDBEES.NS"
     - "ITBEES.NS"
+    - "GOLDBEES.NS"
+    - "SILVERBEES.NS"
+    - "PHARMABEES.NS"
+    - "AUTOBEES.NS"
+    - "JUNIORBEES.NS"
+    - "PSUBNKBEES.NS"
+    - "CPSEETF.NS"
   nifty50_top5:
     - "RELIANCE.NS"
     - "HDFCBANK.NS"

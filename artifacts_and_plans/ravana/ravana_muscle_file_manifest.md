@@ -167,16 +167,16 @@ flowchart TD
 
 ---
 
-### Muscle 8: Overnight Target & Objective Builder
+### Muscle 8: Multi-Horizon Target & Objective Builder
 * **Root Directory:** [`ravana/targets/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets)
-* **Core Responsibilities:** Forward overnight economic target construction ($t \text{ [15:24 IST]} \to t+1 \text{ [09:16 IST]}$), capital threshold gates (₹2,00,000+), and deduction of statutory cash delivery drag (2.85 bps + ₹17 CDSL fee).
+* **Core Responsibilities:** Multi-horizon economic target construction (`OVERNIGHT` $t \text{ [15:24 IST]} \to t+1 \text{ [09:16 IST]}$, `INTRADAY_N_BARS` causal $t+1 \text{ Open} \to t+1+k \text{ Open}$, and `MULTI_DAY_SWING`), capital threshold gates (₹2,00,000+), delivery drag cost models (2.85 bps + ₹17 CDSL fee), and statutory Indian intraday friction schedules (0.0% ETF STT, ₹0.00 CDSL fee, total friction < 1.0 bps).
 
 | File | Type | Functional Role |
 | :--- | :--- | :--- |
-| [`builder.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/builder.py) | Engine | Forward target generator, continuous returns, and sign-based binary targets |
-| [`costs.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/costs.py) | Logic | Indian statutory cash friction schedule and delivery drag cost models |
-| [`config.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/config.py) | Config | Holding horizons, capital gate thresholds, and hurdle rates |
-| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/__init__.py) | Module | Package export boundary |
+| [`builder.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/builder.py) | Engine | Forward target generator, multi-horizon returns (`OVERNIGHT`, `INTRADAY_N_BARS`, `MULTI_DAY_SWING`), and sign-based binary targets |
+| [`costs.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/costs.py) | Logic | Indian statutory cash friction models (`DeliveryFrictionModel` and `IntradayFrictionModel`) |
+| [`config.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/config.py) | Config | Target horizons (`TargetHorizon`), holding horizons, forward bars, 14:45 quarantine cutoff, and hurdle rates |
+| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/targets/__init__.py) | Module | Package export boundary (`MultiHorizonTargetBuilder`, `TargetHorizon`, `IntradayFrictionModel`) |
 
 * **Data Lake Store:** [`ravana/data/lake/m8_targets/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/data/lake/m8_targets)
 * **Dedicated Test File:** [`test_targets_builder.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_targets_builder.py)
@@ -187,11 +187,11 @@ flowchart TD
 
 ### Muscle 1: Symbolic Formula AST Grammar & Primitives
 * **Root Directory:** [`ravana/domain/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/domain)
-* **Core Responsibilities:** Strongly-typed Abstract Syntax Tree (AST) grammar, 26 institutional primitives, safe protected math (`SAFE_DIV`, `SAFE_LOG`, `TANH`), algebraic simplification, and prefix/infix serialization.
+* **Core Responsibilities:** Strongly-typed Abstract Syntax Tree (AST) grammar, 28 institutional primitives including cross-sectional operators (`CS_RANK`, `CS_ZSCORE`), safe protected math (`SAFE_DIV`, `SAFE_LOG`, `TANH`), algebraic simplification, and prefix/infix serialization.
 
 | File | Type | Functional Role |
 | :--- | :--- | :--- |
-| [`formula_ast.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/domain/formula_ast.py) | Core | AST Node hierarchies (`BinaryOp`, `UnaryOp`, `TsOp`, `FeatureNode`, `ConstantNode`) |
+| [`formula_ast.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/domain/formula_ast.py) | Core | AST Node hierarchies (`BinaryOp`, `UnaryOp`, `TsOp`, `CrossSectionalOp`, `FeatureNode`, `ConstantNode`) |
 | [`formula_parser.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/domain/formula_parser.py) | Parser | Infix/prefix string parser reconstructing strongly-typed AST trees |
 | [`genetics.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/domain/genetics.py) | Genetics | Type-safe dimensional crossover, subtree mutation, and point mutation |
 | [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/domain/__init__.py) | Module | Package export boundary |
@@ -205,18 +205,20 @@ flowchart TD
 
 ### Muscle 2: PyTorch Vectorized Tensor Engine
 * **Root Directory:** [`ravana/compute/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute)
-* **Core Responsibilities:** High-throughput PyTorch GPU formula evaluator (>1,300 formulas/sec on Tesla T4), rolling 1D FIR convolution kernels, chunked batching, and dynamic hardware dispatcher.
+* **Core Responsibilities:** High-throughput PyTorch GPU formula evaluator (>1,300 formulas/sec on Tesla T4), rolling 1D FIR convolution kernels, chunked batching, vectorized cross-sectional ranking/zscore over 3D tensors $[B, T, K]$, and dynamic hardware dispatcher.
 
 | File | Type | Functional Role |
 | :--- | :--- | :--- |
-| [`tensor_evaluator.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/tensor_evaluator.py) | Engine | Vectorized AST-to-PyTorch tensor compiler and batch evaluator |
-| [`primitives.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/primitives.py) | Math | PyTorch implementations of rolling time-series operators and safe functions |
+| [`tensor_evaluator.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/tensor_evaluator.py) | Engine | Vectorized AST-to-PyTorch tensor compiler, batch evaluator, and cross-sectional rank/zscore evaluator |
+| [`primitives.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/primitives.py) | Math | PyTorch implementations of rolling time-series operators, cross-sectional primitives (`cs_rank`, `cs_zscore`), and safe functions |
+| [`evaluator.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/evaluator.py) | Alias | Re-export alias for `TensorASTEvaluator` |
 | [`dispatcher.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/dispatcher.py) | Dispatcher | Auto-hardware routing (NumPy CPU fallback $\leftrightarrow$ CUDA GPU batching) |
 | [`kaggle_runner.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/kaggle_runner.py) | Cloud | Headless Kaggle API burst compute submission, polling, and results downloader |
 | [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/compute/__init__.py) | Module | Package export boundary |
 
 * **Dedicated Test Files:**
   - [`test_tensor_evaluator.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_tensor_evaluator.py)
+  - [`test_cross_sectional.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_cross_sectional.py)
   - [`test_compute_dispatcher.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_compute_dispatcher.py)
   - [`test_kaggle_runner.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_kaggle_runner.py)
   - [`test_muscle1_muscle2_integration.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_muscle1_muscle2_integration.py)
@@ -262,18 +264,20 @@ flowchart TD
 
 ### Muscle 11: Event-Driven Vectorized Backtester & Statutory Ledger
 * **Root Directory:** [`ravana/backtest/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest)
-* **Core Responsibilities:** Non-anticipating $t \to t+1$ causal fill simulation, FIFO lot matching, Almgren-Chriss square-root impact slippage, 5% volume participation cap, and exhaustive line-item Indian statutory friction ledger.
+* **Core Responsibilities:** Non-anticipating $t \to t+1$ causal fill simulation, FIFO lot matching, Almgren-Chriss square-root impact slippage, 5% volume participation cap, signal-reversal dynamic exits with hysteresis (`min_hold_bars`), and exhaustive line-item Indian statutory friction ledger.
 
 | File | Type | Functional Role |
 | :--- | :--- | :--- |
-| [`engine.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/engine.py) | Engine | Bar-by-bar causal simulator, cash ledger, FIFO lots, and institutional metrics |
+| [`engine.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/engine.py) | Engine | Bar-by-bar causal simulator, cash ledger, FIFO lots, institutional metrics, and intraday MIS signal-reversal exits |
 | [`friction.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/friction.py) | Tax & Fees | Exact Indian statutory schedule (STT delivery/intraday, DP charges, stamp duty, GST) |
-| [`orders.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/orders.py) | Schema | Strongly typed `Order`, `Fill`, `FifoLot`, and `RoundTripTrade` records |
+| [`orders.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/orders.py) | Schema | Strongly typed `Order`, `Fill`, `FifoLot`, `Position` (with causal `bars_held` tracking), and `RoundTripTrade` records |
 | [`slippage.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/slippage.py) | Math | Almgren-Chriss square-root market impact slippage calculator |
-| [`config.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/config.py) | Config | Capital configuration, brokerage caps (₹20), and execution regimes |
+| [`config.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/config.py) | Config | Capital configuration, brokerage caps (₹20), execution regimes, `signal_exit_threshold`, and `min_hold_bars` |
 | [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/backtest/__init__.py) | Module | Package export boundary |
 
-* **Dedicated Test File:** [`test_backtest_engine.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_backtest_engine.py)
+* **Dedicated Test Files:**
+  - [`test_backtest_engine.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_backtest_engine.py)
+  - [`test_multi_horizon_and_portfolio.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_multi_horizon_and_portfolio.py)
 
 ---
 
@@ -459,7 +463,7 @@ flowchart TD
 ## Test Suite Summary
 
 Every muscle is verified by dedicated unit tests in [`ravana/tests/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests).
-Currently **156/156 tests pass** with zero failures:
+Currently **201/201 tests pass** with zero failures:
 
 ```
 [Muscle 1]    test_formula_ast.py                     --> 18 tests OK
@@ -467,21 +471,23 @@ Currently **156/156 tests pass** with zero failures:
 [Muscle 2]    test_compute_dispatcher.py             -->  6 tests OK
 [Muscle 2]    test_kaggle_runner.py                  -->  5 tests OK
 [Muscle 1+2]  test_muscle1_muscle2_integration.py    -->  4 tests OK
+[Muscle 1+2]  test_cross_sectional.py                --> 19 tests OK
 [Muscle 3]    test_data_ingestion.py                  --> 14 tests OK
 [Muscle 4]    test_data_cleaner.py                    --> 12 tests OK
 [Muscle 5]    test_data_resampler.py                  --> 12 tests OK
 [Muscle 6]    test_data_storage.py                    --> 10 tests OK
 [Muscle 6]    test_lake_diff.py                       -->  4 tests OK
 [Muscle 7]    test_features_matrix.py                 -->  8 tests OK
-[Muscle 8]    test_targets_builder.py                 -->  8 tests OK
+[Muscle 8]    test_targets_builder.py                 --> 10 tests OK
 [Muscle 9]    test_genetic_evolution.py               -->  6 tests OK
 [Muscle 10]   test_fitness_engine.py                  -->  6 tests OK
-[Muscle 11]   test_backtest_engine.py                 -->  7 tests OK
+[Muscle 11]   test_backtest_engine.py                 -->  9 tests OK
 [Muscle 12]   test_risk_engine.py                     --> 11 tests OK
 [Phase 5]     test_validation_engine.py               -->  7 tests OK
 [Audit M1-12] test_audit_remediation.py               --> 10 tests OK
 [Phase 6 & 7] test_phase5_6_7_chain.py                -->  6 tests OK
 [Universe]    test_universe_registry.py               -->  5 tests OK
+[Phase A & B] test_multi_horizon_and_portfolio.py    --> 17 tests OK
 --------------------------------------------------------------------------
-TOTAL: 156 TESTS (100% GREEN)
+TOTAL: 201 TESTS (100% GREEN in ~25.8s)
 ```

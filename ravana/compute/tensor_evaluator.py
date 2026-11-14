@@ -14,11 +14,14 @@ from ravana.domain.formula_ast import (
     ASTNode,
     OPERATORS_BINARY_ARITHMETIC,
     OPERATORS_BINARY_ROLLING,
+    OPERATORS_CROSS_SECTIONAL,
     OPERATORS_UNARY,
     OPERATORS_ROLLING_UNARY,
     STANDARD_FEATURES,
 )
 from ravana.compute.primitives import (
+    cs_rank,
+    cs_zscore,
     div_safe_tensor,
     ts_argmax,
     ts_argmin,
@@ -66,6 +69,8 @@ class TensorASTEvaluator:
             return cls._eval_unary(node, X, f_map, shape)
         if node.op in OPERATORS_ROLLING_UNARY:
             return cls._eval_rolling(node, X, f_map, shape)
+        if node.op in OPERATORS_CROSS_SECTIONAL:
+            return cls._eval_cross_sectional(node, X, f_map, shape)
 
         return torch.zeros(shape, dtype=X.dtype, device=X.device)
 
@@ -213,6 +218,32 @@ class TensorASTEvaluator:
         if node.op == "TS_ARGMAX_10": return ts_argmax(child, window=10)
         if node.op == "TS_ARGMIN_10": return ts_argmin(child, window=10)
         return torch.zeros_like(child)
+
+    @classmethod
+    def _eval_cross_sectional(
+        cls,
+        node: ASTNode,
+        X: torch.Tensor,
+        f_map: Dict[str, int],
+        shape: tuple,
+    ) -> torch.Tensor:
+        is_3d = X.ndim == 3
+        if not is_3d or X.shape[0] <= 1:
+            if node.op == "CS_RANK":
+                return torch.full(shape, 0.5, dtype=X.dtype, device=X.device)
+            elif node.op == "CS_ZSCORE":
+                return torch.zeros(shape, dtype=X.dtype, device=X.device)
+            return torch.zeros(shape, dtype=X.dtype, device=X.device)
+
+        child = cls.eval_node(node.children[0], X, f_map) if node.children else torch.zeros(shape, dtype=X.dtype, device=X.device)
+        child_3d = child.unsqueeze(-1) if child.ndim == 2 else child
+        if node.op == "CS_RANK":
+            res = cs_rank(child_3d)
+            return res.squeeze(-1) if child.ndim == 2 else res
+        elif node.op == "CS_ZSCORE":
+            res = cs_zscore(child_3d)
+            return res.squeeze(-1) if child.ndim == 2 else res
+        return torch.zeros(shape, dtype=X.dtype, device=X.device)
 
     def evaluate(
         self,

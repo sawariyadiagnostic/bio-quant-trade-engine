@@ -184,6 +184,46 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 
 ---
 
+### 16. Multi-Horizon Forward Return Session Boundary & Quarantine Leakage
+* **Impacted Module:** Muscle 8 (`ravana/targets/builder.py`, `config.py`)
+* **Category:** Lookahead & Session Quarantine
+* **Severity:** **HIGH**
+* **Description:** When evaluating intraday forward horizons ($N$-bars ahead, e.g. 6 bars on 5m data), bars near the end of the session could attempt to compute forward returns crossing the 15:30 IST session close into the next day's 09:15 open, or enter within the broker auto-square-off window (15:15 IST).
+* **Remediation Specification:**
+  - Implemented `TargetHorizon.INTRADAY_N_BARS` with strict session equality validation: `session_dates[i+1] == session_dates[i+1+k]`.
+  - Enforced `intraday_cutoff_time = "14:45"` IST; any bar evaluated after 14:45 has `is_entry_bar = 0`, `sample_weight = 0.0`, and zero forward return.
+  - Applied `IntradayFrictionModel` reflecting exact Indian Finance Act statutory rules (0.0% ETF STT, Rs 0.00 CDSL DP fee, total friction < 1.0 bps).
+* **Status:** **RESOLVED & VERIFIED**.
+
+---
+
+### 17. Intraday MIS Passive Holding Drag (Blind 15:15 Square-Off)
+* **Impacted Module:** Muscle 11 (`ravana/backtest/engine.py`, `config.py`)
+* **Category:** Execution Efficiency / Risk Hysteresis
+* **Severity:** **MEDIUM**
+* **Description:** Intraday MIS positions held until the mandatory 15:15 IST auto-square-off even if the alpha signal violently reversed at 10:30 IST, suffering severe adverse excursion and drawdown.
+* **Remediation Specification:**
+  - Implemented signal-reversal exit logic for `TradingRegime.INTRADAY_MIS`.
+  - Added `min_hold_bars = 2` hysteresis to prevent adjacent-bar whipsaw exits.
+  - When `position.bars_held >= min_hold_bars` and signal flips (`signal < -threshold` or `signal < signal_exit_threshold`), `EventDrivenBacktester` causally emits a `SELL` order at the next bar's Open.
+* **Status:** **RESOLVED & VERIFIED**.
+
+---
+
+### 18. Cross-Sectional Degeneracy on Single-Asset and 2D Slices
+* **Impacted Module:** Muscle 1 & 2 (`ravana/compute/primitives.py`, `tensor_evaluator.py`, `ravana/domain/formula_ast.py`)
+* **Category:** Mathematical Robustness
+* **Severity:** **MEDIUM**
+* **Description:** Applying cross-sectional operators (`CS_RANK`, `CS_ZSCORE`) to single-asset portfolios (1D `[T]`, 2D `[T, K]`, or 3D with $B=1$) would cause zero-division or dimensional index errors if not handled gracefully.
+* **Remediation Specification:**
+  - In `cs_rank`, return neutral median percentile `0.5` when $B=1$ or tensor is 1D/2D.
+  - In `cs_zscore`, return zeros `0.0` when $B=1$ or tensor is 1D/2D.
+  - For 3D multi-asset tensors $[B, T, K]$, compute double argsort rank across dim 0 clamped to $[0.0, 1.0]$ and z-score clamped to $[-3.0, 3.0]$.
+  - Expanded Indian asset catalog to top 10 liquid ETFs (`BANKBEES.NS`, `NIFTYBEES.NS`, `ITBEES.NS`, `GOLDBEES.NS`, `SILVERBEES.NS`, `PHARMABEES.NS`, `AUTOBEES.NS`, `JUNIORBEES.NS`, `PSUBNKBEES.NS`, `CPSEETF.NS`).
+* **Status:** **RESOLVED & VERIFIED**.
+
+---
+
 ## Chronological Audit Log
 
 | Date | Phase | Module(s) | Finding | Resolution Status |
@@ -193,3 +233,4 @@ This ledger persists all identified mathematical, microstructure, statistical, a
 | **2026-11-14** | M1–12 Audit | M1, M4, M5, M7, M8, M11, M12 | 10 system-wide bugs (overnight timing, slice cache, flat RSI, SVD) | Resolved with `test_audit_remediation.py` & 150 green tests. |
 | **2026-11-14** | Phase 6–7 | M17, M18, M19, M20 | Small-sample PSI instability, naked shorting risks, lot sizes | Cataloged in this ledger; hardened in implementation. |
 | **2026-11-14** | Forensic Review | M1, M4, M8, M9, M11, M13, M16 | US Macro 10.5h leak, M8/M11 timing, WF session chunking, MC daily | Resolved & verified across all 156 unit tests. |
+| **2026-11-15** | Phase A & B | M1, M2, M8, M11 | Multi-horizon targets, intraday friction, signal reversal, cross-sectional ops | Resolved & verified across all 201 unit tests (100% green). |

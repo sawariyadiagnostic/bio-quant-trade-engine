@@ -186,3 +186,91 @@ class TestBacktestEngine(unittest.TestCase):
         # Cash and equity must match exactly on final bar
         self.assertAlmostEqual(result.cash_curve.iloc[-1], result.equity_curve.iloc[-1], places=2)
         self.assertGreater(result.cash_curve.iloc[-1], 0.0)
+
+    def test_backtest_config_phase_a_defaults(self):
+        """Verify BacktestConfig has Phase A signal_exit_threshold and min_hold_bars."""
+        cfg = BacktestConfig()
+        self.assertEqual(cfg.signal_exit_threshold, 0.0)
+        self.assertEqual(cfg.min_hold_bars, 2)
+
+    def test_intraday_mis_signal_reversal_exit(self):
+        """Verify INTRADAY_MIS respects min_hold_bars hysteresis before signal-reversal exit."""
+        dates = pd.date_range("2026-01-01 09:15", "2026-01-01 15:25", freq="5min")
+        n_bars = len(dates)
+        df = pd.DataFrame(
+            {
+                "Open": np.full(n_bars, 500.0),
+                "High": np.full(n_bars, 502.0),
+                "Low": np.full(n_bars, 498.0),
+                "Close": np.full(n_bars, 500.0),
+                "Volume": np.full(n_bars, 50000.0),
+            },
+            index=dates,
+        )
+
+        signals = pd.Series(0.0, index=df.index)
+        # Bar 1 (09:20): Signal = +1.0 triggers BUY
+        signals.iloc[1] = 1.0
+        # Bar 2 (09:25): BUY fills at Open. Signal reverses to -1.0.
+        # But held = 1 < min_hold_bars (2), so exit should NOT trigger yet!
+        signals.iloc[2] = -1.0
+        # Bar 3 (09:30): Held = 2 >= min_hold_bars. Signal still -1.0 -> SELL order emitted!
+        signals.iloc[3] = -1.0
+
+        cfg = BacktestConfig(
+            initial_capital=200000.0,
+            regime=TradingRegime.INTRADAY_MIS,
+            min_hold_bars=2,
+            signal_exit_threshold=0.0,
+        )
+        engine = EventDrivenBacktester(cfg)
+        result = engine.run(df, signals, ticker="BANKBEES.NS")
+
+        # Expect at least 2 trades (BUY at bar 2, SELL at bar 4)
+        self.assertGreaterEqual(len(result.trades), 2)
+        buy_trade = result.trades[0]
+        sell_trade = result.trades[1]
+        self.assertEqual(buy_trade.side, OrderSide.BUY)
+        self.assertEqual(sell_trade.side, OrderSide.SELL)
+        # Fills should be at 09:25 (bar 2) and 09:35 (bar 4)
+        self.assertEqual(buy_trade.timestamp, df.index[2])
+        self.assertEqual(sell_trade.timestamp, df.index[4])
+
+    def test_intraday_mis_entry_cutoff_and_square_off(self):
+        """Verify INTRADAY_MIS prevents entries after 14:45 and auto squares off at 15:15."""
+        dates = pd.date_range("2026-01-01 09:15", "2026-01-01 15:25", freq="5min")
+        n_bars = len(dates)
+        df = pd.DataFrame(
+            {
+                "Open": np.full(n_bars, 500.0),
+                "High": np.full(n_bars, 502.0),
+                "Low": np.full(n_bars, 498.0),
+                "Close": np.full(n_bars, 500.0),
+                "Volume": np.full(n_bars, 50000.0),
+            },
+            index=dates,
+        )
+
+        # Trigger BUY at 14:50 (past 14:45 cutoff) -> should be rejected/ignored
+        signals_late = pd.Series(0.0, index=df.index)
+        for i, ts in enumerate(df.index):
+            if ts.strftime("%H:%M") == "14:50":
+                signals_late.iloc[i] = 1.0
+
+        cfg = BacktestConfig(regime=TradingRegime.INTRADAY_MIS)
+        engine = EventDrivenBacktester(cfg)
+        res_late = engine.run(df, signals_late, ticker="BANKBEES.NS")
+        self.assertEqual(len(res_late.trades), 0)
+
+        # Trigger BUY at 10:00 and hold past 15:15 -> auto square-off
+        signals_sq = pd.Series(0.0, index=df.index)
+        for i, ts in enumerate(df.index):
+            if ts.strftime("%H:%M") == "10:00":
+                signals_sq.iloc[i] = 1.0
+
+        res_sq = engine.run(df, signals_sq, ticker="BANKBEES.NS")
+        self.assertGreaterEqual(len(res_sq.trades), 2)
+        # Second trade should be the 15:15 or later square-off
+        sq_trade = res_sq.trades[-1]
+        self.assertEqual(sq_trade.side, OrderSide.SELL)
+        self.assertGreaterEqual(sq_trade.timestamp.strftime("%H:%M"), "15:15")

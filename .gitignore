@@ -31,6 +31,7 @@ htmlcov/
 **/.snapshots/
 data/cache/
 data/raw/
+graphify-out/
 ravana/graphify-out/cache/
 
 # IDE & OS Metadata

@@ -25,6 +25,7 @@ OPERATORS_UNARY: Tuple[str, ...] = (
     "SIGN", "ABS", "LOG_ABS", "SIGMOID", "TANH", "RELU", "EXP_SAFE", "LOG_SAFE", "NEG", "SQRT_ABS",
     "SIGNED_POWER"
 )
+OPERATORS_CROSS_SECTIONAL: Tuple[str, ...] = ("CS_RANK", "CS_ZSCORE")
 OPERATORS_ROLLING_UNARY: Tuple[str, ...] = (
     "DELTA_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_RANK_20", "TS_ZSCORE_20", "TS_DECAY_LINEAR_10",
     "TS_DELAY_1", "TS_DELAY_5", "TS_STD_20", "TS_MEDIAN_10", "TS_ARGMAX_10", "TS_ARGMIN_10"
@@ -157,7 +158,7 @@ class ASTNode:
             a = self.children[0].to_formula_str()
             b = self.children[1].to_formula_str()
             return f"{self.op}({a}, {b})"
-        if self.op in (OPERATORS_ROLLING_UNARY + OPERATORS_UNARY):
+        if self.op in (OPERATORS_ROLLING_UNARY + OPERATORS_UNARY + OPERATORS_CROSS_SECTIONAL):
             arg = self.children[0].to_formula_str() if self.children else "X"
             return f"{self.op}({arg})"
         sym = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV_SAFE": "/"}.get(self.op, self.op)
@@ -189,7 +190,7 @@ class ASTNode:
     def simplify(self) -> ASTNode:
         """Recursively simplifies algebraic expressions, prunes introns, and folds constants."""
         self.children = [c.simplify() for c in self.children]
-        if self.op in OPERATORS_UNARY or self.op in OPERATORS_ROLLING_UNARY:
+        if self.op in OPERATORS_UNARY or self.op in OPERATORS_ROLLING_UNARY or self.op in OPERATORS_CROSS_SECTIONAL:
             return self._simplify_unary()
         if self.op in OPERATORS_BINARY_ARITHMETIC:
             return self._simplify_binary()
@@ -206,9 +207,9 @@ class ASTNode:
         if child.op == "CONST":
             try:
                 cv = float(child.val)
-                if self.op in ("DELTA_5", "TS_ZSCORE_20", "TS_STD_20"):
+                if self.op in ("DELTA_5", "TS_ZSCORE_20", "TS_STD_20", "CS_ZSCORE"):
                     return ASTNode("CONST", val="0.0")
-                if self.op in ("TS_RANK_20", "TS_ARGMAX_10", "TS_ARGMIN_10"):
+                if self.op in ("TS_RANK_20", "TS_ARGMAX_10", "TS_ARGMIN_10", "CS_RANK"):
                     return ASTNode("CONST", val="0.5")
                 if self.op in ("TS_DELAY_1", "TS_DELAY_5", "EMA_10", "TS_MAX_10", "TS_MIN_10", "TS_MEDIAN_10", "TS_DECAY_LINEAR_10"):
                     return ASTNode("CONST", val=f"{cv:.4g}")
@@ -348,6 +349,8 @@ class ASTEvaluator:
             return ASTEvaluator._eval_unary(node, df, n)
         if node.op in OPERATORS_ROLLING_UNARY:
             return ASTEvaluator._eval_rolling(node, df, n)
+        if node.op in OPERATORS_CROSS_SECTIONAL:
+            return ASTEvaluator._eval_cross_sectional(node, df, n)
         return np.zeros(n, dtype=np.float64)
 
     @staticmethod
@@ -471,6 +474,68 @@ class ASTEvaluator:
             res = np.zeros(n)
         return np.nan_to_num(res, nan=0.0)
 
+    @staticmethod
+    def _eval_cross_sectional(node: ASTNode, df: Any, n: int) -> np.ndarray:
+        """Evaluates cross-sectional ranking (CS_RANK) or z-score (CS_ZSCORE).
+
+        For NumPy 2D array [T, K] (single asset): CS_RANK returns 0.5, CS_ZSCORE returns 0.0.
+        If DataFrame has multi-asset panel or 3D, calculate cross-sectional rank/zscore across columns.
+        """
+        # 3D NumPy array [B, T, K] or [B, T]
+        if isinstance(df, np.ndarray) and df.ndim == 3:
+            B = df.shape[0]
+            if B <= 1:
+                return np.full(df.shape[:2], 0.5, dtype=np.float64) if node.op == "CS_RANK" else np.zeros(df.shape[:2], dtype=np.float64)
+            child = ASTEvaluator.eval_node(node.children[0], df) if node.children else df
+            if node.op == "CS_RANK":
+                ranks = np.argsort(np.argsort(child, axis=0), axis=0).astype(np.float64) / max(1.0, float(B - 1))
+                return np.nan_to_num(np.clip(ranks, 0.0, 1.0), nan=0.5)
+            elif node.op == "CS_ZSCORE":
+                mean = np.mean(child, axis=0, keepdims=True)
+                std = np.std(child, axis=0, keepdims=True)
+                z = (child - mean) / np.clip(std, 1e-6, None)
+                return np.nan_to_num(np.clip(z, -3.0, 3.0), nan=0.0)
+
+        # Multi-asset DataFrame (e.g. multi-asset panel or MultiIndex columns)
+        if isinstance(df, pd.DataFrame):
+            if isinstance(df.columns, pd.MultiIndex):
+                feat_name = node.children[0].val if (node.children and node.children[0].op == "FEATURE") else None
+                sub_df = None
+                if feat_name:
+                    if feat_name in df.columns.levels[0]:
+                        sub_df = df[feat_name]
+                    elif len(df.columns.levels) > 1 and feat_name in df.columns.levels[1]:
+                        sub_df = df.xs(feat_name, axis=1, level=1)
+                if sub_df is not None and isinstance(sub_df, pd.DataFrame) and sub_df.shape[1] > 1:
+                    num_assets = sub_df.shape[1]
+                    if node.op == "CS_RANK":
+                        ranks = sub_df.rank(axis=1, method="average", ascending=True) - 1.0
+                        res = (ranks / max(1.0, float(num_assets - 1))).clip(0.0, 1.0).fillna(0.5).to_numpy()
+                        return np.nan_to_num(res, nan=0.5)
+                    elif node.op == "CS_ZSCORE":
+                        mean = sub_df.mean(axis=1)
+                        std = sub_df.std(axis=1)
+                        z = sub_df.sub(mean, axis=0).div(std.clip(lower=1e-6), axis=0).clip(-3.0, 3.0).fillna(0.0)
+                        return np.nan_to_num(z.to_numpy(), nan=0.0)
+            elif getattr(df, "attrs", {}).get("is_multi_asset", False) and df.shape[1] > 1:
+                num_assets = df.shape[1]
+                if node.op == "CS_RANK":
+                    ranks = df.rank(axis=1, method="average", ascending=True) - 1.0
+                    res = (ranks / max(1.0, float(num_assets - 1))).clip(0.0, 1.0).fillna(0.5).to_numpy()
+                    return np.nan_to_num(res, nan=0.5)
+                elif node.op == "CS_ZSCORE":
+                    mean = df.mean(axis=1)
+                    std = df.std(axis=1)
+                    z = df.sub(mean, axis=0).div(std.clip(lower=1e-6), axis=0).clip(-3.0, 3.0).fillna(0.0)
+                    return np.nan_to_num(z.to_numpy(), nan=0.0)
+
+        # Single asset 2D array [T, K] or standard single-asset DataFrame
+        if node.op == "CS_RANK":
+            return np.full(n, 0.5, dtype=np.float64)
+        elif node.op == "CS_ZSCORE":
+            return np.zeros(n, dtype=np.float64)
+        return np.zeros(n, dtype=np.float64)
+
 
 # Re-export genetic generation and search operators for backward compatibility
 from ravana.domain.genetics import TreeGenerator, GeneticMutator, GeneticCrossover
@@ -483,6 +548,7 @@ __all__ = [
     "OPERATORS_BINARY",
     "OPERATORS_BINARY_ARITHMETIC",
     "OPERATORS_BINARY_ROLLING",
+    "OPERATORS_CROSS_SECTIONAL",
     "OPERATORS_UNARY",
     "OPERATORS_ROLLING_UNARY",
     "OPERATORS_TERNARY",

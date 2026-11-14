@@ -11,6 +11,7 @@ from ravana.domain.formula_ast import (
     GeneticCrossover,
     FeatureDimension,
     OPERATORS_BINARY,
+    OPERATORS_CROSS_SECTIONAL,
     OPERATORS_UNARY,
     OPERATORS_ROLLING_UNARY,
 )
@@ -117,7 +118,7 @@ class TestInstitutionalFormulaAST(unittest.TestCase):
                         self.assertEqual(len(node.children), 3)
                     elif node.op in OPERATORS_BINARY:
                         self.assertEqual(len(node.children), 2)
-                    elif node.op in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY):
+                    elif node.op in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY + OPERATORS_CROSS_SECTIONAL):
                         self.assertEqual(len(node.children), 1)
                     elif node.op in ("FEATURE", "CONST"):
                         self.assertEqual(len(node.children), 0)

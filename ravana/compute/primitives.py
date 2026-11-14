@@ -338,3 +338,38 @@ def ts_argmin(x: torch.Tensor, window: int = 10) -> torch.Tensor:
     am = unfolded.argmin(dim=-1).to(dtype=flat.dtype) / float(w - 1)
     res = _restore_from_conv(am.unsqueeze(1), orig_shape, ndim)
     return torch.nan_to_num(torch.clamp(res, min=0.0, max=1.0), nan=0.5)
+
+
+def cs_rank(x: torch.Tensor) -> torch.Tensor:
+    """Cross-sectional percentile ranking across the batch/asset dimension (dim 0) at each timestamp.
+
+    If tensor is 2D [T, K] or 1D [T], or if B == 1 (single asset), return full tensor of 0.5 (neutral median rank).
+    If tensor is 3D [B, T, K]:
+    Use torch.argsort(torch.argsort(x, dim=0), dim=0).to(x.dtype) / max(1.0, float(B - 1)).
+    Clamped to [0.0, 1.0], nan_to_num with nan=0.5.
+    """
+    if x.ndim < 3 or x.shape[0] <= 1:
+        return torch.full_like(x, 0.5)
+    B = x.shape[0]
+    ranks = torch.argsort(torch.argsort(x, dim=0), dim=0).to(x.dtype) / max(1.0, float(B - 1))
+    res = torch.clamp(ranks, min=0.0, max=1.0)
+    return torch.nan_to_num(res, nan=0.5)
+
+
+def cs_zscore(x: torch.Tensor) -> torch.Tensor:
+    """Cross-sectional z-score standardization across dim 0 at each timestamp.
+
+    If B == 1 or 1D/2D, return zeros_like(x).
+    If 3D [B, T, K]:
+    Compute mean = torch.mean(x, dim=0, keepdim=True), std = torch.std(x, dim=0, keepdim=True).
+    z = (x - mean) / torch.clamp(std, min=1e-6).
+    Clamp to [-3.0, 3.0], nan_to_num with nan=0.0.
+    """
+    if x.ndim < 3 or x.shape[0] <= 1:
+        return torch.zeros_like(x)
+    mean = torch.mean(x, dim=0, keepdim=True)
+    std = torch.std(x, dim=0, keepdim=True)
+    z = (x - mean) / torch.clamp(std, min=1e-6)
+    res = torch.clamp(z, min=-3.0, max=3.0)
+    return torch.nan_to_num(res, nan=0.0)
+

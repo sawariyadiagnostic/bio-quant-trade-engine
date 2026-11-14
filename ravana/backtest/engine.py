@@ -75,6 +75,12 @@ class EventDrivenBacktester:
             )
             trades.extend(filled_trades)
 
+            # Update holding duration
+            if position.shares != 0:
+                position.bars_held += 1
+            else:
+                position.bars_held = 0
+
             # 2. Mark-to-Market Equity
             close_px = float(current_bar["Close"])
             current_equity = cash + (position.shares * close_px)
@@ -262,7 +268,12 @@ class EventDrivenBacktester:
             if t_str >= "15:15" and position.shares != 0:
                 side = OrderSide.SELL if position.shares > 0 else OrderSide.BUY
                 return Order(f"ORD_SQ_{ts.timestamp()}", ts, ticker, side, abs(position.shares))
-            elif signal > threshold and position.shares == 0:
+            elif position.shares > 0:
+                if position.bars_held >= self.config.min_hold_bars and (
+                    signal < -threshold or signal < self.config.signal_exit_threshold
+                ):
+                    return Order(f"ORD_SELL_{ts.timestamp()}", ts, ticker, OrderSide.SELL, position.shares)
+            elif t_str < "14:45" and signal > threshold and position.shares == 0:
                 shares = self._size_position(cash, close_px)
                 if shares > 0:
                     return Order(f"ORD_BUY_{ts.timestamp()}", ts, ticker, OrderSide.BUY, shares)

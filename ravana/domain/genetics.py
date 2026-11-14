@@ -15,6 +15,7 @@ from ravana.domain.formula_ast import (
     OPERATORS_BINARY,
     OPERATORS_BINARY_ARITHMETIC,
     OPERATORS_BINARY_ROLLING,
+    OPERATORS_CROSS_SECTIONAL,
     OPERATORS_ROLLING_UNARY,
     OPERATORS_TERNARY,
     OPERATORS_UNARY,
@@ -33,7 +34,8 @@ class TreeGenerator:
             return FEATURE_DIMENSIONS.get(node.val, FeatureDimension.DIMENSIONLESS)
         if node.op in (
             "DIV_SAFE", "TS_CORR_20", "TS_RANK_20", "TS_ZSCORE_20",
-            "SIGMOID", "TANH", "SIGN", "TS_ARGMAX_10", "TS_ARGMIN_10"
+            "SIGMOID", "TANH", "SIGN", "TS_ARGMAX_10", "TS_ARGMIN_10",
+            "CS_RANK", "CS_ZSCORE"
         ):
             return FeatureDimension.DIMENSIONLESS
         if node.op == "ADD" and len(node.children) >= 2:
@@ -136,7 +138,7 @@ class TreeGenerator:
 
         child_dim = (
             FeatureDimension.DIMENSIONLESS
-            if op in ("TS_ZSCORE_20", "SIGMOID", "TANH", "TS_ARGMAX_10", "TS_ARGMIN_10")
+            if op in ("TS_ZSCORE_20", "SIGMOID", "TANH", "TS_ARGMAX_10", "TS_ARGMIN_10", "CS_RANK", "CS_ZSCORE")
             else target_dim
         )
         child = cls.generate(max_depth - 1, child_dim, method, allowed_features)
@@ -237,6 +239,8 @@ class GeneticMutator:
             target.op = random.choice(OPERATORS_UNARY)
         elif target.op in OPERATORS_ROLLING_UNARY:
             target.op = random.choice(OPERATORS_ROLLING_UNARY)
+        elif target.op in OPERATORS_CROSS_SECTIONAL:
+            target.op = random.choice(OPERATORS_CROSS_SECTIONAL)
         return cloned.simplify()
 
 
@@ -256,7 +260,7 @@ class GeneticCrossover:
                 node.children.append(ASTNode("CONST", val="1.0"))
             if len(node.children) > 2:
                 node.children = node.children[:2]
-        elif node.op in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY):
+        elif node.op in (OPERATORS_UNARY + OPERATORS_ROLLING_UNARY + OPERATORS_CROSS_SECTIONAL):
             if len(node.children) == 0:
                 node.children.append(ASTNode("CONST", val="1.0"))
             elif len(node.children) > 1:

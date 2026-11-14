@@ -41,6 +41,8 @@ class BacktestConfig:
     risk_free_rate: float = 0.065           # 6.5% statutory benchmark hurdle (RBI 91-day T-Bill)
     entry_cutoff_time: str = "15:20"        # Entry cutoff for overnight strategies
     exit_cutoff_time: str = "09:15"         # Exit time for overnight strategies
+    signal_exit_threshold: float = 0.0
+    min_hold_bars: int = 2
 
     @property
     def initial_capital_inr(self) -> float:

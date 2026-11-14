@@ -87,6 +87,7 @@ class Position:
         self.entry_timestamp: Optional[pd.Timestamp] = None
         self.open_lots: List[FifoLot] = []
         self.closed_trades: List[RoundTripTrade] = []
+        self.bars_held: int = 0
 
     def update_on_trade(self, trade: Trade) -> float:
         """Update position state causal to a new trade fill and return realized gross PnL."""
@@ -140,6 +141,7 @@ class Position:
                     self.avg_entry_price = 0.0
                     self.entry_timestamp = None
                     self.open_lots.clear()
+                    self.bars_held = 0
             elif not self.allow_shorting:
                 return 0.0
 
