@@ -38,6 +38,7 @@ class BacktestConfig:
     brokerage_per_order_inr: float = 0.0    # Discount broker zero delivery brokerage
     allow_shorting: bool = False            # Long-only by default for Indian cash delivery
     impact_gamma: float = 0.1               # Almgren-Chriss square-root impact coefficient
+    risk_free_rate: float = 0.065           # 6.5% statutory benchmark hurdle (RBI 91-day T-Bill)
     entry_cutoff_time: str = "15:20"        # Entry cutoff for overnight strategies
     exit_cutoff_time: str = "09:15"         # Exit time for overnight strategies
 

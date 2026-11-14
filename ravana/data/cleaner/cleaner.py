@@ -121,17 +121,26 @@ class DataCleaningEngine:
 
             m_copy = m_df.copy()
             if (m_copy.index.time == pd.Timestamp("00:00:00").time()).all():
-                # Seal daily macro bars at 16:00 local exchange close so US close (16:00 EST/EDT = 01:30/02:30 IST)
-                # is causally available before the 09:15 IST NSE market open.
-                m_copy.index = m_copy.index + pd.Timedelta(hours=16)
+                # Anchor daily macro close in its origin exchange timezone
+                is_us_macro = ticker in ("^GSPC", "^IXIC", "^VIX", "^TNX") or ticker.startswith("^G")
+                origin_tz = "America/New_York" if is_us_macro else "Asia/Kolkata"
+                close_hour = 16 if is_us_macro else 15
+                close_min = 0 if is_us_macro else 30
 
-            if m_copy.index.tz != target_index.tz:
-                if m_copy.index.tz is None and target_index.tz is not None:
-                    m_copy = m_copy.tz_localize(target_index.tz)
-                elif m_copy.index.tz is not None and target_index.tz is None:
-                    m_copy = m_copy.tz_localize(None)
+                m_copy.index = pd.to_datetime(m_copy.index.date) + pd.Timedelta(hours=close_hour, minutes=close_min)
+                if m_copy.index.tz is None:
+                    m_copy.index = m_copy.index.tz_localize(
+                        origin_tz, ambiguous="NaT", nonexistent="shift_forward"
+                    )
+
+            if target_index.tz is not None:
+                if m_copy.index.tz is None:
+                    m_copy.index = m_copy.index.tz_localize(target_index.tz)
                 else:
-                    m_copy = m_copy.tz_convert(target_index.tz)
+                    m_copy.index = m_copy.index.tz_convert(target_index.tz)
+            else:
+                if m_copy.index.tz is not None:
+                    m_copy.index = m_copy.index.tz_convert("Asia/Kolkata").tz_localize(None)
 
             aligned_m = pd.merge_asof(
                 target_df,
@@ -141,7 +150,8 @@ class DataCleaningEngine:
                 direction="backward",
             )
             if aligned_m["Close"].isna().any():
-                first_val = aligned_m["Close"].dropna().iloc[0] if not aligned_m["Close"].dropna().empty else 1.0
+                fallback_val = float(m_copy["Close"].dropna().iloc[0]) if not m_copy["Close"].dropna().empty else 1.0
+                first_val = float(aligned_m["Close"].dropna().iloc[0]) if not aligned_m["Close"].dropna().empty else fallback_val
                 aligned_m = aligned_m.bfill().fillna(first_val)
             cleaned_macros[ticker] = aligned_m
         return cleaned_macros

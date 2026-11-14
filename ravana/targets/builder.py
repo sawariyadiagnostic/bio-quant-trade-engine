@@ -58,17 +58,21 @@ class OvernightTargetBuilder:
             if entry_idx is None or exit_idx is None:
                 continue
 
-            entry_close = float(df["Close"].iloc[entry_idx])
+            if self.config.entry_bar_offset_from_end > 0 and entry_idx + 1 < len(df) and session_dates[entry_idx + 1] == curr_date:
+                entry_exec_price = float(df["Open"].iloc[entry_idx + 1])
+            else:
+                entry_exec_price = float(df["Close"].iloc[entry_idx])
+
             exit_price = (
                 float(df["Open"].iloc[exit_idx])
                 if self.config.use_next_open_as_exit
                 else float(df["Close"].iloc[exit_idx])
             )
 
-            if not np.isfinite(entry_close) or not np.isfinite(exit_price) or entry_close <= 0.0 or exit_price <= 0.0:
+            if not np.isfinite(entry_exec_price) or not np.isfinite(exit_price) or entry_exec_price <= 0.0 or exit_price <= 0.0:
                 continue
 
-            gross_ret = (exit_price - entry_close) / entry_close
+            gross_ret = (exit_price - entry_exec_price) / entry_exec_price
             net_ret = self.friction_model.apply_friction(gross_ret, self.config.capital_inr)
             days_held = max(1, (pd.Timestamp(next_date) - pd.Timestamp(curr_date)).days)
 

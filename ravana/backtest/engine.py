@@ -87,7 +87,19 @@ class EventDrivenBacktester:
                 ts, current_bar, sig_val, position, cash, ticker, signal_threshold
             )
             if new_order:
-                pending_orders.append(new_order)
+                # If regime is OVERNIGHT and this is the final bar of the trading session,
+                # execute as MOC (Market-on-Close) fill at bar Close so position is held overnight!
+                is_last_bar_of_day = (i == len(df) - 1) or (df.index[i + 1].date() > ts.date())
+                if self.config.regime == TradingRegime.OVERNIGHT and is_last_bar_of_day and new_order.side == OrderSide.BUY:
+                    moc_cash, moc_trades, _ = self._process_pending_orders(
+                        [new_order], current_bar, ts, ticker, cash, position, debited_dates, fill_price=close_px
+                    )
+                    cash = moc_cash
+                    trades.extend(moc_trades)
+                    equity_records[-1] = cash + (position.shares * close_px)
+                    cash_records[-1] = cash
+                else:
+                    pending_orders.append(new_order)
 
         # Force liquidating remaining inventory on backtest completion
         if position.shares > 0:
@@ -101,7 +113,9 @@ class EventDrivenBacktester:
         equity_s = pd.Series(equity_records, index=df.index, name="Equity")
         cash_s = pd.Series(cash_records, index=df.index, name="Cash")
         dd_s = self._compute_drawdown_series(equity_s)
-        metrics = self._compute_performance_metrics(equity_s, trades, position)
+        metrics = self._compute_performance_metrics(
+            equity_s, trades, position, risk_free_rate=self.config.risk_free_rate
+        )
 
         return BacktestResult(
             equity_curve=equity_s,
@@ -122,14 +136,15 @@ class EventDrivenBacktester:
         cash: float,
         position: Position,
         debited_dates: Set[Tuple[str, str]],
+        fill_price: Optional[float] = None,
     ) -> Tuple[float, List[Trade], List[Order]]:
-        """Fill orders against bar Open price with volume cap, slippage, and pre-trade margin guard."""
+        """Fill orders against bar Open price (or explicit fill_price) with volume cap, slippage, and pre-trade margin guard."""
         filled: List[Trade] = []
         remaining_orders: List[Order] = []
-        open_px = float(bar["Open"])
+        exec_price = float(fill_price) if fill_price is not None else float(bar["Open"])
         vol = float(bar.get("Volume", 0.0))
-        hi = float(bar.get("High", open_px))
-        lo = float(bar.get("Low", open_px))
+        hi = float(bar.get("High", exec_price))
+        lo = float(bar.get("Low", exec_price))
         date_key = (ticker, ts.strftime("%Y-%m-%d"))
 
         for ord in orders:
@@ -141,7 +156,7 @@ class EventDrivenBacktester:
             fill = self.slippage_model.simulate_fill(
                 side=side_str,
                 desired_shares=ord.shares,
-                nominal_price=open_px,
+                nominal_price=exec_price,
                 bar_volume=vol,
                 bar_high=hi,
                 bar_low=lo,
@@ -324,7 +339,10 @@ class EventDrivenBacktester:
 
     @staticmethod
     def _compute_performance_metrics(
-        equity: pd.Series, trades: List[Trade], position: Optional[Position] = None
+        equity: pd.Series,
+        trades: List[Trade],
+        position: Optional[Position] = None,
+        risk_free_rate: float = 0.065,
     ) -> Dict[str, float]:
         if len(equity) < 2:
             return {}
@@ -351,13 +369,15 @@ class EventDrivenBacktester:
             cagr = ((1.0 + total_return) ** ann_factor) - 1.0 if total_return > -1.0 else -1.0
 
         ann_vol = float(ret_series.std()) * math.sqrt(bars_per_yr) if ret_series.std() > 0 else 0.0
-        sharpe = (float(ret_series.mean()) * bars_per_yr) / ann_vol if ann_vol > 0 else 0.0
+        rf_rate = risk_free_rate
+        excess_mean_ann = (float(ret_series.mean()) * bars_per_yr) - rf_rate
+        sharpe = excess_mean_ann / ann_vol if ann_vol > 0 else 0.0
 
         neg_returns = np.minimum(0.0, ret_series.to_numpy())
         downside_semi_variance = float(np.mean(neg_returns ** 2)) if n_periods > 0 else 0.0
         downside_std = math.sqrt(downside_semi_variance) * math.sqrt(bars_per_yr) if downside_semi_variance > 0 else 0.0
         sortino = (
-            (float(ret_series.mean()) * bars_per_yr) / downside_std
+            excess_mean_ann / downside_std
             if downside_std > 1e-6
             else (sharpe if sharpe > 0 else 0.0)
         )

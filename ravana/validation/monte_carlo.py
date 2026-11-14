@@ -33,7 +33,12 @@ class MonteCarloStressTester:
         if isinstance(result, WalkForwardResult):
             return self.run_stress_test(result.stitched_oos_returns)
         if isinstance(result, BacktestResult):
-            rets = result.equity_curve.pct_change().dropna().to_numpy(dtype=np.float64)
+            # Resample intraday equity curve to daily session closes to preserve atomic overnight returns
+            if isinstance(result.equity_curve.index, pd.DatetimeIndex):
+                daily_equity = result.equity_curve.groupby(result.equity_curve.index.date).last()
+                rets = daily_equity.pct_change().dropna().to_numpy(dtype=np.float64)
+            else:
+                rets = result.equity_curve.pct_change().dropna().to_numpy(dtype=np.float64)
             return self.run_stress_test(rets)
         return self.run_stress_test(np.asarray(result, dtype=np.float64))
 

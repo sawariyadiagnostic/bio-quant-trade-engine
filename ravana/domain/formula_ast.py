@@ -446,9 +446,11 @@ class ASTEvaluator:
             return _fast_ts_decay_linear(child, w=10)
         s = pd.Series(child)
         if node.op == "TS_DELAY_1":
-            return s.shift(1).bfill().fillna(0.0).to_numpy()
+            first_val = float(child[0]) if len(child) > 0 else 0.0
+            return s.shift(1).bfill().fillna(first_val).to_numpy()
         elif node.op == "TS_DELAY_5":
-            return s.shift(5).bfill().fillna(0.0).to_numpy()
+            first_val = float(child[0]) if len(child) > 0 else 0.0
+            return s.shift(5).bfill().fillna(first_val).to_numpy()
         elif node.op == "DELTA_5":
             res = s.diff(5).fillna(0.0).to_numpy()
         elif node.op == "EMA_10":

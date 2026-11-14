@@ -218,10 +218,14 @@ class GeneticMutator:
         cloned = tree.clone()
         target = random.choice(cloned.get_all_subnodes())
         if target.op == "FEATURE":
+            current_dim = FEATURE_DIMENSIONS.get(target.val, FeatureDimension.DIMENSIONLESS)
             if allowed_features:
-                target.val = random.choice(list(allowed_features))
+                matching = [
+                    f for f in allowed_features
+                    if FEATURE_DIMENSIONS.get(f, FeatureDimension.DIMENSIONLESS) == current_dim
+                ]
+                target.val = random.choice(matching) if matching else random.choice(list(allowed_features))
             else:
-                current_dim = FEATURE_DIMENSIONS.get(target.val, FeatureDimension.DIMENSIONLESS)
                 candidates = [f for f, d in FEATURE_DIMENSIONS.items() if d == current_dim]
                 if candidates:
                     target.val = random.choice(candidates)

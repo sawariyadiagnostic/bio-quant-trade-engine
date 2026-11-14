@@ -35,31 +35,94 @@ class WalkForwardEngine:
         self.config = config or WalkForwardConfig()
 
     def generate_splits(self, targets_df: pd.DataFrame) -> List[Tuple[slice, slice]]:
-        """Generate chronological (train_slice, test_slice) pairs respecting hold horizons."""
+        """Generate chronological (train_slice, test_slice) pairs respecting hold horizons and session structure."""
         n_bars = len(targets_df)
         k = max(1, self.config.n_splits)
         base_purge = max(0, self.config.purge_bars)
 
+        # Check if targets_df has a DatetimeIndex with sufficient sessions
+        if isinstance(targets_df.index, pd.DatetimeIndex):
+            session_dates = targets_df.index.normalize().unique()
+            n_sessions = len(session_dates)
+            if n_sessions >= k + 1:
+                step_sess = n_sessions // (k + 1)
+                splits: List[Tuple[slice, slice]] = []
+                for i in range(k):
+                    tr_s_start = 0 if self.config.anchored else i * step_sess
+                    tr_s_end = (i + 1) * step_sess
+                    tr_dates = session_dates[tr_s_start:tr_s_end]
+
+                    # Multi-day hold embargo in sessions
+                    embargo_sessions = 0
+                    if "calendar_hold_days" in targets_df.columns:
+                        tr_mask = targets_df.index.normalize().isin(tr_dates)
+                        sub_t = targets_df[tr_mask]
+                        if not sub_t.empty:
+                            entry_col = sub_t["is_entry_bar"] if "is_entry_bar" in sub_t.columns else pd.Series(1, index=sub_t.index)
+                            last_entries = sub_t[entry_col == 1]
+                            if not last_entries.empty:
+                                max_hold = int(last_entries["calendar_hold_days"].iloc[-1])
+                                embargo_sessions = max(0, max_hold - 1)
+
+                    te_s_start = tr_s_end + embargo_sessions
+                    if te_s_start >= n_sessions:
+                        continue
+                    te_s_end = n_sessions if i == k - 1 else min(n_sessions, (i + 2) * step_sess)
+                    if te_s_end <= te_s_start:
+                        te_s_end = min(n_sessions, te_s_start + max(1, step_sess))
+                    te_dates = session_dates[te_s_start:te_s_end]
+
+                    train_mask = targets_df.index.normalize().isin(tr_dates)
+                    train_indices = np.where(train_mask)[0]
+                    test_mask = targets_df.index.normalize().isin(te_dates)
+                    test_indices = np.where(test_mask)[0]
+
+                    if len(train_indices) == 0 or len(test_indices) == 0:
+                        continue
+                    train_start = int(train_indices[0])
+                    train_end = int(train_indices[-1]) + 1
+                    test_start = int(test_indices[0])
+                    test_end = int(test_indices[-1]) + 1
+
+                    if test_end > test_start and train_end > train_start:
+                        splits.append((slice(train_start, train_end), slice(test_start, test_end)))
+
+                if splits:
+                    return splits
+
+        # Fallback to bar-based partitioning for synthetic/integer indices
         if n_bars - base_purge * k < k * 10:
             raise ValueError(f"Insufficient bars ({n_bars}) for {k} walk-forward splits with purge={base_purge}.")
 
         step = n_bars // (k + 1)
-        splits: List[Tuple[slice, slice]] = []
+        splits = []
 
         for i in range(k):
             train_start = 0 if self.config.anchored else i * step
             train_end = (i + 1) * step
 
-            # Dynamic purge: account for multi-day holds at the end of train_slice
+            # Dynamic purge: scan trailing entries in train_slice to ensure multi-day holds don't bleed into test
             extra_purge = 0
             if "calendar_hold_days" in targets_df.columns and train_end > 0:
-                last_hold_days = int(targets_df["calendar_hold_days"].iloc[train_end - 1])
-                if last_hold_days > 1:
-                    extra_purge = (last_hold_days - 1) * 75
+                scan_start = max(0, train_end - 375)  # 5 sessions max hold lookback
+                sub_targets = targets_df.iloc[scan_start:train_end]
+                entry_mask = (
+                    sub_targets["is_entry_bar"] == 1
+                    if "is_entry_bar" in sub_targets.columns
+                    else pd.Series(True, index=sub_targets.index)
+                )
+                entry_indices = np.where(entry_mask)[0] + scan_start
+                for e_idx in entry_indices:
+                    hold_days = int(targets_df["calendar_hold_days"].iloc[e_idx])
+                    hold_bars = max(1, hold_days * 75)
+                    overflow = (e_idx + hold_bars) - train_end
+                    if overflow > extra_purge:
+                        extra_purge = overflow
 
             purge = max(base_purge, extra_purge)
             test_start = min(n_bars, train_end + purge)
-            test_end = n_bars if i == k - 1 else min(n_bars, (i + 2) * step)
+            min_test_len = max(5, step // 4)
+            test_end = n_bars if i == k - 1 else min(n_bars, max(test_start + min_test_len, (i + 2) * step))
 
             if test_end > test_start and train_end > train_start:
                 splits.append((slice(train_start, train_end), slice(test_start, test_end)))
@@ -201,14 +264,15 @@ class WalkForwardEngine:
         test_sl: slice,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Evaluate AST node with causal warmup so rolling operators don't cold-start at test_sl."""
-        f_train = features_df.iloc[train_sl]
-        t_train = targets_df.iloc[train_sl]
-        raw_is = ComputeDispatcher.evaluate(node, f_train, backend="numpy")
+        warmup = 60
+        warm_is_start = max(0, train_sl.start - warmup)
+        offset_is = train_sl.start - warm_is_start
+        f_warm_train = features_df.iloc[warm_is_start : train_sl.stop]
+        raw_is = ComputeDispatcher.evaluate(node, f_warm_train, backend="numpy")
         if hasattr(raw_is, "cpu"):
             raw_is = raw_is.cpu().numpy()
-        is_arr = np.asarray(raw_is, dtype=np.float64)
+        is_arr = np.asarray(raw_is, dtype=np.float64)[offset_is:]
 
-        warmup = 60
         warm_start = max(0, test_sl.start - warmup)
         offset = test_sl.start - warm_start
         f_warm_test = features_df.iloc[warm_start : test_sl.stop]
@@ -217,6 +281,7 @@ class WalkForwardEngine:
             raw_oos_warm = raw_oos_warm.cpu().numpy()
         oos_arr = np.asarray(raw_oos_warm, dtype=np.float64)[offset:]
 
+        t_train = targets_df.iloc[train_sl]
         t_test = targets_df.iloc[test_sl]
         mask_is = (
             t_train["is_entry_bar"].to_numpy(dtype=bool)

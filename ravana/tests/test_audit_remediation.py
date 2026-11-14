@@ -139,6 +139,7 @@ class TestAuditRemediations(unittest.TestCase):
         self.assertIn("^GSPC", cleaned_dict)
         aligned = cleaned_dict["^GSPC"]
         self.assertEqual(len(aligned), len(target_dates))
+        self.assertEqual(aligned["Close"].iloc[0], 5000.0)
 
     def test_5_flat_price_rsi_neutral(self):
         """Verify flat price series produces neutral 0.0 normalized RSI rather than -1.0."""
