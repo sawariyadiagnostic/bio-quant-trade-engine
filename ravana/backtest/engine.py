@@ -2,14 +2,14 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
 
 from ravana.backtest.config import AssetType, BacktestConfig, TradingRegime
 from ravana.backtest.friction import IndianFrictionModel
-from ravana.backtest.orders import Order, OrderSide, OrderStatus, Position, Trade
+from ravana.backtest.orders import Order, OrderSide, OrderStatus, Position, RoundTripTrade, Trade
 from ravana.backtest.slippage import MicrostructureSlippageModel
 
 
@@ -22,6 +22,7 @@ class BacktestResult:
     trades: List[Trade]
     metrics: Dict[str, float]
     config: BacktestConfig
+    closed_round_trips: List[RoundTripTrade] = field(default_factory=list)
 
 
 class EventDrivenBacktester:
@@ -109,6 +110,7 @@ class EventDrivenBacktester:
             trades=trades,
             metrics=metrics,
             config=self.config,
+            closed_round_trips=list(position.closed_trades),
         )
 
     def _process_pending_orders(
@@ -353,8 +355,12 @@ class EventDrivenBacktester:
 
         neg_returns = np.minimum(0.0, ret_series.to_numpy())
         downside_semi_variance = float(np.mean(neg_returns ** 2)) if n_periods > 0 else 0.0
-        downside_std = math.sqrt(downside_semi_variance) * math.sqrt(bars_per_yr) if downside_semi_variance > 0 else 1e-6
-        sortino = (float(ret_series.mean()) * bars_per_yr) / downside_std if downside_std > 1e-5 else 0.0
+        downside_std = math.sqrt(downside_semi_variance) * math.sqrt(bars_per_yr) if downside_semi_variance > 0 else 0.0
+        sortino = (
+            (float(ret_series.mean()) * bars_per_yr) / downside_std
+            if downside_std > 1e-6
+            else (sharpe if sharpe > 0 else 0.0)
+        )
 
         running_max = equity.cummax()
         dd = (equity - running_max) / running_max

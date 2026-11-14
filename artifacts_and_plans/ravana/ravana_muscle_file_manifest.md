@@ -342,6 +342,66 @@ flowchart TD
 
 ---
 
+## Phase 6: Capital Allocation & Sovereign Protection (Muscles 17 & 18)
+
+### Muscle 17: Dynamic Volatility Sizing Engine
+* **Root Directory:** [`ravana/risk/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/risk)
+* **Core Responsibilities:** Chains Muscle 12 (`AllocationResult`), Muscle 7 realized volatility, and Phase 5 (`ValidationCertificate`) to enforce inverse-volatility scaling, DSR fractional Kelly modulation, exchange lot-size rounding, and statutory cash reserve buffers.
+* **Architecture Standard:** Single Responsibility Principle (SRP). Re-normalizes gross exposures $\le 1.0 - \text{min\_cash\_reserve\_pct}$ to prevent leverage breaches.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`sizing.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/risk/sizing.py) | Engine | Inverse-volatility targeting, DSR fractional Kelly sizing, and lot-size allocator |
+| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/risk/__init__.py) | Module | Package export boundary exposing `DynamicVolatilitySizer` and `VolatilitySizedAllocation` |
+
+* **Dedicated Test File:** [`test_phase5_6_7_chain.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_phase5_6_7_chain.py)
+
+---
+
+### Muscle 18: Circuit Breakers & Emergency Kill Switch
+* **Root Directory:** [`ravana/risk/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/risk)
+* **Core Responsibilities:** Enforces daily maximum loss limits (-2.0%), trailing drawdown halving (-4.0%) and halt (-8.0%) sentries, consecutive losing trade cooling periods (from Muscle 11 round-trips), and an atomic manual/automated Kill Switch blocking risk-increasing entries while permitting risk-reducing liquidations.
+* **Architecture Standard:** Sovereign capital protection sentry. Emits immutable `CircuitBreakerStatus` telemetry before every order dispatch.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`circuit_breaker.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/risk/circuit_breaker.py) | Engine | Intraday loss gates, trailing drawdown halts, losing streak cooldowns, and kill switch |
+| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/risk/__init__.py) | Module | Package export boundary exposing `CircuitBreakerKillSwitch` and `CircuitBreakerStatus` |
+
+* **Dedicated Test File:** [`test_phase5_6_7_chain.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_phase5_6_7_chain.py)
+
+---
+
+## Phase 7: Live Execution Routing & Observability (Muscles 19 & 20)
+
+### Muscle 19: Live Broker Order Routing Bridge
+* **Root Directory:** [`ravana/execution/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/execution)
+* **Core Responsibilities:** Chains Muscle 17 (`VolatilitySizedAllocation`), Muscle 18 (`CircuitBreakerKillSwitch`), Phase 5 (`ValidationCertificate`), and Muscle 11 microstructure slippage and friction models into an idempotent execution state machine. Enforces asymmetric liquidation safety and prevents unauthorized naked shorting in cash equities.
+* **Architecture Standard:** Abstract `BrokerGateway` adapter allowing seamless hot-swapping between `PaperBrokerGateway` and institutional brokers (Shoonya, Zerodha).
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`router.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/execution/router.py) | Engine | Order routing state machine, slippage audit reconciliation, and broker gateway adapter |
+| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/execution/__init__.py) | Module | Package export boundary exposing `BrokerOrderRouter`, `PaperBrokerGateway`, `RoutingReceipt` |
+
+* **Dedicated Test File:** [`test_phase5_6_7_chain.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_phase5_6_7_chain.py)
+
+---
+
+### Muscle 20: Real-Time Observability & Concept Drift Dashboard
+* **Root Directory:** [`ravana/monitor/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/monitor)
+* **Core Responsibilities:** Monitors live Muscle 7 stationary feature distributions against historical Lakehouse baselines using 10-bin Population Stability Index (PSI) and 2-sample Kolmogorov-Smirnov (KS) tests. Audits broker execution slippage against Muscle 11 predictions and automatically triggers Muscle 18's Kill Switch upon severe concept drift or execution degradation.
+* **Architecture Standard:** Early-morning sample warmup protection ($\ge 30$ samples) preventing spurious log-ratio divergence artifacts.
+
+| File | Type | Functional Role |
+| :--- | :--- | :--- |
+| [`drift_dashboard.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/monitor/drift_dashboard.py) | Engine | PSI and KS feature drift sentry, slippage anomaly auditor, and automated kill-switch sentry |
+| [`__init__.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/monitor/__init__.py) | Module | Package export boundary exposing `ObservabilityDriftMonitor` and `SystemHealthReport` |
+
+* **Dedicated Test File:** [`test_phase5_6_7_chain.py`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests/test_phase5_6_7_chain.py)
+
+---
+
 ## Auxiliary Subsystems & Infrastructure
 
 ### Dynamic Universe Selection & Security Master (Muscle 1 Auxiliary)
@@ -399,28 +459,29 @@ flowchart TD
 ## Test Suite Summary
 
 Every muscle is verified by dedicated unit tests in [`ravana/tests/`](file:///c:/Users/Dell/Desktop/python/trade_clean/ravana/tests).
-Currently **140/140 tests pass** with zero failures:
+Currently **156/156 tests pass** with zero failures:
 
 ```
-[Muscle 1]   test_formula_ast.py                     --> 18 tests OK
-[Muscle 2]   test_tensor_evaluator.py                --> 15 tests OK
-[Muscle 2]   test_compute_dispatcher.py             -->  6 tests OK
-[Muscle 2]   test_kaggle_runner.py                  -->  5 tests OK
-[Muscle 1+2] test_muscle1_muscle2_integration.py    -->  4 tests OK
-[Muscle 3]   test_data_ingestion.py                  --> 14 tests OK
-[Muscle 4]   test_data_cleaner.py                    --> 12 tests OK
-[Muscle 5]   test_data_resampler.py                  --> 12 tests OK
-[Muscle 6]   test_data_storage.py                    --> 10 tests OK
-[Muscle 6]   test_lake_diff.py                       -->  4 tests OK
-[Muscle 7]   test_features_matrix.py                 -->  8 tests OK
-[Muscle 8]   test_targets_builder.py                 -->  8 tests OK
-[Muscle 9]   test_genetic_evolution.py               -->  6 tests OK
-[Muscle 10]  test_fitness_engine.py                  -->  6 tests OK
-[Muscle 11]  test_backtest_engine.py                 -->  7 tests OK
-[Muscle 12]  test_risk_engine.py                     --> 11 tests OK
-[Phase 5]    test_validation_engine.py               -->  7 tests OK
-[Audit M1-12] test_audit_remediation.py              --> 10 tests OK
-[Universe]   test_universe_registry.py               -->  5 tests OK
+[Muscle 1]    test_formula_ast.py                     --> 18 tests OK
+[Muscle 2]    test_tensor_evaluator.py                --> 15 tests OK
+[Muscle 2]    test_compute_dispatcher.py             -->  6 tests OK
+[Muscle 2]    test_kaggle_runner.py                  -->  5 tests OK
+[Muscle 1+2]  test_muscle1_muscle2_integration.py    -->  4 tests OK
+[Muscle 3]    test_data_ingestion.py                  --> 14 tests OK
+[Muscle 4]    test_data_cleaner.py                    --> 12 tests OK
+[Muscle 5]    test_data_resampler.py                  --> 12 tests OK
+[Muscle 6]    test_data_storage.py                    --> 10 tests OK
+[Muscle 6]    test_lake_diff.py                       -->  4 tests OK
+[Muscle 7]    test_features_matrix.py                 -->  8 tests OK
+[Muscle 8]    test_targets_builder.py                 -->  8 tests OK
+[Muscle 9]    test_genetic_evolution.py               -->  6 tests OK
+[Muscle 10]   test_fitness_engine.py                  -->  6 tests OK
+[Muscle 11]   test_backtest_engine.py                 -->  7 tests OK
+[Muscle 12]   test_risk_engine.py                     --> 11 tests OK
+[Phase 5]     test_validation_engine.py               -->  7 tests OK
+[Audit M1-12] test_audit_remediation.py               --> 10 tests OK
+[Phase 6 & 7] test_phase5_6_7_chain.py                -->  6 tests OK
+[Universe]    test_universe_registry.py               -->  5 tests OK
 --------------------------------------------------------------------------
-TOTAL: 150 TESTS (100% GREEN)
+TOTAL: 156 TESTS (100% GREEN)
 ```
