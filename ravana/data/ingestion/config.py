@@ -16,8 +16,9 @@ CORE_ETF_UNIVERSE: List[str] = [
     "AUTOBEES.NS",
     "CPSEETF.NS",
     "GOLDBEES.NS",
+    "SILVERBEES.NS",
 ]
-GLOBAL_MACRO_UNIVERSE: List[str] = ["^GSPC", "^VIX", "INR=X", "BZ=F", "^TNX"]
+GLOBAL_MACRO_UNIVERSE: List[str] = ["^GSPC", "^VIX", "INR=X", "BZ=F", "^TNX", "^IXIC"]
 DOMESTIC_MACRO_UNIVERSE: List[str] = [
     "^NSEBANK",
     "^NSEI",
@@ -40,6 +41,7 @@ ETF_BENCHMARK_MAP: dict[str, str] = {
     "AUTOBEES.NS": "^CNXAUTO",
     "CPSEETF.NS": "^NSEI",
     "GOLDBEES.NS": "GC=F",
+    "SILVERBEES.NS": "SI=F",
 }
 
 

@@ -43,6 +43,8 @@ class BacktestConfig:
     exit_cutoff_time: str = "09:15"         # Exit time for overnight strategies
     signal_exit_threshold: float = 0.0
     min_hold_bars: int = 2
+    hold_on_strong_continuation: bool = False  # If True, skips 09:15 sell when signal >= continuation_threshold
+    continuation_threshold: float = 0.50       # Signal threshold to hold through 09:15 and save ₹17 DP fee
 
     @property
     def initial_capital_inr(self) -> float:

@@ -157,17 +157,19 @@ class TestFeatureMatrixEngine(unittest.TestCase):
                 "Macro_USDINR": np.full(n, 84.0) + np.random.normal(0, 0.1, n),
                 "Macro_SP500": np.full(n, 5800.0) + np.random.normal(0, 5.0, n),
                 "Macro_TNX": np.full(n, 4.40) + np.random.normal(0, 0.02, n),
+                "Macro_CRUDE": np.full(n, 75.0) + np.random.normal(0, 0.5, n),
+                "Macro_NASDAQ": np.full(n, 18000.0) + np.random.normal(0, 20.0, n),
             },
             index=dates,
         )
 
-    def test_26_stationary_features_presence(self) -> None:
-        """Verify engine computes all 26 registered stationary features without NaNs."""
+    def test_31_stationary_features_presence(self) -> None:
+        """Verify engine computes all 31 registered stationary features without NaNs."""
         engine = FeatureMatrixEngine(FeatureConfig())
         matrix = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
 
         expected_features = FeatureRegistry.all_features()
-        self.assertEqual(len(expected_features), 26)
+        self.assertEqual(len(expected_features), 31)
 
         for feat in expected_features:
             self.assertIn(feat, matrix.columns, f"Feature {feat} missing from matrix output")
@@ -178,7 +180,7 @@ class TestFeatureMatrixEngine(unittest.TestCase):
         self.assertEqual(len(matrix), len(self.df))
 
     def test_multi_asset_3d_tensor_dispatch(self) -> None:
-        """Verify compute_multi_asset_tensor produces [B, T, K] float32 tensor with 26 features."""
+        """Verify compute_multi_asset_tensor produces [B, T, K] float32 tensor with 31 features."""
         engine = FeatureMatrixEngine(FeatureConfig())
         df2 = self.df.copy()
         df2["Close"] = df2["Close"] * 1.5
@@ -188,9 +190,9 @@ class TestFeatureMatrixEngine(unittest.TestCase):
 
         self.assertIsInstance(tensor, torch.Tensor)
         self.assertEqual(tensor.dtype, torch.float32)
-        self.assertEqual(tensor.shape, (2, len(self.df), 26))
+        self.assertEqual(tensor.shape, (2, len(self.df), 31))
         self.assertEqual(symbols, ["BANKBEES", "NIFTYBEES"])
-        self.assertEqual(len(features), 26)
+        self.assertEqual(len(features), 31)
         self.assertEqual(len(time_index), len(self.df))
         self.assertTrue(torch.isfinite(tensor).all())
 
@@ -264,7 +266,7 @@ class TestFeatureMatrixEngine(unittest.TestCase):
         matrix = engine.compute_feature_matrix(silver_df, symbol="BANKBEES")
 
         self.assertEqual(len(matrix), len(silver_df))
-        self.assertEqual(len(matrix.columns), 26)
+        self.assertEqual(len(matrix.columns), 31)
         self.assertFalse(matrix.isna().any().any())
         self.assertTrue(np.all(np.isfinite(matrix.values)))
 

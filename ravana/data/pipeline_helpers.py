@@ -49,6 +49,9 @@ def enrich_intraday_for_m7(
         ("VIX", "VIX_clean.parquet", 20.0),
         ("USDINR", "USDINR_clean.parquet", 85.0),
         ("SP500", "GSPC_clean.parquet", 5000.0),
+        ("YIELD", "TNX_clean.parquet", 4.2),
+        ("CRUDE", "BZ_clean.parquet", 75.0),
+        ("NASDAQ", "IXIC_clean.parquet", 18000.0),
     ]
     for name, fname, default_v in macro_specs:
         m_path = m4_dir / "daily_1d" / fname

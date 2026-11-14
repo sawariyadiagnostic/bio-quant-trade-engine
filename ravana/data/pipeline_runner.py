@@ -96,7 +96,7 @@ class BatchPipelineRunner:
             manifest["daily"][ticker] = make_meta(ticker, df, fpath)
 
         # 3. Global Macro Drivers (Daily 2y)
-        macro_tickers = ["^GSPC", "^VIX", "INR=X", "^INDIAVIX"]
+        macro_tickers = ["^GSPC", "^VIX", "INR=X", "^INDIAVIX", "^TNX", "BZ=F", "^IXIC"]
         for ticker in macro_tickers:
             df = self._ingest_ticker(ticker, interval="1d", period="2y")
             base = sanitize_filename(ticker)
@@ -129,7 +129,7 @@ class BatchPipelineRunner:
                 reports["daily_1d"][etf_t] = rep
 
         # 3. Clean Standalone Daily Macro Series
-        for m_tick in ["^GSPC", "^VIX", "INR=X", "^INDIAVIX"]:
+        for m_tick in ["^GSPC", "^VIX", "INR=X", "^INDIAVIX", "^TNX", "BZ=F", "^IXIC"]:
             m_base = sanitize_filename(m_tick)
             m_p = self.m3_dir / "daily_1d" / f"{m_base}.parquet"
             if m_p.exists():
@@ -166,7 +166,7 @@ class BatchPipelineRunner:
                 manifest["macro"][etf_t] = self._resample_and_save_etf(cleaned)
 
         # 3. Resample Macro Drivers (1wk, 1mo)
-        for m_tick in ["^GSPC", "^VIX", "INR=X", "^INDIAVIX"]:
+        for m_tick in ["^GSPC", "^VIX", "INR=X", "^INDIAVIX", "^TNX", "BZ=F", "^IXIC"]:
             manifest["macro"][m_tick] = self._resample_macro_ticker(m_tick)
 
         manifest_path = self.m5_dir / "m5_resampled_manifest.json"
@@ -278,7 +278,7 @@ class BatchPipelineRunner:
 
         macro_dict: Dict[str, pd.DataFrame] = {}
         if interval == "1d":
-            for m_tick in ["^GSPC", "^VIX", "INR=X"]:
+            for m_tick in ["^GSPC", "^VIX", "INR=X", "^INDIAVIX", "^TNX", "BZ=F", "^IXIC"]:
                 m_path = self.m3_dir / "daily_1d" / f"{sanitize_filename(m_tick)}.parquet"
                 if m_path.exists():
                     macro_dict[m_tick] = pd.read_parquet(m_path)

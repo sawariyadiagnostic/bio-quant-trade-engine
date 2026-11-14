@@ -224,6 +224,13 @@ instruments:
     currency: "USD"
     tags: ["macro", "rates"]
 
+  - symbol: "^IXIC"
+    security_id: "INDEX_NASDAQ"
+    asset_class: "MACRO"
+    exchange: "US"
+    currency: "USD"
+    tags: ["macro", "tech"]
+
 baskets:
   core_etfs:
     - "BANKBEES.NS"
@@ -255,3 +262,4 @@ baskets:
     - "INR=X"
     - "BZ=F"
     - "^TNX"
+    - "^IXIC"

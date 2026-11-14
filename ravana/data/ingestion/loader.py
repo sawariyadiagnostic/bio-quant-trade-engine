@@ -97,6 +97,12 @@ class MarketDataLoader:
         # Eliminate duplicate column names if multi-ticker was downloaded
         out = out.loc[:, ~out.columns.duplicated()]
 
+        if "Close" not in out.columns:
+            if "Close_Adj" in out.columns:
+                out["Close"] = out["Close_Adj"]
+            elif "Close_Raw" in out.columns:
+                out["Close"] = out["Close_Raw"]
+
         required = ["Open", "High", "Low", "Close", "Volume", "Close_Adj"]
         for col in required:
             if col in out.columns:

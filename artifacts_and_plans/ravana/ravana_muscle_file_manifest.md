@@ -490,6 +490,7 @@ Currently **204/204 tests pass** with zero failures:
 [Universe]    test_universe_registry.py               -->  5 tests OK
 [Phase A & B] test_multi_horizon_and_portfolio.py    --> 17 tests OK
 [Muscle 19]   test_shoonya_adapter.py                 --> 17 tests OK
+[Dependencies] test_market_dependencies.py            -->  8 tests OK
 --------------------------------------------------------------------------
-TOTAL: 221 TESTS (100% GREEN in ~15.4s)
+TOTAL: 229 TESTS (100% GREEN in ~31.2s)
 ```

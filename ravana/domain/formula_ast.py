@@ -62,7 +62,7 @@ FEATURE_DIMENSIONS: Dict[str, FeatureDimension] = {
     "SP500_Ret": FeatureDimension.DIMENSIONLESS,
     "ADR_Ret": FeatureDimension.DIMENSIONLESS,
     "Global_Confluence": FeatureDimension.DIMENSIONLESS,
-    # Muscle 7 Stationary Vocabulary (26 Features)
+    # Muscle 7 Stationary Vocabulary (31 Features)
     "LOG_RET_1": FeatureDimension.DIMENSIONLESS,
     "LOG_RET_5": FeatureDimension.DIMENSIONLESS,
     "LOG_RET_20": FeatureDimension.DIMENSIONLESS,
@@ -84,10 +84,15 @@ FEATURE_DIMENSIONS: Dict[str, FeatureDimension] = {
     "MACRO_USDINR_RET_1": FeatureDimension.DIMENSIONLESS,
     "MACRO_SP500_RET_1": FeatureDimension.DIMENSIONLESS,
     "MACRO_YIELD_RET_1": FeatureDimension.DIMENSIONLESS,
+    "MACRO_CRUDE_RET_1": FeatureDimension.DIMENSIONLESS,
+    "MACRO_NASDAQ_RET_1": FeatureDimension.DIMENSIONLESS,
+    "INDEX_LEAD_LAG_DRIFT": FeatureDimension.DIMENSIONLESS,
     "SESSION_CLOCK_NORM": FeatureDimension.DIMENSIONLESS,
     "MORNING_OVERFLOW_WINDOW": FeatureDimension.DIMENSIONLESS,
     "AFTERNOON_BOND_WINDOW": FeatureDimension.DIMENSIONLESS,
     "OPENING_RANGE_DRIFT": FeatureDimension.DIMENSIONLESS,
+    "TURN_OF_MONTH_SIP_WINDOW": FeatureDimension.DIMENSIONLESS,
+    "EXPIRY_GAMMA_WINDOW": FeatureDimension.DIMENSIONLESS,
 }
 
 STANDARD_FEATURES: List[str] = [

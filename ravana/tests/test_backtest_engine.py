@@ -274,3 +274,63 @@ class TestBacktestEngine(unittest.TestCase):
         sq_trade = res_sq.trades[-1]
         self.assertEqual(sq_trade.side, OrderSide.SELL)
         self.assertGreaterEqual(sq_trade.timestamp.strftime("%H:%M"), "15:15")
+
+    def test_continuation_gate_saves_dp_fees(self):
+        """Verify continuation gate skips 09:15 exits on strong signal, saving DP fees and lifting net PnL."""
+        dates = pd.date_range("2026-01-05 09:15", "2026-01-07 15:25", freq="5min")
+        dates = [d for d in dates if "09:15" <= d.strftime("%H:%M") <= "15:25"]
+        n = len(dates)
+
+        # 3-day rising price trend (500 to 520)
+        df = pd.DataFrame(
+            {
+                "Open": np.linspace(500.0, 520.0, n),
+                "High": np.linspace(501.0, 521.0, n),
+                "Low": np.linspace(499.0, 519.0, n),
+                "Close": np.linspace(500.0, 520.0, n),
+                "Volume": np.full(n, 50000.0),
+            },
+            index=pd.DatetimeIndex(dates),
+        )
+
+        # Persistent positive alpha signal (0.8)
+        signals = pd.Series(0.8, index=df.index)
+
+        # 1. Without continuation gate: 09:15 exits happen, debiting ₹17 DP fee per exit
+        cfg_no_gate = BacktestConfig(
+            initial_capital=200000.0,
+            asset_type=AssetType.ETF,
+            regime=TradingRegime.OVERNIGHT,
+            fixed_dp_fee_inr=17.0,
+            hold_on_strong_continuation=False,
+        )
+        engine_no_gate = EventDrivenBacktester(cfg_no_gate)
+        res_no_gate = engine_no_gate.run(df, signals, ticker="BANKBEES.NS")
+
+        self.assertEqual(res_no_gate.metrics["continuation_holds_count"], 0)
+        self.assertEqual(res_no_gate.metrics["total_dp_fees_inr"], 51.0)  # 3 days * ₹17 DP fee
+        self.assertEqual(len(res_no_gate.trades), 6)  # 3 daily entry/exit round-trips
+
+        # 2. With continuation gate: 09:15 exits skipped when signal >= continuation_threshold (0.50)
+        cfg_gate = BacktestConfig(
+            initial_capital=200000.0,
+            asset_type=AssetType.ETF,
+            regime=TradingRegime.OVERNIGHT,
+            fixed_dp_fee_inr=17.0,
+            hold_on_strong_continuation=True,
+            continuation_threshold=0.50,
+        )
+        engine_gate = EventDrivenBacktester(cfg_gate)
+        res_gate = engine_gate.run(df, signals, ticker="BANKBEES.NS")
+
+        # Verify continuation holds occurred and saved DP fees
+        self.assertGreater(res_gate.metrics["continuation_holds_count"], 0)
+        self.assertEqual(res_gate.metrics["continuation_holds_count"], 2)
+        self.assertLess(res_gate.metrics["total_dp_fees_inr"], res_no_gate.metrics["total_dp_fees_inr"])
+        self.assertEqual(res_gate.metrics["total_dp_fees_inr"], 17.0)  # Only 1 terminal exit DP fee
+        self.assertLess(len(res_gate.trades), len(res_no_gate.trades))
+        self.assertEqual(len(res_gate.trades), 2)  # 1 initial entry + 1 terminal exit
+
+        # Net PnL (final equity) is higher with continuation gate active
+        self.assertGreater(res_gate.metrics["final_equity"], res_no_gate.metrics["final_equity"])
+

@@ -1,6 +1,6 @@
 """Feature Matrix Engine for Muscle 7.
 
-Computes 26 institutional stationary features across price, volatility,
+Computes 31 institutional stationary features across price, volatility,
 volume, tracking spread cointegration, macro/bond drivers, and intraday
 session-clock windows (Morning 09:15-10:30 Overflow, Afternoon 14:00-14:40 Bond Window,
 and Opening Range Breakout Drift). Generates 2D matrices
@@ -44,7 +44,7 @@ class FeatureMatrixEngine:
     def compute_feature_matrix(
         self, df: pd.DataFrame, symbol: Optional[str] = None
     ) -> pd.DataFrame:
-        """Extract all 26 stationary features from a clean market bar DataFrame."""
+        """Extract all 31 stationary features from a clean market bar DataFrame."""
         features: Dict[str, pd.Series] = {}
 
         # 1. Price Returns
@@ -92,6 +92,9 @@ class FeatureMatrixEngine:
 
         # 7. Intraday Session Clock & Opening Range Windows
         self._compute_intraday_clock_features(df, atr_norm, features)
+
+        # 8. Cross-Market, Index Lead-Lag & Institutional Calendar Dependencies
+        self._compute_dependency_features(df, features)
 
         matrix = pd.DataFrame(features, index=df.index)
         active = [col for col in self.config.active_features if col in matrix.columns]
@@ -234,6 +237,54 @@ class FeatureMatrixEngine:
         safe_atr = np.maximum(1e-4, atr_norm)
         or_drift = (raw_drift / safe_atr).fillna(0.0).clip(-5.0, 5.0)
         features[FeatureName.OPENING_RANGE_DRIFT.value] = or_drift
+
+    def _compute_dependency_features(
+        self, df: pd.DataFrame, features: Dict[str, pd.Series]
+    ) -> None:
+        idx = df.index
+        # 1. Brent Crude
+        crude_ret = self._find_column(df, ["Macro_CRUDE_RET", "Macro_BRENT_RET", "BZ=F_RET"])
+        if crude_ret is not None:
+            features[FeatureName.MACRO_CRUDE_RET_1.value] = crude_ret.fillna(0.0)
+        else:
+            crude = self._find_column(df, ["Macro_CRUDE", "Macro_BRENT", "BZ=F", "BRENT"])
+            features[FeatureName.MACRO_CRUDE_RET_1.value] = (
+                log_returns(crude, 1) if crude is not None else pd.Series(0.0, index=idx)
+            )
+
+        # 2. NASDAQ
+        nasdaq_ret = self._find_column(df, ["Macro_NASDAQ_RET", "Macro_IXIC_RET", "IXIC_RET"])
+        if nasdaq_ret is not None:
+            features[FeatureName.MACRO_NASDAQ_RET_1.value] = nasdaq_ret.fillna(0.0)
+        else:
+            nasdaq = self._find_column(df, ["Macro_NASDAQ", "Macro_IXIC", "^IXIC", "IXIC"])
+            features[FeatureName.MACRO_NASDAQ_RET_1.value] = (
+                log_returns(nasdaq, 1) if nasdaq is not None else pd.Series(0.0, index=idx)
+            )
+
+        # 3. Heavyweight Constituent / Index Lead-Lag Drift
+        c = df["Close"]
+        if "Theoretical_Close" in df.columns:
+            idx_ret_3 = log_returns(df["Theoretical_Close"], 3)
+            etf_ret_3 = log_returns(c, 3)
+            features[FeatureName.INDEX_LEAD_LAG_DRIFT.value] = (idx_ret_3 - etf_ret_3).clip(-0.05, 0.05)
+        else:
+            features[FeatureName.INDEX_LEAD_LAG_DRIFT.value] = pd.Series(0.0, index=idx)
+
+        # 4. Turn-of-Month SIP Window & Thursday Expiry Gamma Window (Timezone-Safe!)
+        if isinstance(idx, pd.DatetimeIndex):
+            ist_idx = idx.tz_convert("Asia/Kolkata") if idx.tz is not None else idx
+            day_of_month = ist_idx.day
+            sip_window = np.where((day_of_month <= 7) | (day_of_month >= 28), 1.0, 0.0)
+            features[FeatureName.TURN_OF_MONTH_SIP_WINDOW.value] = pd.Series(sip_window, index=idx)
+
+            mins = ist_idx.hour * 60.0 + ist_idx.minute
+            is_thursday = ist_idx.dayofweek == 3
+            expiry_gamma = np.where(is_thursday & (mins >= 855.0) & (mins <= 920.0), 1.0, 0.0)
+            features[FeatureName.EXPIRY_GAMMA_WINDOW.value] = pd.Series(expiry_gamma, index=idx)
+        else:
+            features[FeatureName.TURN_OF_MONTH_SIP_WINDOW.value] = pd.Series(0.0, index=idx)
+            features[FeatureName.EXPIRY_GAMMA_WINDOW.value] = pd.Series(0.0, index=idx)
 
     @staticmethod
     def _compute_session_vwap(df: pd.DataFrame) -> pd.Series:

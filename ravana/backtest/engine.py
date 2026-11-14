@@ -52,22 +52,37 @@ class EventDrivenBacktester:
         cash_records: List[float] = []
         debited_dates: Set[Tuple[str, str]] = set()
         pending_orders: List[Order] = []
+        continuation_holds_count: int = 0
 
         for i in range(len(df)):
             current_bar = df.iloc[i]
             ts: pd.Timestamp = df.index[i]
 
             # Auto-schedule 09:15 opening auction exit when carrying an overnight position into a new day
+            prev_sig = float(signals.iloc[i - 1]) if i > 0 else 0.0
+            should_hold_through = (
+                self.config.hold_on_strong_continuation
+                and prev_sig >= self.config.continuation_threshold
+            )
             if (
                 i > 0
                 and self.config.regime == TradingRegime.OVERNIGHT
                 and ts.date() > df.index[i - 1].date()
                 and position.shares > 0
+                and not should_hold_through
                 and not any(o.side == OrderSide.SELL for o in pending_orders)
             ):
                 pending_orders.insert(
                     0, Order(f"ORD_OVN_EXIT_{ts.timestamp()}", ts, ticker, OrderSide.SELL, position.shares)
                 )
+            elif (
+                i > 0
+                and self.config.regime == TradingRegime.OVERNIGHT
+                and ts.date() > df.index[i - 1].date()
+                and position.shares > 0
+                and should_hold_through
+            ):
+                continuation_holds_count += 1
 
             # 1. Process Pending Orders causally at current bar Open
             cash, filled_trades, pending_orders = self._process_pending_orders(
@@ -122,6 +137,7 @@ class EventDrivenBacktester:
         metrics = self._compute_performance_metrics(
             equity_s, trades, position, risk_free_rate=self.config.risk_free_rate
         )
+        metrics["continuation_holds_count"] = continuation_holds_count
 
         return BacktestResult(
             equity_curve=equity_s,
@@ -262,7 +278,8 @@ class EventDrivenBacktester:
                     return Order(f"ORD_BUY_{ts.timestamp()}", ts, ticker, OrderSide.BUY, shares)
             # Exit condition: Morning open (09:15-09:20) and currently holding
             elif (t_str <= self.config.exit_cutoff_time or t_str == "00:00") and position.shares > 0:
-                return Order(f"ORD_SELL_{ts.timestamp()}", ts, ticker, OrderSide.SELL, position.shares)
+                if not (self.config.hold_on_strong_continuation and signal >= self.config.continuation_threshold):
+                    return Order(f"ORD_SELL_{ts.timestamp()}", ts, ticker, OrderSide.SELL, position.shares)
 
         elif self.config.regime == TradingRegime.INTRADAY_MIS:
             if t_str >= "15:15" and position.shares != 0:

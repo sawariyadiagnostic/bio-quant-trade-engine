@@ -47,3 +47,7 @@ desktop.ini
 # Temporary Run Dumps
 tmp/
 temp/
+
+# Large Data Binaries & Lakehouse Store
+*.parquet
+ravana/data/lake/
