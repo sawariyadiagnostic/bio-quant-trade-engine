@@ -103,6 +103,10 @@ class Integrated60DayPortfolioTrader:
         )
         self.inav_trigger = TwoWayINAVSpreadTrigger(z_threshold=1.5, bps_threshold=15.0)
         self.drift_trigger = TwoWaySectorDriftTrigger(z_mom_threshold=1.20, vr_threshold=0.95)
+        self.stop_sweep_trigger = TwoWayLiquidityStopSweepTrigger(
+            sweep_window=10, ofi_threshold=0.05, vr_ceiling=0.92, min_wick_ratio=0.40,
+            supported_symbols={"PHARMABEES", "GOLDBEES", "SILVERBEES"},
+        )
         self.vwap_absorb_trigger = TwoWayVWAPAbsorptionTrigger(ofi_threshold=0.12, vr_ceiling=0.90)
         self.stop_sweep_trigger = TwoWayLiquidityStopSweepTrigger(sweep_window=10, ofi_threshold=0.15)
 
@@ -167,6 +171,11 @@ class Integrated60DayPortfolioTrader:
             # 3. Strategy 5: Formula AST-Driven Sector Macro Drift
             sigs_drift = self.drift_trigger.generate_signals(df, sym)
             for s in sigs_drift:
+                intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
+
+            # 4. Strategy 6: Two-Way Liquidity Stop Sweep
+            sigs_sweep = self.stop_sweep_trigger.generate_signals(df, sym)
+            for s in sigs_sweep:
                 intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
 
         # Replay calendar day by day
