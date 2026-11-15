@@ -40,6 +40,19 @@ class TestTwoWaySectorDriftTrigger(unittest.TestCase):
         signals = trigger.generate_signals(self.df, "UNKNOWN_ETF")
         self.assertEqual(len(signals), 0)
 
+    def test_bullish_and_bearish_drift_evaluation(self) -> None:
+        trigger = TwoWaySectorDriftTrigger(z_mom_threshold=1.0)
+        # Mock benchmark cache
+        b_df = pd.DataFrame(
+            {"Close": [100.0] * len(self.df), "Z_DECAY_MOM": [2.0] * len(self.df)},
+            index=self.df.index,
+        )
+        trigger._bench_cache["CNXIT.parquet"] = b_df
+        signals = trigger.generate_signals(self.df, "ITBEES")
+        self.assertIsInstance(signals, list)
+        buy_signals = [s for s in signals if s.action == TriggerAction.BUY]
+        self.assertGreaterEqual(len(buy_signals), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

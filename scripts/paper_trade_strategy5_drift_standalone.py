@@ -66,7 +66,7 @@ class StandaloneStrategy5Trader:
         self.feeder = SectorDataFeeder(
             data_dir=os.path.join(BASE_DIR, "ravana", "data", "lake", "m3_ingested", "intraday_5m")
         )
-        self.trigger = TwoWaySectorDriftTrigger(min_benchmark_momentum=0.0050, vr_threshold=0.95)
+        self.trigger = TwoWaySectorDriftTrigger(z_mom_threshold=1.20, vr_threshold=0.95)
         self.risk_bridge = StrategyRiskBridge(
             risk_budget_pct=0.0025,
             max_mis_leverage=self.max_mis_leverage,
@@ -140,11 +140,11 @@ class StandaloneStrategy5Trader:
         """Execute Long or Short Drift Continuation trade."""
         curr_px = float(bar["Close"])
         raw_atr = float(bar.get("ATR_14", curr_px * 0.01))
-        atr_val = max(raw_atr, curr_px * 0.0035)
+        atr_val = max(raw_atr, curr_px * 0.0050)
 
         is_long = (sig.action == TriggerAction.BUY)
-        initial_stop = (curr_px - 1.0 * atr_val) if is_long else (curr_px + 1.0 * atr_val)
-        target_px = float(sig.metadata.get("target_price", curr_px + 1.5 * atr_val if is_long else curr_px - 1.5 * atr_val))
+        initial_stop = float(sig.metadata.get("stop_loss", curr_px - 1.2 * atr_val if is_long else curr_px + 1.2 * atr_val))
+        target_px = float(sig.metadata.get("target_price", curr_px + 1.8 * atr_val if is_long else curr_px - 1.8 * atr_val))
 
         sizing = self.risk_bridge.calculate_risk_at_stop_size(
             ticker=sig.symbol,

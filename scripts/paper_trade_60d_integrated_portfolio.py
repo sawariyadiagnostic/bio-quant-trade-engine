@@ -53,7 +53,9 @@ from ravana.strategies.two_way_absorption import (
     TwoWayLiquidityStopSweepTrigger,
     TwoWayVWAPAbsorptionTrigger,
 )
+from ravana.strategies.two_way_inav_spread import TwoWayINAVSpreadTrigger
 from ravana.strategies.two_way_orb import TwoWayMorningORBTrigger
+from ravana.strategies.two_way_pead_drift import TwoWaySectorDriftTrigger
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger("integrated_60d_portfolio")
@@ -93,8 +95,14 @@ class Integrated60DayPortfolioTrader:
             data_dir=os.path.join(BASE_DIR, "ravana", "data", "lake", "m3_ingested", "daily_1d")
         )
 
-        # Intraday triggers
-        self.orb_trigger = TwoWayMorningORBTrigger(ofi_threshold=0.15, vr_threshold=0.95)
+        # Intraday triggers with microstructural specialization
+        self.orb_trigger = TwoWayMorningORBTrigger(
+            ofi_threshold=0.15,
+            vr_threshold=0.95,
+            excluded_symbols={"GOLDBEES", "SILVERBEES", "BANKBEES", "JUNIORBEES", "CPSEETF"},
+        )
+        self.inav_trigger = TwoWayINAVSpreadTrigger(z_threshold=1.5, bps_threshold=15.0)
+        self.drift_trigger = TwoWaySectorDriftTrigger(z_mom_threshold=1.20, vr_threshold=0.95)
         self.vwap_absorb_trigger = TwoWayVWAPAbsorptionTrigger(ofi_threshold=0.12, vr_ceiling=0.90)
         self.stop_sweep_trigger = TwoWayLiquidityStopSweepTrigger(sweep_window=10, ofi_threshold=0.15)
 
@@ -143,11 +151,22 @@ class Integrated60DayPortfolioTrader:
         print("=" * 86)
 
         # Pre-compute all intraday trigger signals
-        print("Pre-evaluating intraday triggers (ORB + VWAP Absorption + Stop Sweep)...")
+        print("Pre-evaluating intraday triggers (ORB + iNAV Spread + Sector Drift)...")
         intraday_signals_by_ts: Dict[pd.Timestamp, List[TriggerSignal]] = {}
         for sym, df in datasets_5m.items():
-            sigs = self.orb_trigger.generate_two_way_signals(df, sym)
-            for s in sigs:
+            # 1. Strategy 1: Two-Way ORB
+            sigs_orb = self.orb_trigger.generate_two_way_signals(df, sym)
+            for s in sigs_orb:
+                intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
+
+            # 2. Strategy 4: Two-Way iNAV Spread Mean Reversion
+            sigs_inav = self.inav_trigger.generate_signals(df, sym)
+            for s in sigs_inav:
+                intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
+
+            # 3. Strategy 5: Formula AST-Driven Sector Macro Drift
+            sigs_drift = self.drift_trigger.generate_signals(df, sym)
+            for s in sigs_drift:
                 intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
 
         # Replay calendar day by day
@@ -274,11 +293,11 @@ class Integrated60DayPortfolioTrader:
         """Open Long or Short Intraday MIS trade."""
         curr_px = float(bar["Close"])
         raw_atr = float(bar.get("ATR_14", curr_px * 0.01))
-        atr_val = max(raw_atr, curr_px * 0.0035)
+        atr_val = max(raw_atr, curr_px * 0.0050)
 
         is_long = (sig.action == TriggerAction.BUY)
-        initial_stop = (curr_px - 1.2 * atr_val) if is_long else (curr_px + 1.2 * atr_val)
-        target_px = (curr_px + 1.5 * atr_val) if is_long else (curr_px - 1.5 * atr_val)
+        initial_stop = float(sig.metadata.get("stop_loss", curr_px - 1.2 * atr_val if is_long else curr_px + 1.2 * atr_val))
+        target_px = float(sig.metadata.get("target_price", curr_px + 1.8 * atr_val if is_long else curr_px - 1.8 * atr_val))
 
         sizing = self.risk_bridge.calculate_risk_at_stop_size(
             ticker=sig.symbol,
@@ -329,14 +348,14 @@ class Integrated60DayPortfolioTrader:
                     self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
                 elif high_px >= trade["target_price"]:
                     self._close_intraday_trade(trade, trade["target_price"], bar_vol, ts, "TARGET_HIT")
-                elif high_px >= trade["entry_price"] + (0.60 * trade["atr"]):
+                elif high_px >= trade["entry_price"] + (0.50 * trade["atr"]):
                     trade["current_stop"] = max(trade["current_stop"], trade["entry_price"] * 1.0002)
             else:
                 if high_px >= trade["current_stop"]:
                     self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
                 elif low_px <= trade["target_price"]:
                     self._close_intraday_trade(trade, trade["target_price"], bar_vol, ts, "TARGET_HIT")
-                elif low_px <= trade["entry_price"] - (0.60 * trade["atr"]):
+                elif low_px <= trade["entry_price"] - (0.50 * trade["atr"]):
                     trade["current_stop"] = min(trade["current_stop"], trade["entry_price"] * 0.9998)
 
     def _close_intraday_trade(
@@ -364,6 +383,7 @@ class Integrated60DayPortfolioTrader:
             self.trade_history.append({
                 "type": "INTRADAY",
                 "ticker": sym,
+                "trigger_name": trade["trigger_name"],
                 "side": "LONG" if trade["is_long"] else "SHORT",
                 "entry_time": str(trade["entry_time"]),
                 "exit_time": str(ts),
