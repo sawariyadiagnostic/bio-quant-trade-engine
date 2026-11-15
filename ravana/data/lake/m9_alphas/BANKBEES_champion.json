@@ -1,6 +1,0 @@
-{
-  "formula_str": "TS_DELAY_5(TS_MAX_10(ATR_14_NORM))",
-  "ic": 0.3678191760498735,
-  "composite_fitness": 0.19073158660328934,
-  "graveyard_size": 1
-}
