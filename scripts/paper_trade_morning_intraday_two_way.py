@@ -78,7 +78,11 @@ class TwoWayMorningIntradayTrader:
         self.feeder = SectorDataFeeder(
             data_dir=os.path.join(BASE_DIR, "ravana", "data", "lake", "m3_ingested", "intraday_5m")
         )
-        self.orb_trigger = TwoWayMorningORBTrigger(ofi_threshold=0.15, vr_threshold=0.95)
+        self.orb_trigger = TwoWayMorningORBTrigger(
+            ofi_threshold=0.15,
+            vr_threshold=0.95,
+            excluded_symbols={"GOLDBEES", "SILVERBEES", "BANKBEES", "JUNIORBEES"},
+        )
         self.risk_bridge = StrategyRiskBridge(
             risk_budget_pct=0.0025,  # ₹500 risk cap on ₹2 Lakh
             max_mis_leverage=self.max_mis_leverage,

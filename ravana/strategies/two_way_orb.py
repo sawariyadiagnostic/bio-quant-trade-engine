@@ -34,9 +34,19 @@ class TwoWayMorningORBTrigger(StructuralTrigger):
 
     name: str = "TwoWayMorningORBTrigger"
 
-    def __init__(self, ofi_threshold: float = 0.15, vr_threshold: float = 0.95) -> None:
+    def __init__(
+        self,
+        ofi_threshold: float = 0.15,
+        vr_threshold: float = 0.95,
+        excluded_symbols: Optional[Set[str]] = None,
+    ) -> None:
         self.ofi_threshold = float(ofi_threshold)
         self.vr_threshold = float(vr_threshold)
+        self.excluded_symbols = (
+            set(excluded_symbols)
+            if excluded_symbols is not None
+            else {"GOLDBEES", "SILVERBEES"}
+        )
 
     def evaluate(self, df: pd.DataFrame, symbol: str) -> pd.Series:
         """Legacy 1D series evaluator returning buy conviction."""
@@ -57,8 +67,8 @@ class TwoWayMorningORBTrigger(StructuralTrigger):
         if df.empty or len(df) < 5:
             return signals
 
-        # Exclude commodities from equity ORB
-        if symbol in ("GOLDBEES", "SILVERBEES"):
+        # Check excluded symbols
+        if symbol in self.excluded_symbols:
             return signals
 
         vr = extract_variance_ratio(df)

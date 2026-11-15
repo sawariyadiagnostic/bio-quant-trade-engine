@@ -50,10 +50,14 @@ class TwoWayINAVSpreadTrigger(StructuralTrigger):
                 conviction.loc[s.timestamp] = s.conviction
         return conviction
 
+    # Restrict to liquid Tier-1 ETFs with tight tracking spreads (spread std <= 15 bps)
+    # Excludes JUNIORBEES (std 212 bps) and CPSEETF (std 262 bps) due to AP creation friction/dividends
+    ELIGIBLE_SYMBOLS: Set[str] = {"NIFTYBEES", "PHARMABEES", "ITBEES", "AUTOBEES", "BANKBEES"}
+
     def generate_signals(self, df: pd.DataFrame, symbol: str) -> List[TriggerSignal]:
         """Generate causal BUY and SELL signals for ETF iNAV tracking spread dislocations."""
         signals: List[TriggerSignal] = []
-        if df.empty or len(df) < 20 or symbol in ("GOLDBEES", "SILVERBEES"):
+        if df.empty or len(df) < 20 or symbol not in self.ELIGIBLE_SYMBOLS:
             return signals
 
         if "Theoretical_Close" not in df.columns or "SPREAD_BPS" not in df.columns:
