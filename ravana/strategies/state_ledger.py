@@ -8,6 +8,7 @@ Anchors runtime strategy state into an ACID SQLite database with Write-Ahead Log
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import os
@@ -59,6 +60,26 @@ class OrderAuditRecord:
         return asdict(self)
 
 
+@dataclass
+class DecisionAuditRecord:
+    """Immutable audit record for a Gemini Decision API evaluation."""
+
+    decision_id: str
+    timestamp: str
+    timeframe: str  # '1m' | '5m' | '1d'
+    cluster_id: str  # 'veto' | 'elastic_string' | 'alpha_crown' | etc.
+    question_key: str
+    selected_choice: Optional[str]
+    probability_score: Optional[float]
+    latency_ms: float
+    status: str  # 'APPLIED' | 'VETOED' | 'BYPASSED'
+    symbol: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert decision audit record to serializable dictionary."""
+        return asdict(self)
+
+
 class SQLiteStateLedger:
     """ACID SQLite State Machine maintaining active positions and order audit trail."""
 
@@ -74,14 +95,19 @@ class SQLiteStateLedger:
         if dirname:
             os.makedirs(dirname, exist_ok=True)
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Create a configured SQLite connection with WAL mode and busy timeout."""
+    @contextmanager
+    def _get_connection(self):
+        """Create a configured SQLite connection with WAL mode, closing on context exit."""
         conn = sqlite3.connect(self.db_path, timeout=10.0, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous=NORMAL;")
         conn.execute("PRAGMA busy_timeout=5000;")
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_database(self) -> None:
         """Initialize required relational schemas and indexes."""
@@ -119,6 +145,22 @@ class SQLiteStateLedger:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_order_ticker ON order_audit_trail(ticker);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_order_status ON order_audit_trail(status);")
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS gemini_decisions_audit (
+                    decision_id TEXT PRIMARY KEY,
+                    timestamp TEXT NOT NULL,
+                    timeframe TEXT NOT NULL,
+                    cluster_id TEXT NOT NULL,
+                    symbol TEXT,
+                    question_key TEXT NOT NULL,
+                    selected_choice TEXT,
+                    probability_score REAL,
+                    latency_ms REAL NOT NULL,
+                    status TEXT NOT NULL
+                );
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_decision_ts ON gemini_decisions_audit(timestamp);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_decision_sym ON gemini_decisions_audit(symbol);")
 
     def record_entry(
         self,
@@ -481,3 +523,94 @@ class SQLiteStateLedger:
             "dynamic_profit_target": profit_target,
             "action": "ADOPTED_EMERGENCY_REBOOT",
         }
+
+    # -------------------------------------------------------------------------
+    # 5. Gemini Decisions Audit Trail
+    # -------------------------------------------------------------------------
+    def record_decision(self, record: DecisionAuditRecord) -> None:
+        """Persist a single Gemini Decision audit entry."""
+        with self._lock, self._get_connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO gemini_decisions_audit (
+                    decision_id, timestamp, timeframe, cluster_id, symbol,
+                    question_key, selected_choice, probability_score, latency_ms, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(decision_id) DO UPDATE SET
+                    selected_choice = excluded.selected_choice,
+                    probability_score = excluded.probability_score,
+                    latency_ms = excluded.latency_ms,
+                    status = excluded.status;
+                """,
+                (
+                    record.decision_id,
+                    record.timestamp,
+                    record.timeframe,
+                    record.cluster_id,
+                    record.symbol,
+                    record.question_key,
+                    record.selected_choice,
+                    record.probability_score,
+                    float(record.latency_ms),
+                    record.status,
+                ),
+            )
+
+    def record_decision_batch(self, records: List[DecisionAuditRecord]) -> None:
+        """Persist a batch of Gemini Decision audit entries in a single transaction."""
+        if not records:
+            return
+        with self._lock, self._get_connection() as conn:
+            conn.executemany(
+                """
+                INSERT INTO gemini_decisions_audit (
+                    decision_id, timestamp, timeframe, cluster_id, symbol,
+                    question_key, selected_choice, probability_score, latency_ms, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(decision_id) DO UPDATE SET
+                    selected_choice = excluded.selected_choice,
+                    probability_score = excluded.probability_score,
+                    latency_ms = excluded.latency_ms,
+                    status = excluded.status;
+                """,
+                [
+                    (
+                        r.decision_id,
+                        r.timestamp,
+                        r.timeframe,
+                        r.cluster_id,
+                        r.symbol,
+                        r.question_key,
+                        r.selected_choice,
+                        r.probability_score,
+                        float(r.latency_ms),
+                        r.status,
+                    )
+                    for r in records
+                ],
+            )
+
+    def get_recent_decisions(
+        self,
+        symbol: Optional[str] = None,
+        cluster_id: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Retrieve recent decision audit entries, optionally filtered by symbol or cluster."""
+        with self._lock, self._get_connection() as conn:
+            query = "SELECT * FROM gemini_decisions_audit"
+            params: List[Any] = []
+            clauses: List[str] = []
+            if symbol:
+                clauses.append("symbol = ?")
+                params.append(symbol)
+            if cluster_id:
+                clauses.append("cluster_id = ?")
+                params.append(cluster_id)
+            if clauses:
+                query += " WHERE " + " AND ".join(clauses)
+            query += " ORDER BY ROWID DESC LIMIT ?"
+            params.append(limit)
+
+            cur = conn.execute(query, tuple(params))
+            return [dict(row) for row in cur.fetchall()]

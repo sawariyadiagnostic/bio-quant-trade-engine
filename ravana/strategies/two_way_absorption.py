@@ -8,6 +8,7 @@ Includes:
 """
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional, Set
 import numpy as np
 import pandas as pd
@@ -23,9 +24,22 @@ from ravana.strategies.triggers import (
     extract_variance_ratio,
 )
 
+# Mean-reverting liquid sector/index assets with high absorption edge
+DEFAULT_ABSORPTION_SYMBOLS: Set[str] = {
+    "AUTOBEES",
+    "BANKBEES",
+    "ITBEES",
+    "NIFTYBEES",
+    "PHARMABEES",
+}
+
 
 class TwoWayVWAPAbsorptionTrigger(StructuralTrigger):
-    """Trigger: Fades Bollinger Band extremes back to VWAP in mean-reverting regimes (VR < 0.90)."""
+    """Trigger: Fades Bollinger Band extremes back to VWAP in mean-reverting regimes (VR < 0.88).
+
+    Conditioned on broad market index (NIFTY 50) session trend to prevent buying falling
+    knives during market sell-offs and shorting strong market momentum rallies.
+    """
 
     name: str = "TwoWayVWAPAbsorptionTrigger"
 
@@ -34,12 +48,36 @@ class TwoWayVWAPAbsorptionTrigger(StructuralTrigger):
         bb_lower: float = 0.18,
         bb_upper: float = 0.82,
         ofi_threshold: float = 0.12,
-        vr_ceiling: float = 0.90,
+        vr_ceiling: float = 0.88,
+        data_dir: Optional[str] = None,
+        allowed_symbols: Optional[Set[str]] = None,
     ) -> None:
         self.bb_lower = float(bb_lower)
         self.bb_upper = float(bb_upper)
         self.ofi_threshold = float(ofi_threshold)
         self.vr_ceiling = float(vr_ceiling)
+        self.data_dir = data_dir or os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "data",
+            "lake",
+            "m3_ingested",
+            "intraday_5m",
+        )
+        self.allowed_symbols = allowed_symbols if allowed_symbols is not None else DEFAULT_ABSORPTION_SYMBOLS
+        self._nifty_df: Optional[pd.DataFrame] = None
+        self._nifty_open_map: Dict[Any, float] = {}
+        self._load_nifty_benchmark()
+
+    def _load_nifty_benchmark(self) -> None:
+        """Load NIFTY 50 5m dataset to establish causal session open baselines."""
+        nifty_path = os.path.join(self.data_dir, "NSEI.parquet")
+        if os.path.exists(nifty_path):
+            try:
+                self._nifty_df = pd.read_parquet(nifty_path)
+                for dt, grp in self._nifty_df.groupby(self._nifty_df.index.date):
+                    self._nifty_open_map[dt] = float(grp["Open"].iloc[0])
+            except Exception:
+                self._nifty_df = None
 
     def evaluate(self, df: pd.DataFrame, symbol: str) -> pd.Series:
         """Legacy 1D series evaluator returning buy conviction."""
@@ -53,7 +91,7 @@ class TwoWayVWAPAbsorptionTrigger(StructuralTrigger):
     def generate_signals(self, df: pd.DataFrame, symbol: str) -> List[TriggerSignal]:
         """Generate causal BUY and SELL signals for intraday Bollinger absorption."""
         signals: List[TriggerSignal] = []
-        if df.empty or len(df) < 20 or symbol in ("GOLDBEES", "SILVERBEES"):
+        if df.empty or len(df) < 20 or symbol not in self.allowed_symbols:
             return signals
 
         vr = extract_variance_ratio(df)
@@ -72,7 +110,7 @@ class TwoWayVWAPAbsorptionTrigger(StructuralTrigger):
         for i in range(1, len(df)):
             ts = df.index[i]
             t_str = ts.strftime("%H:%M")
-            d = ts.normalize()
+            d = ts.date()
 
             if t_str == "15:00":
                 signals.append(
@@ -87,7 +125,7 @@ class TwoWayVWAPAbsorptionTrigger(StructuralTrigger):
                 )
                 continue
 
-            # Active strictly in mid-day liquidity window: 10:00 to 14:15 IST
+            # Active in mid-day liquidity window: 10:00 to 14:15 IST
             if not ("10:00" <= t_str <= "14:15") or d in daily_entered:
                 continue
 
@@ -104,11 +142,25 @@ class TwoWayVWAPAbsorptionTrigger(StructuralTrigger):
             raw_atr = float(df.get("ATR_14", pd.Series(curr_close * 0.01, index=df.index)).iloc[i])
             atr_val = max(raw_atr, curr_close * 0.0035)
 
-            # 1. LONG BOUNCE: Lower Band touch + Bullish reversal tick
-            if (curr_bb <= self.bb_lower) and (curr_close > curr_open) and (curr_ofi >= self.ofi_threshold) and (curr_close < curr_vwap):
+            # Causal NIFTY broad index trend gate
+            n_open = self._nifty_open_map.get(d)
+            n_cl: Optional[float] = None
+            if self._nifty_df is not None and ts in self._nifty_df.index:
+                n_cl = float(self._nifty_df.loc[ts, "Close"])
+
+            # 1. LONG BOUNCE: Lower Band touch + Bullish reversal tick + Nifty >= Open + Min RR to VWAP
+            if (
+                (curr_bb <= self.bb_lower)
+                and (curr_close > curr_open)
+                and (curr_ofi >= self.ofi_threshold)
+                and (curr_vwap - curr_close >= 0.85 * atr_val)
+            ):
+                if n_open is not None and n_cl is not None and n_cl < n_open:
+                    continue  # Do not catch falling knife when broad market is down
+
                 daily_entered.add(d)
                 target = curr_vwap
-                stop = curr_close - (0.8 * atr_val)
+                stop = curr_close - (1.0 * atr_val)
                 signals.append(
                     TriggerSignal(
                         timestamp=ts,
@@ -120,11 +172,19 @@ class TwoWayVWAPAbsorptionTrigger(StructuralTrigger):
                     )
                 )
 
-            # 2. SHORT FADE: Upper Band touch + Bearish rejection tick
-            elif (curr_bb >= self.bb_upper) and (curr_close < curr_open) and (curr_ofi <= -self.ofi_threshold) and (curr_close > curr_vwap):
+            # 2. SHORT FADE: Upper Band touch + Bearish rejection tick + Nifty <= Open + Min RR to VWAP
+            elif (
+                (curr_bb >= self.bb_upper)
+                and (curr_close < curr_open)
+                and (curr_ofi <= -self.ofi_threshold)
+                and (curr_close - curr_vwap >= 0.85 * atr_val)
+            ):
+                if n_open is not None and n_cl is not None and n_cl > n_open:
+                    continue  # Do not short when broad market is strongly rallying
+
                 daily_entered.add(d)
                 target = curr_vwap
-                stop = curr_close + (0.8 * atr_val)
+                stop = curr_close + (1.0 * atr_val)
                 signals.append(
                     TriggerSignal(
                         timestamp=ts,
