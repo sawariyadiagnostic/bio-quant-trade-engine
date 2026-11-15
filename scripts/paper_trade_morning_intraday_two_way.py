@@ -78,7 +78,7 @@ class TwoWayMorningIntradayTrader:
         self.feeder = SectorDataFeeder(
             data_dir=os.path.join(BASE_DIR, "ravana", "data", "lake", "m3_ingested", "intraday_5m")
         )
-        self.orb_trigger = TwoWayMorningORBTrigger(ofi_threshold=0.20, vr_threshold=0.85)
+        self.orb_trigger = TwoWayMorningORBTrigger(ofi_threshold=0.15, vr_threshold=0.95)
         self.risk_bridge = StrategyRiskBridge(
             risk_budget_pct=0.0025,  # ₹500 risk cap on ₹2 Lakh
             max_mis_leverage=self.max_mis_leverage,
@@ -167,14 +167,14 @@ class TwoWayMorningIntradayTrader:
         """Execute Long or Short trade with MIS leverage and 0.25% risk cap."""
         curr_px = float(bar["Close"])
         raw_atr = float(bar.get("ATR_14", curr_px * 0.01))
-        atr_val = max(raw_atr * 1.5, curr_px * 0.0045)
+        atr_val = max(raw_atr, curr_px * 0.0035)
 
         is_tier1 = SECTOR_MAP.get(sig.symbol, {}).get("is_tier1", False)
         product_type = "MIS"
 
         is_long = (sig.action == TriggerAction.BUY)
-        initial_stop = (curr_px - atr_val) if is_long else (curr_px + atr_val)
-        target_px = (curr_px + 2.0 * atr_val) if is_long else (curr_px - 2.0 * atr_val)
+        initial_stop = (curr_px - 1.2 * atr_val) if is_long else (curr_px + 1.2 * atr_val)
+        target_px = (curr_px + 1.5 * atr_val) if is_long else (curr_px - 1.5 * atr_val)
 
         sizing = self.risk_bridge.calculate_risk_at_stop_size(
             ticker=sig.symbol,

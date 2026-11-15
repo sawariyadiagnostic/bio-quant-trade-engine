@@ -22,11 +22,19 @@ from ravana.strategies.triggers import (
 
 
 class TwoWayMorningORBTrigger(StructuralTrigger):
-    """Trigger: Two-Way Opening Range Breakout (Long & Short) in 09:35–11:00 IST window."""
+    """Trigger: Two-Way Opening Range Breakout (Long & Short) in 09:35–11:00 IST morning window.
+    
+    Upgrades:
+    1. Fresh-cross only: triggers only on the exact 5m candle that first crosses OR_high or OR_low.
+    2. Zero chasing: prevents late re-entries on already extended moves.
+    3. Strict Trend Regime: requires VR_20 >= 0.95 (filters out AP mean-reverting chop).
+    4. Commodity Shield: ignores commodity ETFs (Gold/Silver) which do not follow equity ORB.
+    5. Symmetric 1:1.25 Risk-to-Reward: Target at 1.5 ATR, Stop at 1.2 ATR.
+    """
 
     name: str = "TwoWayMorningORBTrigger"
 
-    def __init__(self, ofi_threshold: float = 0.20, vr_threshold: float = 0.85) -> None:
+    def __init__(self, ofi_threshold: float = 0.15, vr_threshold: float = 0.95) -> None:
         self.ofi_threshold = float(ofi_threshold)
         self.vr_threshold = float(vr_threshold)
 
@@ -49,11 +57,14 @@ class TwoWayMorningORBTrigger(StructuralTrigger):
         if df.empty or len(df) < 5:
             return signals
 
+        # Exclude commodities from equity ORB
+        if symbol in ("GOLDBEES", "SILVERBEES"):
+            return signals
+
         vr = extract_variance_ratio(df)
         ofi = extract_ofi_proxy(df)
         vwap = extract_session_vwap(df)
 
-        # Cache daily opening ranges
         daily_or: Dict[Any, Dict[str, float]] = {}
         dates = df.index.normalize()
 
@@ -66,6 +77,9 @@ class TwoWayMorningORBTrigger(StructuralTrigger):
                     "high": float(or_bars["High"].max()),
                     "low": float(or_bars["Low"].min()),
                 }
+
+        # Track daily trigger execution to prevent multiple re-entries per day per symbol
+        daily_entered: Set[Any] = set()
 
         for i in range(len(df)):
             ts = df.index[i]
@@ -86,11 +100,11 @@ class TwoWayMorningORBTrigger(StructuralTrigger):
                 )
                 continue
 
-            # Only enter in high-liquidity morning window: 09:35 to 11:00 IST
-            if not ("09:35" <= t_str <= "11:00"):
+            # Only enter in high-liquidity morning window: 09:35 to 10:45 IST
+            if not ("09:35" <= t_str <= "10:45"):
                 continue
 
-            if d not in daily_or:
+            if d not in daily_or or d in daily_entered:
                 continue
 
             or_high = daily_or[d]["high"]
@@ -98,19 +112,22 @@ class TwoWayMorningORBTrigger(StructuralTrigger):
             curr_vr = float(vr.iloc[i])
             curr_ofi = float(ofi.iloc[i])
             curr_close = float(df["Close"].iloc[i])
+            prev_close = float(df["Close"].iloc[i - 1]) if i > 0 else curr_close
             curr_vwap = float(vwap.iloc[i]) if vwap is not None else curr_close
             raw_atr = float(df.get("ATR_14", pd.Series(curr_close * 0.01, index=df.index)).iloc[i])
             atr_val = max(raw_atr, curr_close * 0.0035)
 
+            # Strict trend regime filter: only trade breakouts when VR indicates momentum
             if curr_vr < self.vr_threshold:
                 continue
 
-            # 1. LONG / BUY BREAKOUT
-            # Price closes above OR_high, positive order flow, above VWAP
-            if (curr_close > or_high * 1.0002) and (curr_ofi >= self.ofi_threshold) and (curr_close >= curr_vwap):
-                base_conv = 0.70 + 0.15 * min(1.0, (curr_vr - 0.90) / 0.40) + 0.15 * min(1.0, curr_ofi)
-                target = curr_close + (2.0 * atr_val)
-                stop = curr_close - (1.5 * atr_val)
+            # 1. LONG / BUY BREAKOUT (Fresh Cross Only)
+            # Previous bar was inside/below OR_high, current bar closes cleanly above OR_high
+            if (prev_close <= or_high) and (curr_close > or_high * 1.0002) and (curr_ofi >= self.ofi_threshold) and (curr_close >= curr_vwap):
+                daily_entered.add(d)
+                base_conv = 0.70 + 0.15 * min(1.0, (curr_vr - 0.95) / 0.35) + 0.15 * min(1.0, curr_ofi)
+                target = curr_close + (1.5 * atr_val)
+                stop = curr_close - (1.2 * atr_val)
                 signals.append(
                     TriggerSignal(
                         timestamp=ts,
@@ -122,12 +139,13 @@ class TwoWayMorningORBTrigger(StructuralTrigger):
                     )
                 )
 
-            # 2. SHORT / SELL BREAKDOWN
-            # Price closes below OR_low, negative order flow, below VWAP
-            elif (curr_close < or_low * 0.9998) and (curr_ofi <= -self.ofi_threshold) and (curr_close <= curr_vwap):
-                base_conv = 0.70 + 0.15 * min(1.0, (curr_vr - 0.90) / 0.40) + 0.15 * min(1.0, abs(curr_ofi))
-                target = curr_close - (2.0 * atr_val)
-                stop = curr_close + (1.5 * atr_val)
+            # 2. SHORT / SELL BREAKDOWN (Fresh Cross Only)
+            # Previous bar was inside/above OR_low, current bar closes cleanly below OR_low
+            elif (prev_close >= or_low) and (curr_close < or_low * 0.9998) and (curr_ofi <= -self.ofi_threshold) and (curr_close <= curr_vwap):
+                daily_entered.add(d)
+                base_conv = 0.70 + 0.15 * min(1.0, (curr_vr - 0.95) / 0.35) + 0.15 * min(1.0, abs(curr_ofi))
+                target = curr_close - (1.5 * atr_val)
+                stop = curr_close + (1.2 * atr_val)
                 signals.append(
                     TriggerSignal(
                         timestamp=ts,
