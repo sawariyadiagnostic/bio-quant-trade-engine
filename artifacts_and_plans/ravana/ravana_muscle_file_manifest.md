@@ -489,8 +489,13 @@ Currently **204/204 tests pass** with zero failures:
 [Phase 6 & 7] test_phase5_6_7_chain.py                -->  6 tests OK
 [Universe]    test_universe_registry.py               -->  5 tests OK
 [Phase A & B] test_multi_horizon_and_portfolio.py    --> 17 tests OK
-[Muscle 19]   test_shoonya_adapter.py                 --> 17 tests OK
-[Dependencies] test_market_dependencies.py            -->  8 tests OK
+[Muscle 19]   test_shoonya_adapter.py                 --> 19 tests OK
+[Dependencies] test_market_dependencies.py            -->  7 tests OK
+[Fast Engine] test_fast_engine.py                     -->  9 tests OK
+[Triggers]    test_strategies.py                      --> 18 tests OK
+[Core Bandit] test_strategy_core_and_bandit.py        --> 10 tests OK
+[Risk & WAL]  test_strategy_risk_and_ledger.py        --> 14 tests OK
+[Integration] test_structural_strategies.py           --> 20 tests OK
 --------------------------------------------------------------------------
-TOTAL: 229 TESTS (100% GREEN in ~31.2s)
+TOTAL: 307 TESTS (100% GREEN in ~28.7s)
 ```
