@@ -56,6 +56,15 @@ from ravana.strategies.two_way_absorption import (
 from ravana.strategies.two_way_inav_spread import TwoWayINAVSpreadTrigger
 from ravana.strategies.two_way_orb import TwoWayMorningORBTrigger
 from ravana.strategies.two_way_pead_drift import TwoWaySectorDriftTrigger
+from ravana.strategies.two_way_afternoon_europe import TwoWayAfternoonEuropeTrigger
+from ravana.strategies.two_way_lead_lag import TwoWayLeadLagTrigger
+from ravana.decisions.client import GeminiDecisionClient
+from ravana.decisions.veto_guard import DecisionVetoGuard
+from ravana.risk.decision_shield import DecisionRiskShield
+from ravana.strategies.elastic_string import (
+    CORE_ELASTIC_PAIRS,
+    generate_signals as generate_elastic_signals,
+)
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger("integrated_60d_portfolio")
@@ -104,11 +113,19 @@ class Integrated60DayPortfolioTrader:
         self.inav_trigger = TwoWayINAVSpreadTrigger(z_threshold=1.5, bps_threshold=15.0)
         self.drift_trigger = TwoWaySectorDriftTrigger(z_mom_threshold=1.20, vr_threshold=0.95)
         self.stop_sweep_trigger = TwoWayLiquidityStopSweepTrigger(
-            sweep_window=10, ofi_threshold=0.05, vr_ceiling=0.92, min_wick_ratio=0.40,
+            sweep_window=10, ofi_threshold=0.05, vr_ceiling=0.92, min_wick_ratio=0.35,
             supported_symbols={"PHARMABEES", "GOLDBEES", "SILVERBEES"},
         )
-        self.vwap_absorb_trigger = TwoWayVWAPAbsorptionTrigger(ofi_threshold=0.12, vr_ceiling=0.90)
-        self.stop_sweep_trigger = TwoWayLiquidityStopSweepTrigger(sweep_window=10, ofi_threshold=0.15)
+        self.vwap_absorb_trigger = TwoWayVWAPAbsorptionTrigger(
+            vr_ceiling=0.88,
+            allowed_symbols={"AUTOBEES", "BANKBEES", "ITBEES", "NIFTYBEES", "PHARMABEES"},
+        )
+        self.europe_trigger = TwoWayAfternoonEuropeTrigger(
+            momentum_threshold=0.0015, ofi_threshold=0.10
+        )
+        self.leadlag_trigger = TwoWayLeadLagTrigger(
+            leader_ret_threshold=0.0022, follower_lag_threshold=0.0008
+        )
 
         self.risk_bridge = StrategyRiskBridge(
             risk_budget_pct=0.0025,
@@ -134,6 +151,18 @@ class Integrated60DayPortfolioTrader:
         self.liquid_yield_pnl: float = 0.0
         self.dp_fees_saved_count: int = 0
         self.causality_violations: int = 0
+        self.vetoed_trades_count: int = 0
+        self.pre_dump_exits_count: int = 0
+
+        # Gemini Decisions Architecture
+        self.decision_client = GeminiDecisionClient()
+        self.veto_guard = DecisionVetoGuard(
+            client=self.decision_client,
+            ledger=self.ledger,
+            dead_money_threshold=0.60,
+            false_breakout_threshold=0.55,
+        )
+        self.risk_shield = DecisionRiskShield(client=self.decision_client, ledger=self.ledger)
 
     def run_simulation(self) -> Dict[str, Any]:
         """Execute synchronized 60-day Intraday MIS + Overnight CNC simulation."""
@@ -177,6 +206,34 @@ class Integrated60DayPortfolioTrader:
             sigs_sweep = self.stop_sweep_trigger.generate_signals(df, sym)
             for s in sigs_sweep:
                 intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
+
+            # 5. Strategy 3: Two-Way VWAP Absorption (Trend-Gated)
+            sigs_abs = self.vwap_absorb_trigger.generate_signals(df, sym)
+            for s in sigs_abs:
+                intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
+
+            # 6. Strategy 2: Two-Way Europe Open (IT & NIFTY Only)
+            if sym in ("ITBEES", "NIFTYBEES"):
+                sigs_eu = self.europe_trigger.generate_signals(df, sym)
+                for s in sigs_eu:
+                    intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
+
+            # 7. Strategy 9: Two-Way Cross-Asset Lead-Lag
+            if sym in ("PSUBNKBEES", "SILVERBEES"):
+                sigs_ll = self.leadlag_trigger.generate_signals(df, sym)
+                for s in sigs_ll:
+                    intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
+
+        # 5. Strategy 7: Live Elastic String Basis Tension Stat-Arb
+        for pair_cfg in CORE_ELASTIC_PAIRS:
+            if pair_cfg.etf_symbol in datasets_5m and pair_cfg.anchor_symbol in datasets_5m:
+                sigs_elastic = generate_elastic_signals(
+                    datasets_5m[pair_cfg.etf_symbol],
+                    datasets_5m[pair_cfg.anchor_symbol],
+                    pair_cfg,
+                )
+                for s in sigs_elastic:
+                    intraday_signals_by_ts.setdefault(s.timestamp, []).append(s)
 
         # Replay calendar day by day
         for d_idx, current_date in enumerate(trading_dates):
@@ -237,6 +294,21 @@ class Integrated60DayPortfolioTrader:
             if open_px <= pos["stop_loss"] or is_last_day:
                 self._close_overnight_position(sym, open_px, current_date, "HARD_STOP_OR_FINAL")
                 continue
+
+            # Gemini Decisions Overnight Continuation Gate (09:15 IST open)
+            if self.risk_shield is not None:
+                should_hold, ratcheted_stop, cont_reason = self.risk_shield.evaluate_overnight_continuation(
+                    ticker=sym,
+                    overnight_pos=pos,
+                    today_bar=today_bar,
+                )
+                if should_hold and not is_last_day:
+                    self.dp_fees_saved_count += 1
+                    pos["stop_loss"] = max(pos["stop_loss"], ratcheted_stop)
+                    continue
+                else:
+                    self._close_overnight_position(sym, open_px, current_date, cont_reason)
+                    continue
 
             # Momentum Continuation: check 20-day return persistence
             ret_20d = float(today_bar.get("RETURN_20D", 0.0))
@@ -300,6 +372,13 @@ class Integrated60DayPortfolioTrader:
 
     def _open_intraday_trade(self, sig: TriggerSignal, bar: pd.Series, ts: pd.Timestamp) -> None:
         """Open Long or Short Intraday MIS trade."""
+        # 1. Gemini Decisions Veto Guard: Veto false breakout traps and dead-money stagnation
+        if self.veto_guard is not None:
+            approved, veto_reason, prob = self.veto_guard.evaluate_signal(sig, bar)
+            if not approved:
+                self.vetoed_trades_count += 1
+                return
+
         curr_px = float(bar["Close"])
         raw_atr = float(bar.get("ATR_14", curr_px * 0.01))
         atr_val = max(raw_atr, curr_px * 0.0050)
@@ -307,6 +386,15 @@ class Integrated60DayPortfolioTrader:
         is_long = (sig.action == TriggerAction.BUY)
         initial_stop = float(sig.metadata.get("stop_loss", curr_px - 1.2 * atr_val if is_long else curr_px + 1.2 * atr_val))
         target_px = float(sig.metadata.get("target_price", curr_px + 1.8 * atr_val if is_long else curr_px - 1.8 * atr_val))
+
+        # 2. Gemini Decisions Dynamic Volatility Adaptive Stop
+        if self.risk_shield is not None:
+            initial_stop = self.risk_shield.compute_adaptive_stop(
+                ticker=sig.symbol,
+                entry_price=curr_px,
+                default_stop=initial_stop,
+                bar=bar,
+            )
 
         sizing = self.risk_bridge.calculate_risk_at_stop_size(
             ticker=sig.symbol,
@@ -343,6 +431,21 @@ class Integrated60DayPortfolioTrader:
 
     def _manage_intraday_positions(self, current_bars: Dict[str, pd.Series], ts: pd.Timestamp) -> None:
         """5-Layer Stop & Target Evaluation for open Intraday trades."""
+        # Gemini Decisions Pre-Dump Exit Shield (14:35 - 14:50 IST)
+        if self.risk_shield is not None and self.open_intraday_trades:
+            active_list = [
+                {"ticker": s, "shares": t["shares"], "entry_price": t["entry_price"]}
+                for s, t in self.open_intraday_trades.items()
+            ]
+            shield_exits = self.risk_shield.evaluate_pre_dump_exit(ts, active_list, current_bars)
+            for exit_sym, reason in shield_exits:
+                if exit_sym in self.open_intraday_trades and exit_sym in current_bars:
+                    trade = self.open_intraday_trades[exit_sym]
+                    close_px = float(current_bars[exit_sym]["Close"])
+                    bar_vol = float(current_bars[exit_sym].get("Volume", 1e5))
+                    self._close_intraday_trade(trade, close_px, bar_vol, ts, "PRE_DUMP_SHIELD_EXIT")
+                    self.pre_dump_exits_count += 1
+
         for sym, trade in list(self.open_intraday_trades.items()):
             if sym not in current_bars:
                 continue
@@ -601,6 +704,8 @@ class Integrated60DayPortfolioTrader:
         print(f"  ├── Inverse Short Hedge: ₹{self.inverse_hedge_pnl:+,.2f} (Bear Market Downside Protection)")
         print(f"  └── LIQUIDBEES Yield   : ₹{self.liquid_yield_pnl:+,.2f} (6.5% Risk-free Interest on Unused Cash)")
         print(f"  CDSL DP Fees Saved     : {self.dp_fees_saved_count} days (₹{self.dp_fees_saved_count * 15.93:,.2f}) via Continuation Gate")
+        print(f"  Vetoed Traps & Dead-Money: {self.vetoed_trades_count} trades (Gemini Veto Guard Blocked)")
+        print(f"  Pre-Dump MIS Exits     : {self.pre_dump_exits_count} trades (Shielded Before 15:00 Broker Dump)")
         print(f"  Causality Violations   : 0 (Strictly Causal: Zero Lookahead / No n+1 Leakage)")
         print("=" * 86)
 
@@ -608,10 +713,14 @@ class Integrated60DayPortfolioTrader:
             "initial_capital": self.initial_capital,
             "final_capital": final_capital,
             "net_profit": net_profit,
+            "roi_pct": roi_pct,
             "intraday_pnl": self.total_intraday_pnl,
             "overnight_pnl": self.total_overnight_pnl,
             "inverse_hedge_pnl": self.inverse_hedge_pnl,
             "liquid_yield_pnl": self.liquid_yield_pnl,
+            "vetoed_trades_count": self.vetoed_trades_count,
+            "pre_dump_exits_count": self.pre_dump_exits_count,
+            "dp_fees_saved_count": self.dp_fees_saved_count,
             "trade_history": self.trade_history,
         }
 

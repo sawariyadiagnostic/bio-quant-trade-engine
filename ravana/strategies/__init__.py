@@ -15,6 +15,7 @@ from ravana.strategies.elastic_string import (
     ElasticStringTrigger,
     check_snap_release,
     compute_basis_tension,
+    generate_signals,
 )
 from ravana.strategies.composite import (
     ALL_TRIGGER_NAMES,
@@ -123,4 +124,5 @@ __all__ = [
     "ElasticStringTrigger",
     "compute_basis_tension",
     "check_snap_release",
+    "generate_signals",
 ]

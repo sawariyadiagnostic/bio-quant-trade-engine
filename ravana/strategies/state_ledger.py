@@ -89,6 +89,10 @@ class SQLiteStateLedger:
         self._ensure_storage_dir()
         self._init_database()
 
+    def close(self) -> None:
+        """Close ledger resources if any (no-op as connections are context-managed)."""
+        pass
+
     def _ensure_storage_dir(self) -> None:
         """Create parent directory for SQLite database if not present."""
         dirname = os.path.dirname(self.db_path)
