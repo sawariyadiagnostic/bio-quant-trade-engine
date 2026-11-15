@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
+from loguru import logger
 import numpy as np
 import pandas as pd
 
@@ -106,6 +107,9 @@ class PaperBrokerGateway(BrokerGateway):
         )
 
 
+EXIT_TRANCHE_1 = "EXIT_TRANCHE_1"
+
+
 class BrokerOrderRouter:
     """Routes sized allocations to the broker while enforcing Muscle 18 and Phase 5 gates."""
 
@@ -121,34 +125,120 @@ class BrokerOrderRouter:
         self.live_mode = live_mode
         self.allow_shorting = allow_shorting
         self.slippage_estimator = MicrostructureSlippageModel()
+        self.continuation_holds_count: int = 0
 
-    def route_target_allocation(
+    @staticmethod
+    def _is_morning_session_open(ts: pd.Timestamp) -> bool:
+        """Return True if timestamp is within morning session open (09:15 to 09:25 IST)."""
+        if ts is None:
+            return False
+        local_ts = ts.tz_convert("Asia/Kolkata") if ts.tzinfo is not None else ts
+        t_str = local_ts.strftime("%H:%M")
+        return "09:15" <= t_str <= "09:25"
+
+    def _resolve_signal(
         self,
-        sized_allocation: VolatilitySizedAllocation,
+        sym: str,
+        continuation_signals: Optional[Union[Dict[str, float], float]],
+        continuation_signal: Optional[float],
+        kwargs: Dict[str, Any],
+    ) -> float:
+        """Extract symbol-specific continuation signal from multiple input formats."""
+        if isinstance(continuation_signals, dict):
+            return float(continuation_signals.get(sym, 0.0))
+        if isinstance(continuation_signals, (int, float)):
+            return float(continuation_signals)
+        if continuation_signal is not None:
+            return float(continuation_signal)
+        if "signal" in kwargs:
+            return float(kwargs["signal"])
+        if "signals" in kwargs:
+            sigs = kwargs["signals"]
+            return float(sigs.get(sym, 0.0) if isinstance(sigs, dict) else sigs)
+        return 0.0
+
+    def route_exit_tranche(
+        self,
+        tranche: str,
         current_holdings: Dict[str, int],
         current_prices: Dict[str, float],
         breaker_status: CircuitBreakerStatus,
         certificate: Optional[ValidationCertificate] = None,
         timestamp: Optional[pd.Timestamp] = None,
     ) -> RoutingReceipt:
-        """Diff target shares against current holdings and route delta orders safely."""
+        """Route partial multi-tranche exit orders (e.g. 50% for EXIT_TRANCHE_1)."""
         ts = timestamp or pd.Timestamp.now(tz="Asia/Kolkata")
         orders: List[Order] = []
-        all_syms = sorted(set(current_holdings.keys()) | set(sized_allocation.sized_shares.keys()))
+        if tranche == EXIT_TRANCHE_1:
+            for sym, curr_qty in current_holdings.items():
+                if curr_qty > 0:
+                    exit_shares = curr_qty // 2 if curr_qty > 1 else curr_qty
+                    if exit_shares > 0:
+                        orders.append(
+                            Order(f"SELL_T1_{sym}_{int(ts.timestamp())}", ts, sym, OrderSide.SELL, exit_shares)
+                        )
+        return self.route_orders(orders, current_prices, breaker_status, certificate)
+
+    def route_target_allocation(
+        self,
+        sized_allocation: Optional[Union[VolatilitySizedAllocation, str]] = None,
+        current_holdings: Optional[Dict[str, int]] = None,
+        current_prices: Optional[Dict[str, float]] = None,
+        breaker_status: Optional[CircuitBreakerStatus] = None,
+        certificate: Optional[ValidationCertificate] = None,
+        timestamp: Optional[pd.Timestamp] = None,
+        hold_on_strong_continuation: bool = True,
+        continuation_threshold: float = 0.50,
+        continuation_signals: Optional[Union[Dict[str, float], float]] = None,
+        continuation_signal: Optional[float] = None,
+        exit_tranche: Optional[str] = None,
+        **kwargs: Any,
+    ) -> RoutingReceipt:
+        """Diff target shares against current holdings and route delta orders safely."""
+        holdings = current_holdings or {}
+        prices = current_prices or {}
+        ts = timestamp or pd.Timestamp.now(tz="Asia/Kolkata")
+
+        # Two-tranche exit handling
+        tranche = exit_tranche or (sized_allocation if isinstance(sized_allocation, str) else None)
+        if tranche == EXIT_TRANCHE_1:
+            status = breaker_status or self.kill_switch.evaluate(0.0)
+            return self.route_exit_tranche(EXIT_TRANCHE_1, holdings, prices, status, certificate, ts)
+
+        orders: List[Order] = []
+        target_shares = sized_allocation.sized_shares if isinstance(sized_allocation, VolatilitySizedAllocation) else {}
+        all_syms = sorted(set(holdings.keys()) | set(target_shares.keys()))
 
         for sym in all_syms:
-            curr_qty = current_holdings.get(sym, 0)
-            targ_qty = sized_allocation.sized_shares.get(sym, 0)
+            curr_qty = holdings.get(sym, 0)
+            targ_qty = target_shares.get(sym, 0)
             delta = targ_qty - curr_qty
             if delta > 0:
                 orders.append(Order(f"BUY_{sym}_{int(ts.timestamp())}", ts, sym, OrderSide.BUY, delta))
             elif delta < 0:
-                # Strictly prevent unauthorized naked shorting for cash delivery equities
                 sell_shares = min(curr_qty, abs(delta)) if not self.allow_shorting else abs(delta)
-                if sell_shares > 0:
-                    orders.append(Order(f"SELL_{sym}_{int(ts.timestamp())}", ts, sym, OrderSide.SELL, sell_shares))
+                if sell_shares <= 0:
+                    continue
 
-        return self.route_orders(orders, current_prices, breaker_status, certificate)
+                sig = self._resolve_signal(sym, continuation_signals, continuation_signal, kwargs)
+                if (
+                    hold_on_strong_continuation
+                    and self._is_morning_session_open(ts)
+                    and sig >= continuation_threshold
+                ):
+                    self.continuation_holds_count += 1
+                    if hasattr(self.gateway, "continuation_holds_count"):
+                        self.gateway.continuation_holds_count += 1
+                    logger.info(
+                        f"Continuation hold active for {sym}: signal {sig:.2f} >= {continuation_threshold:.2f} "
+                        f"at {ts.strftime('%H:%M:%S')}. Skipping morning sell order and preserving ₹17 DP fee."
+                    )
+                    continue
+
+                orders.append(Order(f"SELL_{sym}_{int(ts.timestamp())}", ts, sym, OrderSide.SELL, sell_shares))
+
+        status = breaker_status or self.kill_switch.evaluate(0.0)
+        return self.route_orders(orders, prices, status, certificate)
 
     def route_orders(
         self,

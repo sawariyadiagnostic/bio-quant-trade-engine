@@ -1,7 +1,8 @@
 """Configuration and Feature Registry for Muscle 7 Feature Matrix Engine.
 
-Defines the 31 standardized stationary market vocabulary features (including
-intraday session-clock windows, opening-range breakout drift, and bond yield drivers),
+Defines the 36 standardized stationary market vocabulary features (including
+intraday session-clock windows, opening-range breakout drift, bond yield drivers,
+and advanced information theory / microstructure order flow signals),
 their mathematical descriptions, rolling windows, and normalization rules.
 """
 
@@ -9,9 +10,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
 
+FEATURE_VOCABULARY_SIZE: int = 36
+
 
 class FeatureName(str, Enum):
-    """Canonical registry of the 31 institutional stationary features."""
+    """Canonical registry of the 36 institutional stationary features."""
 
     # Price Returns (Stationary)
     LOG_RET_1 = "LOG_RET_1"
@@ -62,9 +65,16 @@ class FeatureName(str, Enum):
     TURN_OF_MONTH_SIP_WINDOW = "TURN_OF_MONTH_SIP_WINDOW"  # 1.0 on days 28..31 and 1..7 (DII SIP inflow window)
     EXPIRY_GAMMA_WINDOW = "EXPIRY_GAMMA_WINDOW"      # 1.0 on Thursday 14:15-15:20 IST weekly expiry gamma window
 
+    # Information Theory & Microstructure Dynamics (Muscle 7 Expanded)
+    VARIANCE_RATIO_20 = "variance_ratio_20"
+    ORDER_FLOW_IMBALANCE_5 = "order_flow_imbalance_5"
+    FVG_BULLISH_DRIFT = "fvg_bullish_drift"
+    STOP_SWEEP_RECLAIM = "stop_sweep_reclaim"
+    VIX_CRUSH_RELIEF = "vix_crush_relief"
+
 
 class FeatureRegistry:
-    """Provides metadata and discovery for all 31 stationary features."""
+    """Provides metadata and discovery for all 36 stationary features."""
 
     _DESCRIPTIONS: Dict[str, str] = {
         FeatureName.LOG_RET_1.value: "1-bar logarithmic return ln(Close_t / Close_{t-1})",
@@ -98,11 +108,16 @@ class FeatureRegistry:
         FeatureName.OPENING_RANGE_DRIFT.value: "ATR-normalized breakout drift from 09:15-09:45 Opening Range midpoint",
         FeatureName.TURN_OF_MONTH_SIP_WINDOW.value: "1.0 during 1st-7th and 28th-31st DII SIP cash deployment window, 0.0 otherwise",
         FeatureName.EXPIRY_GAMMA_WINDOW.value: "1.0 on Thursday 14:15-15:20 IST weekly options expiry gamma unpinning window, 0.0 otherwise",
+        FeatureName.VARIANCE_RATIO_20.value: "20-bar Lo-MacKinlay Variance Ratio r5_var / (5 * r1_var) in [0.10, 3.00]",
+        FeatureName.ORDER_FLOW_IMBALANCE_5.value: "5-bar volume-weighted Close Location Value order flow imbalance in [-1.0, 1.0]",
+        FeatureName.FVG_BULLISH_DRIFT.value: "3-bar Fair Value Gap bullish drift normalized by ATR_14 in [0.0, 5.0]",
+        FeatureName.STOP_SWEEP_RECLAIM.value: "10-bar swing low sweep and reclaim with positive OFI confirmation in {0.0, 1.0}",
+        FeatureName.VIX_CRUSH_RELIEF.value: "VIX crush relief indicator (Macro_VIX > 18.0 with 1-bar decline < -2%) in {0.0, 1.0}",
     }
 
     @classmethod
     def all_features(cls) -> List[str]:
-        """Return list of all 31 registered feature names."""
+        """Return list of all 36 registered feature names."""
         return [f.value for f in FeatureName]
 
     @classmethod
@@ -143,6 +158,13 @@ class FeatureConfig:
 
     # Macro baseline level for normalization
     vix_baseline: float = 15.0
+
+    # Information Theory & Microstructure Lookbacks
+    variance_ratio_window: int = 20
+    order_flow_window: int = 5
+    sweep_low_window: int = 10
+    vix_crush_threshold: float = 18.0
+    vix_crush_return_threshold: float = -0.02
 
     # Finite bounds clipping
     clip_outliers: bool = True

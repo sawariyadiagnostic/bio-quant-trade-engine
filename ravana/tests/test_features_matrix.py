@@ -163,13 +163,13 @@ class TestFeatureMatrixEngine(unittest.TestCase):
             index=dates,
         )
 
-    def test_31_stationary_features_presence(self) -> None:
-        """Verify engine computes all 31 registered stationary features without NaNs."""
+    def test_36_stationary_features_presence(self) -> None:
+        """Verify engine computes all 36 registered stationary features without NaNs."""
         engine = FeatureMatrixEngine(FeatureConfig())
         matrix = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
 
         expected_features = FeatureRegistry.all_features()
-        self.assertEqual(len(expected_features), 31)
+        self.assertEqual(len(expected_features), 36)
 
         for feat in expected_features:
             self.assertIn(feat, matrix.columns, f"Feature {feat} missing from matrix output")
@@ -180,7 +180,7 @@ class TestFeatureMatrixEngine(unittest.TestCase):
         self.assertEqual(len(matrix), len(self.df))
 
     def test_multi_asset_3d_tensor_dispatch(self) -> None:
-        """Verify compute_multi_asset_tensor produces [B, T, K] float32 tensor with 31 features."""
+        """Verify compute_multi_asset_tensor produces [B, T, K] float32 tensor with 36 features."""
         engine = FeatureMatrixEngine(FeatureConfig())
         df2 = self.df.copy()
         df2["Close"] = df2["Close"] * 1.5
@@ -190,9 +190,9 @@ class TestFeatureMatrixEngine(unittest.TestCase):
 
         self.assertIsInstance(tensor, torch.Tensor)
         self.assertEqual(tensor.dtype, torch.float32)
-        self.assertEqual(tensor.shape, (2, len(self.df), 31))
+        self.assertEqual(tensor.shape, (2, len(self.df), 36))
         self.assertEqual(symbols, ["BANKBEES", "NIFTYBEES"])
-        self.assertEqual(len(features), 31)
+        self.assertEqual(len(features), 36)
         self.assertEqual(len(time_index), len(self.df))
         self.assertTrue(torch.isfinite(tensor).all())
 
@@ -247,6 +247,95 @@ class TestFeatureMatrixEngine(unittest.TestCase):
                 atol=1e-5,
             )
 
+    def test_variance_ratio_20(self) -> None:
+        """Verify Lo-MacKinlay Variance Ratio is bounded in [0.10, 3.00] and defaults to 1.0."""
+        engine = FeatureMatrixEngine(FeatureConfig())
+        matrix = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
+        vr = matrix["variance_ratio_20"]
+
+        self.assertTrue(np.all(np.isfinite(vr)))
+        self.assertTrue((vr >= 0.10).all())
+        self.assertTrue((vr <= 3.00).all())
+
+        # Constant price series must default to 1.0
+        const_df = self.df.copy()
+        const_df["Close"] = 100.0
+        const_df["High"] = 100.0
+        const_df["Low"] = 100.0
+        const_matrix = engine.compute_feature_matrix(const_df, symbol="BANKBEES")
+        self.assertTrue((const_matrix["variance_ratio_20"] == 1.0).all())
+
+    def test_order_flow_imbalance_5(self) -> None:
+        """Verify Order Flow Imbalance is bounded in [-1.0, 1.0] and responds to CLV."""
+        engine = FeatureMatrixEngine(FeatureConfig())
+        matrix = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
+        ofi = matrix["order_flow_imbalance_5"]
+
+        self.assertTrue(np.all(np.isfinite(ofi)))
+        self.assertTrue((ofi >= -1.0).all())
+        self.assertTrue((ofi <= 1.0).all())
+
+        # Test pure buying pressure (Close == High): OFI must be positive
+        buy_df = self.df.copy()
+        buy_df["High"] = buy_df["Close"] + 1.0
+        buy_df["Low"] = buy_df["Close"] - 1.0
+        buy_df["Close"] = buy_df["High"]  # Close at High -> CLV = +1.0
+        buy_matrix = engine.compute_feature_matrix(buy_df, symbol="BANKBEES")
+        self.assertTrue((buy_matrix["order_flow_imbalance_5"].iloc[5:] > 0.9).all())
+
+    def test_fvg_bullish_drift(self) -> None:
+        """Verify Fair Value Gap bullish drift detects gaps and stays in [0.0, 5.0]."""
+        engine = FeatureMatrixEngine(FeatureConfig())
+        matrix = engine.compute_feature_matrix(self.df, symbol="BANKBEES")
+        fvg = matrix["fvg_bullish_drift"]
+
+        self.assertTrue(np.all(np.isfinite(fvg)))
+        self.assertTrue((fvg >= 0.0).all())
+        self.assertTrue((fvg <= 5.0).all())
+
+        # Synthesize a clear gap at bar 30: Low[30] > High[28]
+        gap_df = self.df.copy()
+        gap_df.iloc[30, gap_df.columns.get_loc("Low")] = gap_df.iloc[28]["High"] + 2.0
+        gap_df.iloc[30, gap_df.columns.get_loc("Close")] = gap_df.iloc[30]["Low"] + 0.5
+        gap_df.iloc[30, gap_df.columns.get_loc("High")] = gap_df.iloc[30]["Close"] + 0.5
+        gap_matrix = engine.compute_feature_matrix(gap_df, symbol="BANKBEES")
+        self.assertGreater(gap_matrix["fvg_bullish_drift"].iloc[30], 0.0)
+
+    def test_stop_sweep_reclaim(self) -> None:
+        """Verify 10-bar swing low sweep and reclaim triggers only under valid conditions."""
+        engine = FeatureMatrixEngine(FeatureConfig())
+        sweep_df = self.df.copy()
+
+        # Prior 10-bar low before bar 25
+        prior_10_low = sweep_df["Low"].iloc[15:25].min()
+
+        # Bar 25 sweeps prior low (Low < prior_10_low), reclaims (Close > prior_10_low), with high volume buying
+        sweep_df.iloc[25, sweep_df.columns.get_loc("Low")] = prior_10_low - 0.5
+        sweep_df.iloc[25, sweep_df.columns.get_loc("High")] = prior_10_low + 1.0
+        sweep_df.iloc[25, sweep_df.columns.get_loc("Close")] = prior_10_low + 1.0
+        sweep_df.iloc[25, sweep_df.columns.get_loc("Volume")] = 1000000.0  # Strong reclaim volume -> OFI > 0.15
+
+        matrix = engine.compute_feature_matrix(sweep_df, symbol="BANKBEES")
+        self.assertEqual(matrix["stop_sweep_reclaim"].iloc[25], 1.0)
+
+    def test_vix_crush_relief(self) -> None:
+        """Verify VIX crush relief triggers when Macro_VIX > 18.0 and return < -2%."""
+        engine = FeatureMatrixEngine(FeatureConfig())
+        vix_df = self.df.copy()
+
+        # Bar 40: VIX = 20.0, Bar 41: VIX = 19.0 (return ~ -5.1% < -2%, VIX > 18.0)
+        vix_df.iloc[40, vix_df.columns.get_loc("Macro_VIX")] = 20.0
+        vix_df.iloc[41, vix_df.columns.get_loc("Macro_VIX")] = 19.0
+
+        matrix = engine.compute_feature_matrix(vix_df, symbol="BANKBEES")
+        self.assertEqual(matrix["vix_crush_relief"].iloc[41], 1.0)
+        self.assertEqual(matrix["vix_crush_relief"].iloc[40], 0.0)
+
+        # Drop Macro_VIX -> should return zeros
+        no_vix_df = self.df.drop(columns=["Macro_VIX"])
+        no_vix_matrix = engine.compute_feature_matrix(no_vix_df, symbol="BANKBEES")
+        self.assertTrue((no_vix_matrix["vix_crush_relief"] == 0.0).all())
+
     def test_lakehouse_live_integration(self) -> None:
         """Verify feature engine computes cleanly on real Lakehouse Silver/Gold partitions."""
         from ravana.data.storage import LakeManager, StorageConfig
@@ -266,7 +355,7 @@ class TestFeatureMatrixEngine(unittest.TestCase):
         matrix = engine.compute_feature_matrix(silver_df, symbol="BANKBEES")
 
         self.assertEqual(len(matrix), len(silver_df))
-        self.assertEqual(len(matrix.columns), 31)
+        self.assertEqual(len(matrix.columns), 36)
         self.assertFalse(matrix.isna().any().any())
         self.assertTrue(np.all(np.isfinite(matrix.values)))
 

@@ -86,6 +86,7 @@ class ShoonyaBrokerGateway(BrokerGateway):
         )
         self.clordid_ledger: Dict[str, Trade] = {}
         self._auth_lock = threading.Lock()
+        self.continuation_holds_count: int = 0
 
         creds = self.config.credentials or ShoonyaCredentials.from_env()
         self.gateway = ShoonyaGateway(
@@ -113,6 +114,30 @@ class ShoonyaBrokerGateway(BrokerGateway):
             time.sleep(wait_dur)
             return wait_dur
         return 0.0
+
+    def should_hold_continuation(
+        self, symbol: str, current_signal: float, threshold: float = 0.50
+    ) -> bool:
+        """Evaluate whether to hold position through morning session to save DP fees."""
+        return float(current_signal) >= float(threshold)
+
+    @staticmethod
+    def compute_stoikov_micro_price(
+        bid_price: float, ask_price: float, bid_qty: int, ask_qty: int
+    ) -> float:
+        """Compute volume-weighted Stoikov micro-price from top-of-book depth."""
+        b_qty = float(bid_qty)
+        a_qty = float(ask_qty)
+        denom = b_qty + a_qty + 1e-5
+        numer = (b_qty * float(ask_price)) + (a_qty * float(bid_price))
+        return float(numer / denom)
+
+    @staticmethod
+    def get_staggered_open_timestamp(ts: pd.Timestamp) -> pd.Timestamp:
+        """Stagger 09:15:00 opening batch orders across 45-second post-auction buffer."""
+        if ts.hour == 9 and ts.minute == 15 and ts.second < 45:
+            return ts.replace(second=45, microsecond=0)
+        return ts
 
     def _authenticate_live(self) -> bool:
         """Atomically authenticate with Shoonya using 4-second TOTP epoch buffer guard."""

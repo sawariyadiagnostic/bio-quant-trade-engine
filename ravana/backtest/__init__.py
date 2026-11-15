@@ -6,6 +6,7 @@ from ravana.backtest.config import (
     TradingRegime,
 )
 from ravana.backtest.engine import BacktestResult, EventDrivenBacktester
+from ravana.backtest.fast_engine import FastBacktester, NumbaFastBacktester
 from ravana.backtest.friction import FrictionBreakdown, IndianFrictionModel
 from ravana.backtest.orders import (
     Order,
@@ -23,9 +24,11 @@ __all__ = [
     "EventDrivenBacktester",
     "ExecutionFill",
     "ExecutionTiming",
+    "FastBacktester",
     "FrictionBreakdown",
     "IndianFrictionModel",
     "MicrostructureSlippageModel",
+    "NumbaFastBacktester",
     "Order",
     "OrderSide",
     "OrderStatus",

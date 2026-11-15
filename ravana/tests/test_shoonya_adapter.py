@@ -13,6 +13,7 @@ from ravana.backtest.orders import Order, OrderSide, OrderStatus, Trade
 from ravana.execution.router import (
     BrokerOrderRouter,
     ExecutionAuditRecord,
+    EXIT_TRANCHE_1,
     RoutingReceipt,
 )
 from ravana.execution.shoonya_adapter import (
@@ -486,6 +487,78 @@ class TestShoonyaBrokerGateway(unittest.TestCase):
         sell_trade = [t for t in receipt.executed_trades if t.side == OrderSide.SELL][0]
         self.assertEqual(sell_trade.friction.dp_charges_inr, 15.93)
         self.assertGreater(sell_trade.friction.stt_inr, 0.0)
+
+    def test_shoonya_helper_methods(self) -> None:
+        """Verify ShoonyaBrokerGateway helper methods for continuation, Stoikov micro-price, and stagger."""
+        gateway = ShoonyaBrokerGateway(ShoonyaGatewayConfig(paper_trading=True))
+        self.assertEqual(gateway.continuation_holds_count, 0)
+
+        # 1. should_hold_continuation
+        self.assertTrue(gateway.should_hold_continuation("NIFTYBEES", 0.65, 0.50))
+        self.assertFalse(gateway.should_hold_continuation("NIFTYBEES", 0.35, 0.50))
+        self.assertTrue(gateway.should_hold_continuation("NIFTYBEES", 0.50, 0.50))
+
+        # 2. compute_stoikov_micro_price
+        p_sym = gateway.compute_stoikov_micro_price(
+            bid_price=100.0, ask_price=101.0, bid_qty=500, ask_qty=500
+        )
+        self.assertAlmostEqual(p_sym, 100.5, places=2)
+
+        p_skew = gateway.compute_stoikov_micro_price(
+            bid_price=100.0, ask_price=101.0, bid_qty=900, ask_qty=100
+        )
+        self.assertAlmostEqual(p_skew, 100.9, places=2)
+
+        # 3. get_staggered_open_timestamp
+        t_open = pd.Timestamp("2026-01-05 09:15:00", tz="Asia/Kolkata")
+        t_stag = gateway.get_staggered_open_timestamp(t_open)
+        self.assertEqual(t_stag, pd.Timestamp("2026-01-05 09:15:45", tz="Asia/Kolkata"))
+
+        t_mid = pd.Timestamp("2026-01-05 09:20:00", tz="Asia/Kolkata")
+        self.assertEqual(gateway.get_staggered_open_timestamp(t_mid), t_mid)
+
+    def test_router_continuation_gate_and_two_tranche_exits(self) -> None:
+        """Verify BrokerOrderRouter morning continuation hold and EXIT_TRANCHE_1 half-exit."""
+        gateway = ShoonyaBrokerGateway(ShoonyaGatewayConfig(paper_trading=True))
+        router = BrokerOrderRouter(gateway=gateway, live_mode=False)
+
+        # 1. Continuation Hold: 09:15 morning liquidation skipped when signal >= 0.50
+        t_morning = pd.Timestamp("2026-01-05 09:15:00", tz="Asia/Kolkata")
+        empty_alloc = VolatilitySizedAllocation(
+            base_allocation=AllocationResult(
+                target_weights={}, target_shares={}, target_notionals={},
+                drawdown_state=DrawdownState.NORMAL, drawdown_multiplier=1.0,
+                cash_reserve_inr=100000.0, total_allocated_inr=0.0,
+            ),
+            sized_weights={}, sized_shares={}, sized_notionals={},
+            vol_scalars={}, kelly_fraction_applied=0.5,
+            cash_reserve_inr=100000.0, total_deployed_inr=0.0,
+        )
+        receipt_hold = router.route_target_allocation(
+            sized_allocation=empty_alloc,
+            current_holdings={"NIFTYBEES": 100},
+            current_prices={"NIFTYBEES": 250.0},
+            timestamp=t_morning,
+            hold_on_strong_continuation=True,
+            continuation_threshold=0.50,
+            continuation_signals={"NIFTYBEES": 0.75},
+        )
+        self.assertEqual(len(receipt_hold.submitted_orders), 0)
+        self.assertEqual(len(receipt_hold.executed_trades), 0)
+        self.assertEqual(router.continuation_holds_count, 1)
+        self.assertEqual(gateway.continuation_holds_count, 1)
+
+        # 2. Two-tranche exit: EXIT_TRANCHE_1 routes exactly 50% shares
+        receipt_t1 = router.route_target_allocation(
+            sized_allocation=EXIT_TRANCHE_1,
+            current_holdings={"NIFTYBEES": 100, "GOLDBEES": 40},
+            current_prices={"NIFTYBEES": 250.0, "GOLDBEES": 60.0},
+            timestamp=pd.Timestamp("2026-01-05 11:30:00", tz="Asia/Kolkata"),
+        )
+        self.assertEqual(len(receipt_t1.submitted_orders), 2)
+        shares_map = {t.ticker: t.shares for t in receipt_t1.executed_trades}
+        self.assertEqual(shares_map["NIFTYBEES"], 50)
+        self.assertEqual(shares_map["GOLDBEES"], 20)
 
 
 if __name__ == "__main__":
