@@ -5,6 +5,7 @@ from ravana.risk.config import (
     DrawdownState,
     RiskConfig,
 )
+from ravana.risk.decision_shield import DecisionRiskShield
 from ravana.risk.engine import AllocationResult, PortfolioRiskEngine
 from ravana.risk.gatekeeper import RiskGatekeeper
 from ravana.risk.hrp import HierarchicalRiskParity
@@ -13,13 +14,14 @@ from ravana.risk.sizing import DynamicVolatilitySizer, VolatilitySizedAllocation
 __all__ = [
     "AllocationMethod",
     "AllocationResult",
+    "CircuitBreakerKillSwitch",
+    "CircuitBreakerStatus",
+    "DecisionRiskShield",
     "DrawdownState",
+    "DynamicVolatilitySizer",
     "HierarchicalRiskParity",
     "PortfolioRiskEngine",
     "RiskConfig",
     "RiskGatekeeper",
-    "DynamicVolatilitySizer",
     "VolatilitySizedAllocation",
-    "CircuitBreakerKillSwitch",
-    "CircuitBreakerStatus",
 ]

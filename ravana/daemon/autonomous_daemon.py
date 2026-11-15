@@ -39,6 +39,10 @@ from ravana.strategies.risk_adapter import (
     StrategyRiskBridge,
 )
 from ravana.strategies.state_ledger import SQLiteStateLedger
+from ravana.decisions.client import GeminiDecisionClient
+from ravana.decisions.universe_allocator import UniverseAlphaCrown
+from ravana.decisions.veto_guard import DecisionVetoGuard
+from ravana.risk.decision_shield import DecisionRiskShield
 
 logger = logging.getLogger("ravana.daemon")
 
@@ -59,6 +63,8 @@ class DaemonConfig:
     audit_file_path: str = "audit/shoonya_paper_orders.json"
     log_file_path: str = "audit/ravana_autonomous_daemon.log"
     paper_trading: bool = True
+    enable_gemini_decisions: bool = True
+    gemini_mock: bool = False
 
 
 @dataclass
@@ -109,6 +115,17 @@ class AutonomousExecutionDaemon:
         self.current_capital: float = self.config.initial_capital_inr
         self.open_trades: Dict[str, ActiveTradeTracker] = {}
         self.closed_trades_history: List[Dict[str, Any]] = []
+
+        if self.config.enable_gemini_decisions:
+            self.decision_client = GeminiDecisionClient(mock=self.config.gemini_mock)
+            self.veto_guard = DecisionVetoGuard(client=self.decision_client, ledger=self.ledger)
+            self.alpha_crown = UniverseAlphaCrown(client=self.decision_client, ledger=self.ledger)
+            self.risk_shield = DecisionRiskShield(client=self.decision_client, ledger=self.ledger)
+        else:
+            self.decision_client = None
+            self.veto_guard = None
+            self.alpha_crown = None
+            self.risk_shield = None
 
     def _ensure_directories(self) -> None:
         """Create audit directories if missing."""
@@ -179,7 +196,9 @@ class AutonomousExecutionDaemon:
         return cluster_notional < max_cluster_cap
 
     def _select_entry_candidates(
-        self, candidate_signals: List[TriggerSignal]
+        self,
+        candidate_signals: List[TriggerSignal],
+        current_bars: Optional[Dict[str, pd.Series]] = None,
     ) -> List[TriggerSignal]:
         """Rank BUY signals by conviction and select within available portfolio slots."""
         available_slots = self.config.max_concurrent_positions - len(self.open_trades)
@@ -196,6 +215,28 @@ class AutonomousExecutionDaemon:
                 continue
             valid.append(s)
 
+        if not valid:
+            return []
+
+        # Gemini Decisions Universe Alpha Crown for multiple candidates
+        if self.alpha_crown is not None and len(valid) > 1 and current_bars is not None:
+            winner_sig, alloc_frac = self.alpha_crown.select_top_allocation(
+                candidate_signals=valid,
+                current_bars=current_bars,
+                capital=self.current_capital,
+            )
+            if winner_sig is not None and alloc_frac > 0.0:
+                logger.info(
+                    "GEMINI ALPHA CROWN: Crown winner %s selected among %d candidates (alloc=%.2f).",
+                    winner_sig.symbol,
+                    len(valid),
+                    alloc_frac,
+                )
+                return [winner_sig]
+            elif winner_sig is None:
+                logger.info("GEMINI ALPHA CROWN: Evaluated %d candidates -> selected CASH.", len(valid))
+                return []
+
         valid.sort(key=lambda s: s.conviction, reverse=True)
         return valid[:available_slots]
 
@@ -209,11 +250,32 @@ class AutonomousExecutionDaemon:
         timestamp: pd.Timestamp,
     ) -> Optional[Trade]:
         """Size and execute BUY order through Shoonya Gateway and State Ledger."""
+        # 1. Gemini Decisions Veto Guard (trap, false breakout, dead money risk)
+        if self.veto_guard is not None:
+            approved, veto_reason, prob = self.veto_guard.evaluate_signal(sig, bar)
+            if not approved:
+                logger.info(
+                    "GEMINI VETO: %s signal rejected by %s (p=%.2f)",
+                    sig.symbol,
+                    veto_reason,
+                    prob,
+                )
+                return None
+
         curr_px = float(bar["Close"])
         raw_atr = float(bar.get("ATR_14", curr_px * 0.01))
         # Ensure minimum stop distance of 35 bps to prevent micro-spread tick churn
         atr_val = max(raw_atr, curr_px * 0.0035)
         initial_stop = curr_px - (1.0 * atr_val)
+
+        # 2. Gemini Decisions Dynamic Volatility Adaptive Stop
+        if self.risk_shield is not None:
+            initial_stop = self.risk_shield.compute_adaptive_stop(
+                ticker=sig.symbol,
+                entry_price=curr_px,
+                default_stop=initial_stop,
+                bar=bar,
+            )
 
         prod_type = "CNC" if sig.trigger_name == "OvernightContinuationTrigger" else "MIS"
         sizing = self.risk_bridge.calculate_risk_at_stop_size(
