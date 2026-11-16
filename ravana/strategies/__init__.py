@@ -48,6 +48,8 @@ from ravana.strategies.two_way_absorption import (
     TwoWayLiquidityStopSweepTrigger,
 )
 from ravana.strategies.two_way_afternoon_europe import TwoWayAfternoonEuropeTrigger
+from ravana.strategies.two_way_chop_reversion import TwoWayChopMeanReversionTrigger
+from ravana.strategies.volatility_scaler import AdaptiveThresholdScaler
 from ravana.strategies.two_way_expiry_gamma import TwoWayExpiryGammaTrigger
 from ravana.strategies.two_way_lead_lag import TwoWayLeadLagTrigger
 from ravana.strategies.triggers import (
@@ -83,6 +85,8 @@ __all__ = [
     "TwoWayAfternoonEuropeTrigger",
     "TwoWayExpiryGammaTrigger",
     "TwoWayLeadLagTrigger",
+    "TwoWayChopMeanReversionTrigger",
+    "AdaptiveThresholdScaler",
     # 10 Hardened Structural Triggers
     "OpeningRangeBreakoutTrigger",
     "ThursdayExpiryGammaTrigger",
