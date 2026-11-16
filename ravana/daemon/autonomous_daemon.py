@@ -343,8 +343,28 @@ class AutonomousExecutionDaemon:
         """Evaluate 5-Layer Stop Shield and Two-Tranche Scale-Out across open positions."""
         closed_symbols: List[str] = []
 
+        # Gemini Decisions Pre-Dump Shield (14:35 - 14:50 IST)
+        if self.risk_shield is not None and self.open_trades:
+            active_positions_payload = [
+                {"ticker": s, "shares": t.shares, "entry_price": t.entry_price, "product_type": t.product_type}
+                for s, t in self.open_trades.items()
+                if t.product_type == "MIS"
+            ]
+            shield_exits = self.risk_shield.evaluate_pre_dump_exit(
+                timestamp=timestamp,
+                active_positions=active_positions_payload,
+                current_bars=current_bars,
+            )
+            for exit_sym, reason in shield_exits:
+                if exit_sym in self.open_trades and exit_sym in current_bars:
+                    trade = self.open_trades[exit_sym]
+                    close_px = float(current_bars[exit_sym]["Close"])
+                    bar_vol = float(current_bars[exit_sym].get("Volume", 1e5))
+                    self._execute_full_exit(trade, close_px, bar_vol, timestamp, reason)
+                    closed_symbols.append(exit_sym)
+
         for sym, trade in list(self.open_trades.items()):
-            if sym not in current_bars:
+            if sym in closed_symbols or sym not in current_bars:
                 continue
 
             bar = current_bars[sym]
@@ -541,7 +561,7 @@ class AutonomousExecutionDaemon:
             candidate_signals = sector_signals_by_ts.get(ts, [])
 
             # 4. Resolve portfolio contention and execute accepted BUY candidates
-            accepted_entries = self._select_entry_candidates(candidate_signals)
+            accepted_entries = self._select_entry_candidates(candidate_signals, current_bars=current_bars)
             for sig in accepted_entries:
                 if sig.symbol in current_bars:
                     self._execute_buy(sig, current_bars[sig.symbol], ts)

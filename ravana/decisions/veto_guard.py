@@ -41,8 +41,8 @@ class DecisionVetoGuard:
         self,
         client: Optional[GeminiDecisionClient] = None,
         ledger: Optional[SQLiteStateLedger] = None,
-        dead_money_threshold: float = 0.60,
-        false_breakout_threshold: float = 0.55,
+        dead_money_threshold: float = 0.75,
+        false_breakout_threshold: float = 0.72,
     ) -> None:
         self.client = client if client is not None else GeminiDecisionClient(mock=True)
         self.ledger = ledger
@@ -66,8 +66,16 @@ class DecisionVetoGuard:
         vwap = _extract_bar_val(bar, ["VWAP", "vwap", "Vwap"], price)
         atr = _extract_bar_val(bar, ["ATR_14", "ATR", "atr", "atr_14"], 0.0)
         spread_z = _extract_bar_val(bar, ["SPREAD_Z", "spread_z", "spreadZ"], 0.0)
+        if spread_z == 0.0 and getattr(signal, "metadata", None):
+            spread_z = float(signal.metadata.get("spread_z", signal.metadata.get("z_score", 0.0)))
         ofi = _extract_bar_val(bar, ["OFI_5", "OFI", "ofi", "ofi_5"], 0.0)
+        if ofi == 0.0 and getattr(signal, "metadata", None):
+            ofi = float(signal.metadata.get("ofi", signal.metadata.get("ofi_5", 0.0)))
         vr = _extract_bar_val(bar, ["VARIANCE_RATIO_20", "VR_20", "VR", "vr", "vr_20"], 1.0)
+        if vr == 1.0 and getattr(signal, "metadata", None):
+            vr = float(signal.metadata.get("vr", signal.metadata.get("variance_ratio", 1.0)))
+        nifty_ret = _extract_bar_val(bar, ["NIFTY_RET", "nifty_ret", "Index_Ret"], 0.0)
+        rel_str = _extract_bar_val(bar, ["REL_STRENGTH", "RS", "relative_strength"], 0.0)
 
         parts = [
             f"Symbol: {symbol}",
@@ -78,6 +86,9 @@ class DecisionVetoGuard:
             f"Spread_Z: {spread_z:.2f}",
             f"OFI: {ofi:.4f}",
             f"VR: {vr:.4f}",
+            f"Regime: {'Chop' if vr < 0.85 else 'Trending'}",
+            f"NIFTY_Ret: {nifty_ret:+.2f}%",
+            f"Rel_Strength: {rel_str:+.2f}%",
             f"Trigger: {signal.trigger_name}",
             f"Action: {signal.action.value}",
             f"Conviction: {signal.conviction:.2f}",

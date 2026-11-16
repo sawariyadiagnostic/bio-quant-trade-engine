@@ -184,6 +184,30 @@ class DecisionResult:
 
         return cls(key=key, decision_type=dtype, raw_data=item)
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize result to a dictionary for caching and ledger storage."""
+        return {
+            "key": self.key,
+            "decision_type": self.decision_type.value,
+            "selected_choice": self.selected_choice,
+            "score": self.score,
+            "probability": self.probability,
+            "raw_data": self.raw_data or {},
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DecisionResult":
+        """Deserialize result from dictionary."""
+        dtype = DecisionType(data.get("decision_type", "noul"))
+        return cls(
+            key=data["key"],
+            decision_type=dtype,
+            selected_choice=data.get("selected_choice"),
+            score=data.get("score"),
+            probability=data.get("probability"),
+            raw_data=data.get("raw_data", {}),
+        )
+
 
 @dataclass
 class BatchResponse:
@@ -192,3 +216,26 @@ class BatchResponse:
     latency_ms: float = 0.0
     status: str = "OK"
     error_message: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize batch response to dictionary."""
+        return {
+            "results": {k: v.to_dict() for k, v in self.results.items()},
+            "latency_ms": self.latency_ms,
+            "status": self.status,
+            "error_message": self.error_message,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BatchResponse":
+        """Deserialize batch response from dictionary."""
+        results = {
+            k: DecisionResult.from_dict(v)
+            for k, v in data.get("results", {}).items()
+        }
+        return cls(
+            results=results,
+            latency_ms=data.get("latency_ms", 0.0),
+            status=data.get("status", "OK"),
+            error_message=data.get("error_message"),
+        )

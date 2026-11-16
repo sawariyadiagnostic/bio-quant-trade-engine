@@ -51,3 +51,9 @@ temp/
 # Large Data Binaries & Lakehouse Store
 *.parquet
 ravana/data/lake/
+
+# Ephemeral Audit & Cache Databases
+audit/*.db
+audit/*.log
+ravana/audit/
+

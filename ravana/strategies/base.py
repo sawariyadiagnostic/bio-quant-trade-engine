@@ -28,6 +28,10 @@ class TriggerAction(str, Enum):
     EXIT_TIME_STOP = "EXIT_TIME_STOP"
 
 
+# Alias for backward compatibility
+Action = TriggerAction
+
+
 @dataclass
 class StopLayerState:
     """State tracker for the 5-Layer Zero-Giveback stop and scale-out engine."""
@@ -40,6 +44,7 @@ class StopLayerState:
     active_stop: float = 0.0
     peak_price: float = 0.0
     bars_held: int = 0
+    is_long: bool = True
 
 
 @dataclass(frozen=True)
@@ -112,12 +117,18 @@ class ZeroGivebackStopEngine:
         self,
         entry_price: float,
         atr: float,
+        is_long: bool = True,
         custom_stop: Optional[float] = None,
     ) -> StopLayerState:
         """Initialize Layer 1 Thesis Invalidation Stop and initial state."""
-        floor_stop = entry_price * (1.0 - self.max_invalidation_bps / 10000.0)
-        init_stop = max(custom_stop, floor_stop) if custom_stop is not None else floor_stop
-        be_stop = entry_price * (1.0 + self.breakeven_friction_bps / 10000.0)
+        if is_long:
+            floor_stop = entry_price * (1.0 - self.max_invalidation_bps / 10000.0)
+            init_stop = max(custom_stop, floor_stop) if custom_stop is not None else floor_stop
+            be_stop = entry_price * (1.0 + self.breakeven_friction_bps / 10000.0)
+        else:
+            ceil_stop = entry_price * (1.0 + self.max_invalidation_bps / 10000.0)
+            init_stop = min(custom_stop, ceil_stop) if custom_stop is not None else ceil_stop
+            be_stop = entry_price * (1.0 - self.breakeven_friction_bps / 10000.0)
 
         return StopLayerState(
             initial_stop=init_stop,
@@ -128,6 +139,7 @@ class ZeroGivebackStopEngine:
             active_stop=init_stop,
             peak_price=entry_price,
             bars_held=0,
+            is_long=is_long,
         )
 
     def update(
@@ -138,38 +150,51 @@ class ZeroGivebackStopEngine:
         bar_low: float,
         bar_close: float,
         atr: float,
+        is_long: Optional[bool] = None,
         is_mis: bool = True,
     ) -> Tuple[StopLayerState, TriggerAction]:
         """Evaluate the 5 layers against the current bar and return updated state and action."""
+        if is_long is None:
+            is_long = getattr(state, "is_long", True)
         state.bars_held += 1
-        state.peak_price = max(state.peak_price, bar_high)
 
-        # 1. Check for Active Stop Breach (Layer 1, Ratchets, or Chandelier)
-        if bar_low <= state.active_stop:
-            return state, TriggerAction.EXIT_ALL
-
-        # 2. Layer 5: 4-Bar Dead-Money Time Stop (flat exit if no traction)
-        if state.bars_held >= self.dead_money_bars:
-            if state.peak_price < entry_price + self.dead_money_peak_atr * atr:
+        if is_long:
+            state.peak_price = max(state.peak_price, bar_high)
+            if bar_low <= state.active_stop:
+                return state, TriggerAction.EXIT_ALL
+            if state.bars_held >= self.dead_money_bars and state.peak_price < entry_price + self.dead_money_peak_atr * atr:
                 return state, TriggerAction.EXIT_TIME_STOP
-
-        # 3. Layer 2: +0.45 ATR Breakeven Ratchet
-        if not state.is_breakeven_triggered and bar_high >= entry_price + self.breakeven_atr_threshold * atr:
-            state.is_breakeven_triggered = True
-            state.active_stop = max(state.active_stop, state.breakeven_stop)
-
-        # 4. Layer 3: Two-Tranche Scale-Out at +0.75 ATR (MIS only)
-        action = TriggerAction.HOLD
-        if is_mis and not state.tranche_1_sold and bar_high >= entry_price + self.tranche1_atr_threshold * atr:
-            state.tranche_1_sold = True
-            runner_stop = entry_price + self.runner_snap_atr * atr
-            state.active_stop = max(state.active_stop, runner_stop)
-            action = TriggerAction.EXIT_TRANCHE_1
-
-        # 5. Layer 4: Chandelier Ratchet at +1.0 ATR
-        if state.peak_price >= entry_price + self.chandelier_activation_atr * atr:
-            chan_stop = state.peak_price - self.chandelier_distance_atr * atr
-            state.chandelier_stop = chan_stop
-            state.active_stop = max(state.active_stop, chan_stop)
-
-        return state, action
+            if not state.is_breakeven_triggered and bar_high >= entry_price + self.breakeven_atr_threshold * atr:
+                state.is_breakeven_triggered = True
+                state.active_stop = max(state.active_stop, state.breakeven_stop)
+            action = TriggerAction.HOLD
+            if is_mis and not state.tranche_1_sold and bar_high >= entry_price + self.tranche1_atr_threshold * atr:
+                state.tranche_1_sold = True
+                state.active_stop = max(state.active_stop, entry_price + self.runner_snap_atr * atr)
+                action = TriggerAction.EXIT_TRANCHE_1
+            if state.peak_price >= entry_price + self.chandelier_activation_atr * atr:
+                dist = 0.15 if state.peak_price >= entry_price + 1.8 * atr else self.chandelier_distance_atr
+                chan_stop = state.peak_price - dist * atr
+                state.chandelier_stop = chan_stop
+                state.active_stop = max(state.active_stop, chan_stop)
+            return state, action
+        else:
+            state.peak_price = min(state.peak_price, bar_low) if state.peak_price > 0 else bar_low
+            if bar_high >= state.active_stop:
+                return state, TriggerAction.EXIT_ALL
+            if state.bars_held >= self.dead_money_bars and state.peak_price > entry_price - self.dead_money_peak_atr * atr:
+                return state, TriggerAction.EXIT_TIME_STOP
+            if not state.is_breakeven_triggered and bar_low <= entry_price - self.breakeven_atr_threshold * atr:
+                state.is_breakeven_triggered = True
+                state.active_stop = min(state.active_stop, state.breakeven_stop)
+            action = TriggerAction.HOLD
+            if is_mis and not state.tranche_1_sold and bar_low <= entry_price - self.tranche1_atr_threshold * atr:
+                state.tranche_1_sold = True
+                state.active_stop = min(state.active_stop, entry_price - self.runner_snap_atr * atr)
+                action = TriggerAction.EXIT_TRANCHE_1
+            if state.peak_price <= entry_price - self.chandelier_activation_atr * atr:
+                dist = 0.15 if state.peak_price <= entry_price - 1.8 * atr else self.chandelier_distance_atr
+                chan_stop = state.peak_price + dist * atr
+                state.chandelier_stop = chan_stop
+                state.active_stop = min(state.active_stop, chan_stop)
+            return state, action

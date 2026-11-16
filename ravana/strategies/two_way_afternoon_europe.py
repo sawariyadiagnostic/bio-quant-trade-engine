@@ -19,7 +19,7 @@ from ravana.strategies.base import (
     TriggerAction,
     TriggerSignal,
 )
-from ravana.strategies.triggers import extract_ofi_proxy
+from ravana.strategies.triggers import extract_ofi_proxy, extract_session_vwap
 
 
 class TwoWayAfternoonEuropeTrigger(StructuralTrigger):
@@ -56,6 +56,7 @@ class TwoWayAfternoonEuropeTrigger(StructuralTrigger):
 
         log_ret_5 = np.log(df["Close"] / df["Close"].shift(5).replace(0.0, np.nan)).fillna(0.0)
         ofi = extract_ofi_proxy(df)
+        session_vwap = extract_session_vwap(df)
         daily_entered: Set[Any] = set()
 
         for i in range(5, len(df)):
@@ -87,8 +88,10 @@ class TwoWayAfternoonEuropeTrigger(StructuralTrigger):
             raw_atr = float(df.get("ATR_14", pd.Series(curr_close * 0.01, index=df.index)).iloc[i])
             atr_val = max(raw_atr, curr_close * 0.0035)
 
-            # 1. Bullish EU Open Momentum -> BUY
-            if ret5 >= self.momentum_threshold and curr_ofi >= self.ofi_threshold:
+            curr_vwap = float(session_vwap.iloc[i])
+
+            # 1. Bullish EU Open Momentum -> BUY (Must be above VWAP)
+            if ret5 >= self.momentum_threshold and curr_ofi >= self.ofi_threshold and curr_close > curr_vwap:
                 daily_entered.add(d)
                 target = curr_close + (self.target_atr_mult * atr_val)
                 stop = curr_close - (self.stop_atr_mult * atr_val)
@@ -107,8 +110,8 @@ class TwoWayAfternoonEuropeTrigger(StructuralTrigger):
                     )
                 )
 
-            # 2. Bearish EU Open Momentum -> SELL / SHORT
-            elif ret5 <= -self.momentum_threshold and curr_ofi <= -self.ofi_threshold:
+            # 2. Bearish EU Open Momentum -> SELL / SHORT (Must be below VWAP)
+            elif ret5 <= -self.momentum_threshold and curr_ofi <= -self.ofi_threshold and curr_close < curr_vwap:
                 daily_entered.add(d)
                 target = curr_close - (self.target_atr_mult * atr_val)
                 stop = curr_close + (self.stop_atr_mult * atr_val)

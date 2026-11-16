@@ -301,3 +301,14 @@ class ElasticStringEngine:
 
 # Alias for trigger integration
 ElasticStringTrigger = ElasticStringEngine
+
+
+def generate_signals(
+    etf_df: Union[pd.DataFrame, pd.Series],
+    anchor_df: Union[pd.DataFrame, pd.Series],
+    pair_config: Optional[ElasticPairConfig] = None,
+) -> List[TriggerSignal]:
+    """Module-level generator for discrete execution signals using ElasticStringEngine."""
+    engine = ElasticStringEngine(config=pair_config)
+    return engine.generate_signals(etf_df, anchor_df, pair_config)
+

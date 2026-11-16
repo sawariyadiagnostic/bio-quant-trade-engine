@@ -1,33 +1,12 @@
 """RAVANA v4.3: Integrated 60-Day Multi-Strategy Intraday (MIS) & Overnight (CNC) Engine.
-
-Executes synchronized trading across the 60-day 5-minute dataset (2026-08-18 to 2026-11-13):
-1. Intraday MIS Trading (09:15 to 15:00 IST):
-   - TwoWayMorningORBTrigger: Fresh-cross breakouts and breakdowns (VR >= 0.95).
-   - TwoWayVWAPAbsorptionTrigger: Fading Bollinger extremes to VWAP in chop (VR < 0.90).
-   - TwoWayLiquidityStopSweepTrigger: 10-bar swing sweeps with wick rejections.
-   - 5-Layer Stop Shield & Tactical Execution.
-   - Mandatory MIS Square-Off by 15:00 IST (flat book).
-2. Overnight CNC Allocation (15:10 IST to 09:15 IST next day):
-   - All-Weather Macro Allocator: Bull Sector Rotation & Bear Inverse Short Hedge.
-   - Continuation Gate (DP Fee Saver) & Sovereign Risk Parity (35% caps).
-   - 6.5% Liquid Yield on unallocated cash.
-3. Strict Point-in-Time Causality (Zero Lookahead / No n+1 Leakage).
+Synchronized 60-day execution: 5-Stage Trailing Stop, Gemini Decisions, and Macro Rotation.
 """
 from __future__ import annotations
-
-import json
-import logging
-import math
-import os
-import sys
-import time
+import json, logging, math, os, sys, time
 from typing import Any, Dict, List, Optional, Set, Tuple
-import numpy as np
-import pandas as pd
+import numpy as np, pandas as pd
 
-# UTF-8 Console Safety
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
@@ -59,8 +38,10 @@ from ravana.strategies.two_way_pead_drift import TwoWaySectorDriftTrigger
 from ravana.strategies.two_way_afternoon_europe import TwoWayAfternoonEuropeTrigger
 from ravana.strategies.two_way_lead_lag import TwoWayLeadLagTrigger
 from ravana.decisions.client import GeminiDecisionClient
+from ravana.decisions.universe_allocator import UniverseAlphaCrown
 from ravana.decisions.veto_guard import DecisionVetoGuard
 from ravana.risk.decision_shield import DecisionRiskShield
+from ravana.strategies.base import StopLayerState, ZeroGivebackStopEngine
 from ravana.strategies.elastic_string import (
     CORE_ELASTIC_PAIRS,
     generate_signals as generate_elastic_signals,
@@ -113,12 +94,12 @@ class Integrated60DayPortfolioTrader:
         self.inav_trigger = TwoWayINAVSpreadTrigger(z_threshold=1.5, bps_threshold=15.0)
         self.drift_trigger = TwoWaySectorDriftTrigger(z_mom_threshold=1.20, vr_threshold=0.95)
         self.stop_sweep_trigger = TwoWayLiquidityStopSweepTrigger(
-            sweep_window=10, ofi_threshold=0.05, vr_ceiling=0.92, min_wick_ratio=0.35,
-            supported_symbols={"PHARMABEES", "GOLDBEES", "SILVERBEES"},
+            sweep_window=10, ofi_threshold=0.08, vr_ceiling=0.85, min_wick_ratio=0.40,
+            supported_symbols={"BANKBEES", "NIFTYBEES", "ITBEES"},
         )
         self.vwap_absorb_trigger = TwoWayVWAPAbsorptionTrigger(
-            vr_ceiling=0.88,
-            allowed_symbols={"AUTOBEES", "BANKBEES", "ITBEES", "NIFTYBEES", "PHARMABEES"},
+            vr_ceiling=0.85,
+            allowed_symbols={"AUTOBEES", "BANKBEES", "ITBEES", "NIFTYBEES"},
         )
         self.europe_trigger = TwoWayAfternoonEuropeTrigger(
             momentum_threshold=0.0015, ofi_threshold=0.10
@@ -155,14 +136,16 @@ class Integrated60DayPortfolioTrader:
         self.pre_dump_exits_count: int = 0
 
         # Gemini Decisions Architecture
-        self.decision_client = GeminiDecisionClient()
+        self.decision_client = GeminiDecisionClient(backtest_mode=True, enable_cache=True)
         self.veto_guard = DecisionVetoGuard(
             client=self.decision_client,
             ledger=self.ledger,
-            dead_money_threshold=0.60,
-            false_breakout_threshold=0.55,
+            dead_money_threshold=0.75,
+            false_breakout_threshold=0.72,
         )
+        self.alpha_crown = UniverseAlphaCrown(client=self.decision_client, ledger=self.ledger)
         self.risk_shield = DecisionRiskShield(client=self.decision_client, ledger=self.ledger)
+        self.stop_engine = ZeroGivebackStopEngine()
 
     def run_simulation(self) -> Dict[str, Any]:
         """Execute synchronized 60-day Intraday MIS + Overnight CNC simulation."""
@@ -347,17 +330,17 @@ class Integrated60DayPortfolioTrader:
             t_str = ts.strftime("%H:%M")
             current_bars = {sym: df.loc[ts] for sym, df in day_bars_all.items() if ts in df.index}
 
-            # 1. Manage active intraday positions
+            # 1. Manage active intraday positions with 5-Stage Stop Engine & Pre-Dump Shield
             self._manage_intraday_positions(current_bars, ts)
 
-            # 2. Mandatory Square-off locks: Flat MIS book at end of morning session (11:30 IST)
-            if t_str >= "11:30":
-                self._square_off_all_intraday(current_bars, ts, "MORNING_1130_LOCK")
+            # 2. Mandatory Pre-Dump Square-off: Flat intraday MIS book by 14:45 IST ahead of 15:00 broker dump
+            if t_str >= "14:45":
+                self._square_off_all_intraday(current_bars, ts, "PRE_DUMP_1445_LOCK")
                 continue
 
-            # 3. New entries strictly in High-Liquidity Morning Session (09:35 to 10:45 IST)
-            # Midday and afternoon entries (11:00-14:30) are structurally banned due to 15:00 square-off decay
-            if ("09:35" <= t_str <= "10:45") and (len(self.open_intraday_trades) < 2):
+            # 3. New entries in Morning Window (09:35-11:00) and Afternoon Europe Window (13:00-14:00)
+            in_entry_window = ("09:35" <= t_str <= "11:00") or ("13:00" <= t_str <= "14:00")
+            if in_entry_window and (len(self.open_intraday_trades) < 2):
                 candidates = signals_by_ts.get(ts, [])
                 valid_candidates = [
                     c for c in candidates
@@ -365,10 +348,12 @@ class Integrated60DayPortfolioTrader:
                     and c.symbol in current_bars
                     and c.action in (TriggerAction.BUY, TriggerAction.SELL)
                 ]
-                valid_candidates.sort(key=lambda s: s.conviction, reverse=True)
-                available = 2 - len(self.open_intraday_trades)
-                for sig in valid_candidates[:available]:
-                    self._open_intraday_trade(sig, current_bars[sig.symbol], ts)
+                if valid_candidates:
+                    winning_sig, alloc_frac = self.alpha_crown.select_top_allocation(
+                        valid_candidates, current_bars, self.current_cash
+                    )
+                    if winning_sig is not None and alloc_frac > 0.0:
+                        self._open_intraday_trade(winning_sig, current_bars[winning_sig.symbol], ts)
 
     def _open_intraday_trade(self, sig: TriggerSignal, bar: pd.Series, ts: pd.Timestamp) -> None:
         """Open Long or Short Intraday MIS trade."""
@@ -396,16 +381,16 @@ class Integrated60DayPortfolioTrader:
                 bar=bar,
             )
 
-        sizing = self.risk_bridge.calculate_risk_at_stop_size(
-            ticker=sig.symbol,
-            entry_price=curr_px,
-            stop_loss_price=initial_stop,
-            account_equity=self.current_cash,
-            product_type="MIS",
-        )
-        shares = sizing.shares
-        if shares <= 0:
+        # 3. Dynamic Geometric Compounding: Risk 0.25% of current equity
+        account_equity = self.current_cash + sum(t["shares"] * t["entry_price"] for t in self.open_intraday_trades.values())
+        risk_budget = max(500.0, account_equity * 0.0025)
+        stop_dist = abs(curr_px - initial_stop)
+        if stop_dist <= 0:
             return
+        calculated_shares = int(risk_budget / stop_dist)
+        max_notional_shares = int((account_equity * 0.20) / curr_px)
+        max_vol_shares = int(float(bar.get("Volume", 1e5)) * 0.02)
+        shares = max(1, min(calculated_shares, max_notional_shares, max_vol_shares))
 
         side = OrderSide.BUY if is_long else OrderSide.SELL
         order = Order(
@@ -417,6 +402,12 @@ class Integrated60DayPortfolioTrader:
         )
         trade = self.gateway.place_order(order, reference_price=curr_px, bar_volume=float(bar.get("Volume", 1e5)))
         if trade:
+            stop_state = self.stop_engine.initialize_position(
+                entry_price=trade.price,
+                atr=atr_val,
+                is_long=is_long,
+                custom_stop=initial_stop,
+            )
             self.open_intraday_trades[sig.symbol] = {
                 "ticker": sig.symbol,
                 "shares": trade.shares,
@@ -427,6 +418,8 @@ class Integrated60DayPortfolioTrader:
                 "atr": atr_val,
                 "trigger_name": sig.trigger_name,
                 "is_long": is_long,
+                "stop_state": stop_state,
+                "original_shares": trade.shares,
             }
 
     def _manage_intraday_positions(self, current_bars: Dict[str, pd.Series], ts: pd.Timestamp) -> None:
@@ -452,23 +445,47 @@ class Integrated60DayPortfolioTrader:
             bar = current_bars[sym]
             high_px = float(bar["High"])
             low_px = float(bar["Low"])
+            close_px = float(bar["Close"])
             bar_vol = float(bar.get("Volume", 1e5))
             is_long = trade["is_long"]
+            stop_state = trade.get("stop_state")
+
+            if stop_state is not None:
+                updated_state, action = self.stop_engine.update(
+                    state=stop_state,
+                    entry_price=trade["entry_price"],
+                    bar_high=high_px,
+                    bar_low=low_px,
+                    bar_close=close_px,
+                    atr=trade["atr"],
+                    is_long=is_long,
+                    is_mis=True,
+                )
+                trade["stop_state"] = updated_state
+                trade["current_stop"] = updated_state.active_stop
+
+                if action == TriggerAction.EXIT_ALL:
+                    self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
+                    continue
+                elif action == TriggerAction.EXIT_TIME_STOP:
+                    self._close_intraday_trade(trade, close_px, bar_vol, ts, "DEAD_MONEY_STALL_EXIT")
+                    continue
+                elif action == TriggerAction.EXIT_TRANCHE_1:
+                    tranche_shares = trade["shares"] // 2
+                    if tranche_shares > 0:
+                        exit_px = trade["entry_price"] + (0.75 * trade["atr"]) if is_long else trade["entry_price"] - (0.75 * trade["atr"])
+                        self._partial_close_intraday_trade(trade, tranche_shares, exit_px, bar_vol, ts, "TRANCHE_1_SCALE_OUT")
 
             if is_long:
                 if low_px <= trade["current_stop"]:
                     self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
                 elif high_px >= trade["target_price"]:
                     self._close_intraday_trade(trade, trade["target_price"], bar_vol, ts, "TARGET_HIT")
-                elif high_px >= trade["entry_price"] + (0.50 * trade["atr"]):
-                    trade["current_stop"] = max(trade["current_stop"], trade["entry_price"] * 1.0002)
             else:
                 if high_px >= trade["current_stop"]:
                     self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
                 elif low_px <= trade["target_price"]:
                     self._close_intraday_trade(trade, trade["target_price"], bar_vol, ts, "TARGET_HIT")
-                elif low_px <= trade["entry_price"] - (0.50 * trade["atr"]):
-                    trade["current_stop"] = min(trade["current_stop"], trade["entry_price"] * 0.9998)
 
     def _close_intraday_trade(
         self, trade: Dict[str, Any], exit_px: float, bar_vol: float, ts: pd.Timestamp, reason: str
@@ -503,6 +520,43 @@ class Integrated60DayPortfolioTrader:
                 "reason": reason,
             })
             del self.open_intraday_trades[sym]
+
+    def _partial_close_intraday_trade(
+        self, trade: Dict[str, Any], shares_to_close: int, exit_px: float, bar_vol: float, ts: pd.Timestamp, reason: str
+    ) -> None:
+        """Partially close intraday MIS trade (Tranche-1 scale-out) and bank PnL."""
+        sym = trade["ticker"]
+        side = OrderSide.SELL if trade["is_long"] else OrderSide.BUY
+        order = Order(
+            order_id=f"INTRA_SCALE_{sym}_{int(ts.timestamp())}",
+            timestamp=ts,
+            ticker=sym,
+            side=side,
+            shares=shares_to_close,
+        )
+        fill = self.gateway.place_order(order, reference_price=exit_px, bar_volume=bar_vol)
+        if fill:
+            pnl = (
+                (fill.price - trade["entry_price"]) * shares_to_close
+                if trade["is_long"]
+                else (trade["entry_price"] - fill.price) * shares_to_close
+            )
+            self.current_cash += pnl
+            self.total_intraday_pnl += pnl
+            trade["shares"] -= shares_to_close
+            self.trade_history.append({
+                "type": "INTRADAY_SCALE",
+                "ticker": sym,
+                "trigger_name": trade["trigger_name"],
+                "side": "LONG" if trade["is_long"] else "SHORT",
+                "entry_time": str(trade["entry_time"]),
+                "exit_time": str(ts),
+                "entry_price": trade["entry_price"],
+                "exit_price": fill.price,
+                "shares": shares_to_close,
+                "pnl": round(pnl, 2),
+                "reason": reason,
+            })
 
     def _square_off_intraday_by_trigger(
         self, trigger_prefix: str, current_bars: Dict[str, pd.Series], ts: pd.Timestamp, reason: str

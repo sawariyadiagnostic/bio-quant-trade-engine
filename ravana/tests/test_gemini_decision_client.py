@@ -239,6 +239,7 @@ class TestRateLimiterAndRetries(unittest.TestCase):
             mock=False,
             max_retries=2,
             retry_delay=0.01,
+            enable_cache=False,
         )
         questions = [Question(key="q1", question="Outperform?", decision_type=DecisionType.NOUL)]
         resp = client.evaluate("Market context", questions)
