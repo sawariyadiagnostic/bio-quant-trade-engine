@@ -55,5 +55,6 @@ ravana/data/lake/
 # Ephemeral Audit & Cache Databases
 audit/*.db
 audit/*.log
+audit/*.json
 ravana/audit/
 
