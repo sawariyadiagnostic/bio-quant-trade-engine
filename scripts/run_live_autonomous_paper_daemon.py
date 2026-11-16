@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 import pandas as pd
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
@@ -48,6 +48,13 @@ from scripts.fetch_today_live_data import fetch_today_all, fetch_daily_all
 logger = logging.getLogger("ravana.live_daemon")
 
 
+class FlushFileHandler(logging.FileHandler):
+    """FileHandler that flushes immediately on every write."""
+    def emit(self, record: logging.LogRecord) -> None:
+        super().emit(record)
+        self.flush()
+
+
 class LiveAutonomousPaperDaemon:
     """Production Autonomous Daemon for Live Paper Trading."""
 
@@ -67,7 +74,7 @@ class LiveAutonomousPaperDaemon:
         self._init_subsystems()
 
     def _init_logging(self) -> None:
-        """Configure dual console and file logging."""
+        """Configure dual console and file logging with immediate flush."""
         os.makedirs(os.path.join(BASE_DIR, "audit"), exist_ok=True)
         log_path = os.path.join(BASE_DIR, "audit", "ravana_live_daemon.log")
         logging.basicConfig(
@@ -75,10 +82,11 @@ class LiveAutonomousPaperDaemon:
             format="%(asctime)s [%(levelname)s] %(message)s",
             handlers=[
                 logging.StreamHandler(sys.stdout),
-                logging.FileHandler(log_path, encoding="utf-8"),
+                FlushFileHandler(log_path, encoding="utf-8", mode="a"),
             ],
             force=True,
         )
+        logger.setLevel(logging.INFO)
 
     def _init_subsystems(self) -> None:
         """Initialize all execution, risk, and decision components."""
