@@ -1,6 +1,6 @@
 [Unit]
 Description=RAVANA v4.3 Autonomous Live Paper Trading Daemon
-After=network.target network-online.target
+After=network.target network-online.target tailscaled.service
 Wants=network-online.target
 
 [Service]
@@ -11,6 +11,7 @@ ExecStart=/opt/ravana/venv/bin/python /opt/ravana/scripts/run_live_autonomous_pa
 Restart=always
 RestartSec=10
 TimeoutStopSec=30
+WatchdogSec=300
 
 # Environment variables
 EnvironmentFile=-/opt/ravana/.env

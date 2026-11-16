@@ -63,18 +63,42 @@ SHOONYA_VENDOR_CODE=""
 SHOONYA_IMEI=""
 RAVANA_PAPER_TRADING=true
 RAVANA_ENABLE_DECISIONS=true
+
+# Telegram Telemetry & Mobile C2 Bridge
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_CHAT_ID=""
 EOF
     chmod 600 "${ENV_FILE}"
-    echo "[WARNING] Created ${ENV_FILE}. Please edit it with your GEMINI_API_KEY and Shoonya credentials."
+    echo "[WARNING] Created ${ENV_FILE}. Please edit it with your GEMINI_API_KEY, Shoonya credentials, and Telegram tokens."
 fi
 
-# 6. Configure systemd Service
+# 6. Tailscale Private Mesh VPN Installation & Zero-Exposure Firewall
+echo "[INFO] Checking Tailscale installation..."
+if ! command -v tailscale &>/dev/null; then
+    echo "[INFO] Installing Tailscale Private Mesh VPN..."
+    curl -fsSL https://tailscale.com/install.sh | sh
+    echo "[INFO] Tailscale installed successfully. Run 'sudo tailscale up' to authenticate."
+else
+    echo "[INFO] Tailscale is already installed."
+fi
+
+echo "[INFO] Configuring UFW firewall for Zero Public Attack Surface..."
+sudo apt-get install -y --no-install-recommends ufw
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp comment 'SSH Public until Tailscale connected'
+sudo ufw allow in on tailscale0 to any port 22 proto tcp comment 'SSH over Tailscale'
+sudo ufw allow in on tailscale0 to any port 7860 proto tcp comment 'ADHD Cockpit over Tailscale'
+sudo ufw --force enable
+echo "[INFO] Firewall active: Public Port 7860 closed. Accessible strictly over private Tailscale mesh."
+
+# 7. Configure systemd Service
 SERVICE_FILE="/etc/systemd/system/ravana.service"
 echo "[INFO] Configuring systemd service at ${SERVICE_FILE}..."
 sudo bash -c "cat << EOF > ${SERVICE_FILE}
 [Unit]
 Description=RAVANA v4.3 Autonomous Live Paper Trading Daemon
-After=network.target network-online.target
+After=network.target network-online.target tailscaled.service
 Wants=network-online.target
 
 [Service]
@@ -86,6 +110,7 @@ ExecStart=${VENV_DIR}/bin/python ${INSTALL_DIR}/scripts/run_live_autonomous_pape
 Restart=always
 RestartSec=10
 TimeoutStopSec=30
+WatchdogSec=300
 
 EnvironmentFile=-${ENV_FILE}
 Environment=PYTHONUNBUFFERED=1
@@ -102,7 +127,7 @@ StandardError=append:${INSTALL_DIR}/audit/ravana_live_daemon.log
 WantedBy=multi-user.target
 EOF"
 
-# 7. Configure Logrotate
+# 8. Configure Logrotate
 LOGROTATE_FILE="/etc/logrotate.d/ravana"
 echo "[INFO] Configuring log rotation at ${LOGROTATE_FILE}..."
 sudo bash -c "cat << EOF > ${LOGROTATE_FILE}
@@ -117,12 +142,12 @@ ${INSTALL_DIR}/audit/*.log {
 }
 EOF"
 
-# 8. Reload systemd daemon
+# 9. Reload systemd daemon
 echo "[INFO] Reloading systemd..."
 sudo systemctl daemon-reload
 sudo systemctl enable ravana.service
 
-# 9. Create Helper Management Scripts
+# 10. Create Helper Management Scripts
 cat << 'EOF' > "${INSTALL_DIR}/status.sh"
 #!/usr/bin/env bash
 echo "=== RAVANA DAEMON SYSTEMD STATUS ==="
