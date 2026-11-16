@@ -89,21 +89,22 @@ class Integrated60DayPortfolioTrader:
         self.orb_trigger = TwoWayMorningORBTrigger(
             ofi_threshold=0.15,
             vr_threshold=0.95,
-            excluded_symbols={"GOLDBEES", "SILVERBEES", "BANKBEES", "JUNIORBEES", "CPSEETF"},
+            excluded_symbols={"GOLDBEES", "SILVERBEES", "BANKBEES", "JUNIORBEES", "CPSEETF", "PSUBNKBEES"},
         )
         self.inav_trigger = TwoWayINAVSpreadTrigger(z_threshold=1.5, bps_threshold=15.0)
         self.drift_trigger = TwoWaySectorDriftTrigger(z_mom_threshold=1.20, vr_threshold=0.95)
         self.stop_sweep_trigger = TwoWayLiquidityStopSweepTrigger(
             sweep_window=10, ofi_threshold=0.08, vr_ceiling=0.85, min_wick_ratio=0.40,
-            supported_symbols={"BANKBEES", "NIFTYBEES", "ITBEES"},
+            supported_symbols={"PHARMABEES", "GOLDBEES", "SILVERBEES"},
         )
         self.vwap_absorb_trigger = TwoWayVWAPAbsorptionTrigger(
             vr_ceiling=0.85,
-            allowed_symbols={"AUTOBEES", "BANKBEES", "ITBEES", "NIFTYBEES"},
+            allowed_symbols={"AUTOBEES", "ITBEES", "NIFTYBEES"},
         )
         self.europe_trigger = TwoWayAfternoonEuropeTrigger(
             momentum_threshold=0.0015, ofi_threshold=0.10
         )
+        self.europe_trigger.supported_symbols = {"ITBEES", "NIFTYBEES"}
         self.leadlag_trigger = TwoWayLeadLagTrigger(
             leader_ret_threshold=0.0022, follower_lag_threshold=0.0008
         )
@@ -333,13 +334,18 @@ class Integrated60DayPortfolioTrader:
             # 1. Manage active intraday positions with 5-Stage Stop Engine & Pre-Dump Shield
             self._manage_intraday_positions(current_bars, ts)
 
-            # 2. Mandatory Pre-Dump Square-off: Flat intraday MIS book by 14:45 IST ahead of 15:00 broker dump
+            # 2. Morning Session Lock at 11:30 AM (banking morning alpha, zero lunch chop)
+            if t_str == "11:30":
+                self._square_off_all_intraday(current_bars, ts, "MORNING_1130_LOCK")
+                continue
+
+            # 3. Mandatory Pre-Dump Square-off: Flat intraday MIS book by 14:45 IST ahead of 15:00 broker dump
             if t_str >= "14:45":
                 self._square_off_all_intraday(current_bars, ts, "PRE_DUMP_1445_LOCK")
                 continue
 
-            # 3. New entries in Morning Window (09:35-11:00) and Afternoon Europe Window (13:00-14:00)
-            in_entry_window = ("09:35" <= t_str <= "11:00") or ("13:00" <= t_str <= "14:00")
+            # 4. New entries in Morning Window (09:35-10:45) and Afternoon Europe Window (13:15-13:45)
+            in_entry_window = ("09:35" <= t_str <= "10:45") or ("13:15" <= t_str <= "13:45")
             if in_entry_window and (len(self.open_intraday_trades) < 2):
                 candidates = signals_by_ts.get(ts, [])
                 valid_candidates = [
@@ -369,21 +375,12 @@ class Integrated60DayPortfolioTrader:
         atr_val = max(raw_atr, curr_px * 0.0050)
 
         is_long = (sig.action == TriggerAction.BUY)
-        initial_stop = float(sig.metadata.get("stop_loss", curr_px - 1.2 * atr_val if is_long else curr_px + 1.2 * atr_val))
-        target_px = float(sig.metadata.get("target_price", curr_px + 1.8 * atr_val if is_long else curr_px - 1.8 * atr_val))
+        initial_stop = float(sig.metadata.get("stop_loss", curr_px - 0.75 * atr_val if is_long else curr_px + 0.75 * atr_val))
+        target_px = float(sig.metadata.get("target_price", curr_px + 1.50 * atr_val if is_long else curr_px - 1.50 * atr_val))
 
-        # 2. Gemini Decisions Dynamic Volatility Adaptive Stop
-        if self.risk_shield is not None:
-            initial_stop = self.risk_shield.compute_adaptive_stop(
-                ticker=sig.symbol,
-                entry_price=curr_px,
-                default_stop=initial_stop,
-                bar=bar,
-            )
-
-        # 3. Dynamic Geometric Compounding: Risk 0.25% of current equity
+        # 2. Dynamic Geometric Compounding: Risk 0.20% of current equity
         account_equity = self.current_cash + sum(t["shares"] * t["entry_price"] for t in self.open_intraday_trades.values())
-        risk_budget = max(500.0, account_equity * 0.0025)
+        risk_budget = max(400.0, account_equity * 0.0020)
         stop_dist = abs(curr_px - initial_stop)
         if stop_dist <= 0:
             return
@@ -448,44 +445,25 @@ class Integrated60DayPortfolioTrader:
             close_px = float(bar["Close"])
             bar_vol = float(bar.get("Volume", 1e5))
             is_long = trade["is_long"]
-            stop_state = trade.get("stop_state")
-
-            if stop_state is not None:
-                updated_state, action = self.stop_engine.update(
-                    state=stop_state,
-                    entry_price=trade["entry_price"],
-                    bar_high=high_px,
-                    bar_low=low_px,
-                    bar_close=close_px,
-                    atr=trade["atr"],
-                    is_long=is_long,
-                    is_mis=True,
-                )
-                trade["stop_state"] = updated_state
-                trade["current_stop"] = updated_state.active_stop
-
-                if action == TriggerAction.EXIT_ALL:
-                    self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
-                    continue
-                elif action == TriggerAction.EXIT_TIME_STOP:
-                    self._close_intraday_trade(trade, close_px, bar_vol, ts, "DEAD_MONEY_STALL_EXIT")
-                    continue
-                elif action == TriggerAction.EXIT_TRANCHE_1:
-                    tranche_shares = trade["shares"] // 2
-                    if tranche_shares > 0:
-                        exit_px = trade["entry_price"] + (0.75 * trade["atr"]) if is_long else trade["entry_price"] - (0.75 * trade["atr"])
-                        self._partial_close_intraday_trade(trade, tranche_shares, exit_px, bar_vol, ts, "TRANCHE_1_SCALE_OUT")
-
+            # Ratchet stop to Breakeven once in profit (+0.50 ATR)
             if is_long:
+                if high_px >= trade["entry_price"] + (0.50 * trade["atr"]):
+                    trade["current_stop"] = max(trade["current_stop"], trade["entry_price"] * 1.0002)
                 if low_px <= trade["current_stop"]:
                     self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
-                elif high_px >= trade["target_price"]:
+                    continue
+                if high_px >= trade["target_price"]:
                     self._close_intraday_trade(trade, trade["target_price"], bar_vol, ts, "TARGET_HIT")
+                    continue
             else:
+                if low_px <= trade["entry_price"] - (0.50 * trade["atr"]):
+                    trade["current_stop"] = min(trade["current_stop"], trade["entry_price"] * 0.9998)
                 if high_px >= trade["current_stop"]:
                     self._close_intraday_trade(trade, trade["current_stop"], bar_vol, ts, "STOP_LOSS_HIT")
-                elif low_px <= trade["target_price"]:
+                    continue
+                if low_px <= trade["target_price"]:
                     self._close_intraday_trade(trade, trade["target_price"], bar_vol, ts, "TARGET_HIT")
+                    continue
 
     def _close_intraday_trade(
         self, trade: Dict[str, Any], exit_px: float, bar_vol: float, ts: pd.Timestamp, reason: str
