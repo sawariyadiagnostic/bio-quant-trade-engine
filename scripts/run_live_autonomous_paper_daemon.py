@@ -39,6 +39,9 @@ from ravana.strategies.two_way_inav_spread import TwoWayINAVSpreadTrigger
 from ravana.strategies.two_way_orb import TwoWayMorningORBTrigger
 from ravana.strategies.two_way_pead_drift import TwoWaySectorDriftTrigger
 from ravana.strategies.two_way_absorption import TwoWayLiquidityStopSweepTrigger, TwoWayVWAPAbsorptionTrigger
+from ravana.strategies.volatility_scaler import AdaptiveThresholdScaler
+from ravana.strategies.two_way_chop_reversion import TwoWayChopMeanReversionTrigger
+from ravana.telemetry.telegram_bot import TelegramTelemetryBridge
 from ravana.decisions.client import GeminiDecisionClient
 from ravana.decisions.universe_allocator import UniverseAlphaCrown
 from ravana.decisions.veto_guard import DecisionVetoGuard
@@ -120,6 +123,19 @@ class LiveAutonomousPaperDaemon:
         self.europe_trigger = TwoWayAfternoonEuropeTrigger(momentum_threshold=0.0015, ofi_threshold=0.10)
         self.europe_trigger.supported_symbols = {"ITBEES", "NIFTYBEES"}
 
+        # Dynamic Hurdle Scaler & Chop Mean-Reversion Trigger
+        self.scaler = AdaptiveThresholdScaler()
+        self.chop_trigger = TwoWayChopMeanReversionTrigger(
+            bb_lower=0.15,
+            bb_upper=0.85,
+            ofi_threshold=0.05,
+            vr_ceiling=0.75,
+            micro_rr=(0.40, 0.50),
+        )
+
+        # Encrypted Telegram Mobile C2 Bridge
+        self.telegram = TelegramTelemetryBridge()
+
         # Google Decisions Integration
         self.decision_client = GeminiDecisionClient(backtest_mode=False, enable_cache=True)
         self.veto_guard = DecisionVetoGuard(
@@ -151,17 +167,28 @@ class LiveAutonomousPaperDaemon:
         signal.signal(signal.SIGINT, self._handle_shutdown)
         signal.signal(signal.SIGTERM, self._handle_shutdown)
 
+        session_summary_sent = False
         while self.running:
             try:
                 now_ist = datetime.now()
                 t_str = now_ist.strftime("%H:%M")
 
                 if t_str >= "15:35":
+                    if not session_summary_sent:
+                        equity = self.current_cash + sum(
+                            t.get("shares", 1) * t.get("entry_price", 0.0)
+                            for t in self.active_overnight_positions.values()
+                        )
+                        self.telegram.send_pnl_summary(
+                            self.total_intraday_pnl, equity, self.active_overnight_positions
+                        )
+                        session_summary_sent = True
                     logger.info("Market session concluded for today (%s). Daemon idling.", t_str)
                     self._sleep_until_next_boundary()
                     continue
 
                 if "09:15" <= t_str <= "15:30":
+                    session_summary_sent = False
                     self._process_bar_epoch(now_ist, t_str)
 
                 self._sleep_until_next_boundary()
@@ -189,11 +216,13 @@ class LiveAutonomousPaperDaemon:
         # 2. Morning Session Lock (11:30 AM)
         if t_str == "11:30":
             self._square_off_all(current_bars, latest_ts, "MORNING_1130_LOCK")
+            self.telegram.send_session_alert("MORNING_1130_LOCK", f"Intraday square-off executed. PnL: ₹{self.total_intraday_pnl:+.2f}")
             return
 
         # 3. Mandatory Pre-Dump Square-Off (14:45 PM)
         if t_str >= "14:45" and t_str < "15:10":
             self._square_off_all(current_bars, latest_ts, "PRE_DUMP_1445_LOCK")
+            self.telegram.send_session_alert("PRE_DUMP_1445_LOCK", "All MIS squared off before 15:00 broker dump.")
             return
 
         # 4. Overnight CNC Allocation (15:15 PM)
@@ -202,8 +231,8 @@ class LiveAutonomousPaperDaemon:
             return
 
         # 5. Evaluate New Intraday MIS Entries
-        in_morning = ("09:35" <= t_str <= "10:45")
-        in_afternoon = ("13:15" <= t_str <= "13:45")
+        in_morning = ("09:35" <= t_str <= "11:15")
+        in_afternoon = ("13:00" <= t_str <= "14:30")
         if (in_morning or in_afternoon) and (len(self.open_trades) < 2):
             self._evaluate_new_entries(etf_dfs, current_bars, latest_ts, t_str)
 
@@ -237,6 +266,7 @@ class LiveAutonomousPaperDaemon:
                     if trade["current_stop"] < be_level:
                         trade["current_stop"] = be_level
                         logger.info("[STOP RATCHET] %s Stop moved to Breakeven: ₹%.2f", sym, be_level)
+                        self.telegram.send_stop_ratchet(sym, be_level, trade["entry_price"])
                 if low_px <= trade["current_stop"]:
                     self._close_trade(trade, trade["current_stop"], vol, ts, "STOP_LOSS_HIT")
                 elif high_px >= trade["target_price"]:
@@ -247,6 +277,7 @@ class LiveAutonomousPaperDaemon:
                     if trade["current_stop"] > be_level:
                         trade["current_stop"] = be_level
                         logger.info("[STOP RATCHET] %s Stop moved to Breakeven: ₹%.2f", sym, be_level)
+                        self.telegram.send_stop_ratchet(sym, be_level, trade["entry_price"])
                 if high_px >= trade["current_stop"]:
                     self._close_trade(trade, trade["current_stop"], vol, ts, "STOP_LOSS_HIT")
                 elif low_px <= trade["target_price"]:
@@ -262,17 +293,24 @@ class LiveAutonomousPaperDaemon:
         """Scan candidate triggers and execute top Google Decisions approved setup."""
         candidates: List[TriggerSignal] = []
 
-        if "09:35" <= t_str <= "10:45":
+        if "09:35" <= t_str <= "11:15":
             for sym, df in etf_dfs.items():
-                candidates.extend(self.orb_trigger.generate_signals(df, sym))
-                candidates.extend(self.drift_trigger.generate_signals(df, sym))
-                candidates.extend(self.stop_sweep_trigger.generate_signals(df, sym))
-                candidates.extend(self.inav_trigger.generate_signals(df, sym))
-                candidates.extend(self.vwap_absorb_trigger.generate_signals(df, sym))
-        elif "13:15" <= t_str <= "13:45":
-            for sym in ("ITBEES", "NIFTYBEES"):
-                if sym in etf_dfs:
-                    candidates.extend(self.europe_trigger.generate_signals(etf_dfs[sym], sym))
+                if "09:35" <= t_str <= "10:45":
+                    candidates.extend(self.orb_trigger.generate_signals(df, sym))
+                    candidates.extend(self.drift_trigger.generate_signals(df, sym))
+                    candidates.extend(self.stop_sweep_trigger.generate_signals(df, sym))
+                    candidates.extend(self.inav_trigger.generate_signals(df, sym))
+                    candidates.extend(self.vwap_absorb_trigger.generate_signals(df, sym))
+                vr_val = float(df.get("VR_20", pd.Series(1.0, index=df.index)).iloc[-1])
+                if vr_val < 0.75:
+                    candidates.extend(self.chop_trigger.generate_signals(df, sym))
+        elif "13:00" <= t_str <= "14:30":
+            for sym, df in etf_dfs.items():
+                if "13:15" <= t_str <= "13:45" and sym in ("ITBEES", "NIFTYBEES"):
+                    candidates.extend(self.europe_trigger.generate_signals(df, sym))
+                vr_val = float(df.get("VR_20", pd.Series(1.0, index=df.index)).iloc[-1])
+                if vr_val < 0.75:
+                    candidates.extend(self.chop_trigger.generate_signals(df, sym))
 
         valid = [
             c for c in candidates
@@ -297,6 +335,7 @@ class LiveAutonomousPaperDaemon:
             if not approved:
                 self.vetoed_trades_count += 1
                 logger.info("[VETO GUARD] Rejected %s (%s): %s (Prob: %.2f)", sig.symbol, sig.trigger_name, veto_reason, prob)
+                self.telegram.send_veto_alert(sig.symbol, sig.trigger_name, veto_reason, prob)
                 return
 
         curr_px = float(bar["Close"])
@@ -304,8 +343,14 @@ class LiveAutonomousPaperDaemon:
         atr_val = max(raw_atr, curr_px * 0.0050)
         is_long = (sig.action.value == "BUY")
 
-        initial_stop = curr_px - (0.75 * atr_val) if is_long else curr_px + (0.75 * atr_val)
-        target_px = curr_px + (1.50 * atr_val) if is_long else curr_px - (1.50 * atr_val)
+        if "target_price" in sig.metadata and "stop_price" in sig.metadata:
+            initial_stop = float(sig.metadata["stop_price"])
+            target_px = float(sig.metadata["target_price"])
+        else:
+            stop_mult = self.scaler.get_stop_multiplier(0.75, 1.0)
+            target_mult = self.scaler.get_target_multiplier(1.50, 1.0)
+            initial_stop = curr_px - (stop_mult * atr_val) if is_long else curr_px + (stop_mult * atr_val)
+            target_px = curr_px + (target_mult * atr_val) if is_long else curr_px - (target_mult * atr_val)
 
         equity = self.current_cash + sum(t["shares"] * t["entry_price"] for t in self.open_trades.values())
         risk_budget = max(400.0, equity * self.risk_budget_pct)
@@ -333,6 +378,15 @@ class LiveAutonomousPaperDaemon:
                 "BUY" if is_long else "SELL", trade.shares, sig.symbol, trade.price,
                 initial_stop, target_px, sig.trigger_name
             )
+            self.telegram.send_trade_fill({
+                "side": "BUY" if is_long else "SELL",
+                "shares": trade.shares,
+                "symbol": sig.symbol,
+                "price": trade.price,
+                "stop_price": initial_stop,
+                "target_price": target_px,
+                "trigger_name": sig.trigger_name,
+            })
 
     def _close_trade(self, trade: Dict[str, Any], exit_px: float, vol: float, ts: pd.Timestamp, reason: str) -> None:
         """Close active intraday position and record PnL."""
@@ -392,6 +446,10 @@ class LiveAutonomousPaperDaemon:
 
         logger.info("[OVERNIGHT REGIME] Market classified as: %s (is_bear=%s, is_bull=%s)",
                     regime.get("regime"), regime.get("is_bear"), regime.get("is_bull"))
+        self.telegram.send_session_alert(
+            "OVERNIGHT_ALLOCATION",
+            f"Regime: {regime.get('regime')} (Bull: {regime.get('is_bull')}, Bear: {regime.get('is_bear')})"
+        )
         for tgt in targets:
             if tgt.ticker == "LIQUIDBEES" or tgt.target_weight_pct <= 0.0:
                 continue

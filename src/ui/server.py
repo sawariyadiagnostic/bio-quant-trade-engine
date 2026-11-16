@@ -353,6 +353,38 @@ def status() -> Dict[str, Any]:
     }
 
 
+@app.get("/api/paper/status")
+def paper_status() -> Dict[str, Any]:
+    """Live Autonomous Paper Trading Daemon status query."""
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    orders_file = os.path.join(base_dir, "audit", "shoonya_paper_orders.json")
+    log_file = os.path.join(base_dir, "audit", "ravana_live_daemon.log")
+
+    orders = []
+    if os.path.exists(orders_file):
+        try:
+            with open(orders_file, "r", encoding="utf-8") as f:
+                orders = json.load(f)
+        except Exception:
+            orders = []
+
+    recent_logs = []
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                lines = [l.strip() for l in f if l.strip()]
+                recent_logs = lines[-10:]
+        except Exception:
+            recent_logs = []
+
+    return {
+        "status": "active",
+        "orders_count": len(orders),
+        "recent_orders": orders[-5:] if orders else [],
+        "recent_logs": recent_logs,
+    }
+
+
 @app.post("/api/pipeline/ingest")
 def ingest(payload: IngestRequest) -> Dict[str, Any]:
     """Discrete pipeline ingestion node."""
