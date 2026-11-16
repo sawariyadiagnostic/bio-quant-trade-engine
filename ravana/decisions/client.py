@@ -177,7 +177,11 @@ class GeminiDecisionClient:
             if "trending" in c_lower or "vr: 1." in c_lower:
                 return "true", 0.84
             return "true", 0.65
-        if key in ("should_hold_through_0915_open", "should_hold_overnight_position"):
+        if key == "is_high_conviction_expansion":
+            if "vr: 1." in c_lower or "ofi=+" in c_lower or "ofi=-" in c_lower:
+                return "true", 0.78
+            return "false", 0.35
+        if key in ("should_hold_through_0915_open", "should_hold_overnight_position", "should_hold_overnight"):
             return "true", 0.78
         if key == "should_force_exit_at_1440":
             if any(t in context for t in ("14:35", "14:40", "14:45")):
@@ -188,11 +192,17 @@ class GeminiDecisionClient:
     def _eval_heuristic_choice(self, q: Question, context: str) -> Tuple[str, float]:
         """Deterministic heuristic for CHOICE selections."""
         choices = q.choices or ["CHOICE_A"]
-        if q.key == "best_etf_to_buy_now":
+        if q.key in ("best_etf_to_buy_now", "best_sector_etf"):
             for c in choices:
-                if c != "CASH" and c in context:
+                if c != "CASH" and f"{c}:" in context:
                     return c, 0.82
-            return choices[0], 0.75
+            return "CASH" if "CASH" in choices else choices[0], 0.75
+        if q.key == "direction_action":
+            if "vwap_diff=+" in context:
+                return "BUY_LONG", 0.82
+            if "vwap_diff=-" in context:
+                return "SELL_SHORT", 0.82
+            return "STAY_CASH", 0.75
         if q.key == "elastic_tension_state":
             if "Z <= -1.8" in context or "oversold" in context.lower():
                 return "OVERSTRETCHED_PULL_LONG", 0.84
