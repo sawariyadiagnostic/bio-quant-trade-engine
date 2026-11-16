@@ -69,6 +69,31 @@ def fetch_today_all() -> dict:
             print(f"  [FAIL] {sym}: {exc}")
     return today_dfs
 
+
+def fetch_daily_all(period: str = "3mo") -> dict:
+    """Fetch daily bars for all 10 Sector ETFs + NIFTY 50 with EMA_50 and VR_20."""
+    daily_dfs = {}
+    for sym, yf_sym in TICKERS.items():
+        try:
+            df = yf.download(yf_sym, period=period, interval="1d", progress=False)
+            if df.empty:
+                continue
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = [c[0] for c in df.columns]
+            cols = ["Open", "High", "Low", "Close", "Volume"]
+            df = df[[c for c in cols if c in df.columns]].copy()
+            df["EMA_50"] = df["Close"].ewm(span=50, adjust=False).mean()
+            log_ret_1 = np.log(df["Close"] / df["Close"].shift(1).replace(0.0, np.nan)).fillna(0.0)
+            log_ret_k = np.log(df["Close"] / df["Close"].shift(5).replace(0.0, np.nan)).fillna(0.0)
+            var_1 = log_ret_1.rolling(20, min_periods=5).var()
+            var_k = log_ret_k.rolling(20, min_periods=5).var()
+            df["VR_20"] = (var_k / (5.0 * var_1 + 1e-8)).fillna(1.0)
+            daily_dfs[sym] = df
+        except Exception:
+            pass
+    return daily_dfs
+
+
 if __name__ == "__main__":
     dfs = fetch_today_all()
     print(f"Successfully fetched {len(dfs)} instruments for today.")

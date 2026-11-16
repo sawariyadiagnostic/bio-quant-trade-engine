@@ -1,0 +1,30 @@
+[Unit]
+Description=RAVANA v4.3 Autonomous Live Paper Trading Daemon
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/ravana
+ExecStart=/opt/ravana/venv/bin/python /opt/ravana/scripts/run_live_autonomous_paper_daemon.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+
+# Environment variables
+EnvironmentFile=-/opt/ravana/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONIOENCODING=utf-8
+
+# Process management & Resource limits
+LimitNOFILE=65535
+MemoryHigh=2G
+MemoryMax=3G
+
+# Logging
+StandardOutput=append:/opt/ravana/audit/ravana_live_daemon.log
+StandardError=append:/opt/ravana/audit/ravana_live_daemon.log
+
+[Install]
+WantedBy=multi-user.target
