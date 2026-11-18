@@ -55,11 +55,15 @@ function ravanaCockpit() {
         ordersPerPage: 15,
 
         // 20x20 MAP-Elites State
+        gridTicker: 'ALL',
         gridMetric: 'fitness',
         gridData: null,
         gridOccupiedCount: 0,
         gridOccupancyPct: 0.0,
         hoveredCell: null,
+
+        // Overnight Macro Allocation & Multi-Day Carry State
+        overnight: null,
 
         // Live Daemon Logs
         logs: [],
@@ -102,12 +106,18 @@ function ravanaCockpit() {
             } else if (tab === 'matrix') {
                 this.fetchGridMatrix();
             }
+            this.$nextTick(() => {
+                if (window.lucide && typeof lucide.createIcons === 'function') {
+                    lucide.createIcons();
+                }
+            });
         },
 
         async fetchAllData() {
             await Promise.all([
                 this.fetchPortfolioSummary(),
                 this.fetchDailyBreakdown(),
+                this.fetchOvernightStatus(),
                 this.fetchStrategies(),
                 this.fetchOrders(),
                 this.fetchGridMatrix(),
@@ -116,6 +126,17 @@ function ravanaCockpit() {
             this.$nextTick(() => {
                 this.initOrUpdateCharts();
             });
+        },
+
+        async fetchOvernightStatus() {
+            try {
+                const res = await fetch('/api/portfolio/overnight');
+                if (res.ok) {
+                    this.overnight = await res.json();
+                }
+            } catch (e) {
+                console.error('Failed to fetch overnight status:', e);
+            }
         },
 
         async fetchDailyBreakdown() {
@@ -139,7 +160,8 @@ function ravanaCockpit() {
             try {
                 await Promise.all([
                     this.fetchPortfolioSummary(),
-                    this.fetchPaperStatus()
+                    this.fetchPaperStatus(),
+                    this.fetchOvernightStatus()
                 ]);
                 this.lastSync = new Date().toLocaleTimeString();
             } catch (err) {
@@ -197,7 +219,8 @@ function ravanaCockpit() {
 
         async fetchGridMatrix() {
             try {
-                const res = await fetch(`/api/elites/grid?ticker=NIFTYBEES&metric=${this.gridMetric}`);
+                const sym = this.gridTicker || 'ALL';
+                const res = await fetch(`/api/elites/grid?ticker=${sym}&metric=${this.gridMetric}`);
                 if (!res.ok) return;
                 const data = await res.json();
                 this.gridData = data.grid || [];
@@ -410,10 +433,24 @@ function ravanaCockpit() {
             if (!this.gridData || !this.gridData[row]) return 'bg-slate-900/60 border-slate-800/40';
             const cell = this.gridData[row][col];
             if (!cell) return 'bg-slate-900/40 border-slate-800/30 hover:border-slate-600';
-            const f = cell.fitness || 0;
-            if (f >= 3.5) return 'bg-emerald-500/80 border-emerald-400 text-white shadow-sm shadow-emerald-500/50';
-            if (f >= 3.0) return 'bg-teal-500/70 border-teal-400 text-white';
-            if (f >= 2.5) return 'bg-cyan-600/60 border-cyan-400 text-white';
+
+            let val = cell.fitness || 0;
+            let high = 3.4, mid = 3.0, low = 2.6;
+
+            if (this.gridMetric === 'net_return_pct') {
+                val = cell.net_return_pct || 0;
+                high = 32.0; mid = 26.0; low = 20.0;
+            } else if (this.gridMetric === 'sortino') {
+                val = cell.sortino || 0;
+                high = 4.4; mid = 3.8; low = 3.2;
+            } else if (this.gridMetric === 'win_rate') {
+                val = cell.win_rate || 0;
+                high = 71.0; mid = 66.0; low = 62.0;
+            }
+
+            if (val >= high) return 'bg-emerald-500/80 border-emerald-400 text-white shadow-sm shadow-emerald-500/50';
+            if (val >= mid) return 'bg-teal-500/70 border-teal-400 text-white';
+            if (val >= low) return 'bg-cyan-600/60 border-cyan-400 text-white';
             return 'bg-blue-600/50 border-blue-400 text-white';
         }
     };

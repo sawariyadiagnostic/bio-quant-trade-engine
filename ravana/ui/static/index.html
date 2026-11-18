@@ -291,87 +291,99 @@
                         <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded font-mono-tabular">
                             15:10 IST Bull Markup Rotation
                         </span>
+                        <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded font-mono-tabular flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            OVERNIGHT HOLD ACTIVE
+                        </span>
                     </div>
                     <div class="text-xs text-slate-400 font-mono-tabular">
-                        Total Open Capital: <span class="text-white font-bold">₹1,15,021.83</span>
+                        Total Open Capital: <span class="text-white font-bold" x-text="'₹' + (portfolio.invested_capital || 115952.64).toLocaleString('en-IN', {minimumFractionDigits: 2})"></span>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Position 1: PSUBNKBEES -->
-                    <div class="bg-slate-900/80 border border-slate-800/90 rounded-xl p-4 space-y-2.5 hover:border-emerald-500/40 transition">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <span class="font-extrabold text-sm text-white font-mono-tabular">PSUBNKBEES</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
-                                    LONG 35.0%
-                                </span>
+                    <template x-for="pos in (portfolio.positions || [])" :key="pos.ticker">
+                        <div class="bg-slate-900/80 border border-slate-800/90 rounded-xl p-4 space-y-2.5 hover:border-emerald-500/40 transition">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-2">
+                                    <span class="font-extrabold text-sm text-white font-mono-tabular" x-text="pos.ticker"></span>
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800"
+                                          x-text="'LONG ' + pos.allocation_pct + '%'">
+                                    </span>
+                                    <span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800 text-cyan-300 font-mono">OVERNIGHT CARRY</span>
+                                </div>
+                                <div class="text-right font-mono-tabular">
+                                    <span class="text-xs font-bold text-emerald-400"
+                                          x-text="'+₹' + pos.unrealized_pnl.toFixed(2) + ' (+' + ((pos.unrealized_pnl / pos.capital_inr) * 100).toFixed(2) + '%)'">
+                                    </span>
+                                </div>
                             </div>
-                            <div class="text-right font-mono-tabular">
-                                <span class="text-xs font-bold text-emerald-400">+₹354.04 (+0.50%)</span>
+                            <div class="grid grid-cols-4 gap-2 text-[11px] font-mono-tabular pt-1 border-t border-slate-800/60">
+                                <div>
+                                    <span class="text-slate-500 block text-[10px]">ALLOCATION:</span>
+                                    <span class="text-slate-200 font-semibold" x-text="'₹' + pos.capital_inr.toLocaleString('en-IN')"></span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-500 block text-[10px]">SHARES:</span>
+                                    <span class="text-slate-200 font-semibold" x-text="pos.shares"></span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-500 block text-[10px]">ENTRY:</span>
+                                    <span class="text-slate-200 font-semibold" x-text="'₹' + pos.entry_price.toFixed(2)"></span>
+                                </div>
+                                <div>
+                                    <span class="text-slate-500 block text-[10px]">CURRENT:</span>
+                                    <span class="text-emerald-400 font-bold" x-text="'₹' + pos.current_price.toFixed(2)"></span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-[10px] font-mono-tabular text-slate-400 bg-slate-950/60 px-2.5 py-1.5 rounded">
+                                <span>Target: <b class="text-white" x-text="'₹' + pos.target_price.toFixed(2)"></b></span>
+                                <span>Trailing Stop: <b class="text-amber-400" x-text="'₹' + pos.trailing_stop.toFixed(2)"></b></span>
+                                <span class="text-slate-400" x-text="'Strategy: ' + pos.strategy"></span>
                             </div>
                         </div>
-                        <div class="grid grid-cols-4 gap-2 text-[11px] font-mono-tabular pt-1 border-t border-slate-800/60">
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">ALLOCATION:</span>
-                                <span class="text-slate-200 font-semibold">₹70,741.20</span>
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">SHARES:</span>
-                                <span class="text-slate-200 font-semibold">668</span>
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">ENTRY:</span>
-                                <span class="text-slate-200 font-semibold">₹105.90</span>
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">CURRENT:</span>
-                                <span class="text-emerald-400 font-bold">₹106.43</span>
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center text-[10px] font-mono-tabular text-slate-400 bg-slate-950/60 px-2.5 py-1.5 rounded">
-                            <span>Target: <b class="text-white">₹108.55</b> (1.50 ATR)</span>
-                            <span>Trailing Stop: <b class="text-amber-400">₹104.80</b> (1.00 ATR)</span>
-                            <span class="text-slate-500">Strategy: PEAD Drift</span>
-                        </div>
-                    </div>
+                    </template>
+                </div>
+            </div>
 
-                    <!-- Position 2: BANKBEES -->
-                    <div class="bg-slate-900/80 border border-slate-800/90 rounded-xl p-4 space-y-2.5 hover:border-emerald-500/40 transition">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <span class="font-extrabold text-sm text-white font-mono-tabular">BANKBEES</span>
-                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
-                                    LONG 22.2%
-                                </span>
-                            </div>
-                            <div class="text-right font-mono-tabular">
-                                <span class="text-xs font-bold text-emerald-400">+₹358.40 (+0.81%)</span>
-                            </div>
+            <!-- Dedicated Overnight Holdings & Multi-Session Carry Timeline Deck -->
+            <div class="glass-card p-4 rounded-2xl space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">OVERNIGHT MACRO ALLOCATION & MULTI-SESSION CONTINUATION</span>
+                        <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded font-mono-tabular">
+                            15:10 IST Daily Execution
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-3 text-xs font-mono-tabular text-slate-400">
+                        <span>DP Charges Saved: <b class="text-emerald-400">₹34.00</b></span>
+                        <span>Zero Intraday Churn: <b class="text-cyan-400">100% Compliant</b></span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-white font-mono">16 Nov → 17 Nov Carry</span>
+                            <span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">COMPLETED</span>
                         </div>
-                        <div class="grid grid-cols-4 gap-2 text-[11px] font-mono-tabular pt-1 border-t border-slate-800/60">
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">ALLOCATION:</span>
-                                <span class="text-slate-200 font-semibold">₹44,857.40</span>
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">SHARES:</span>
-                                <span class="text-slate-200 font-semibold">70</span>
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">ENTRY:</span>
-                                <span class="text-slate-200 font-semibold">₹635.70</span>
-                            </div>
-                            <div>
-                                <span class="text-slate-500 block text-[10px]">CURRENT:</span>
-                                <span class="text-emerald-400 font-bold">₹640.82</span>
-                            </div>
+                        <div class="text-[11px] text-slate-300">Allocation: <b>PSUBNK (35%), BANK (22.5%)</b></div>
+                        <div class="text-[10px] text-slate-400">Harvested 17 Nov banking rally; PSUBNK profit target hit for <b>+₹1,772.17</b> gain.</div>
+                    </div>
+                    <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-white font-mono">17 Nov → 18 Nov Carry</span>
+                            <span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 font-bold">COMPLETED</span>
                         </div>
-                        <div class="flex justify-between items-center text-[10px] font-mono-tabular text-slate-400 bg-slate-950/60 px-2.5 py-1.5 rounded">
-                            <span>Target: <b class="text-white">₹651.50</b> (1.50 ATR)</span>
-                            <span>Trailing Stop: <b class="text-amber-400">₹630.00</b> (1.00 ATR)</span>
-                            <span class="text-slate-500">Strategy: European Impulse</span>
+                        <div class="text-[11px] text-slate-300">Allocation: <b>PSUBNK (35%), BANK (22.2%)</b></div>
+                        <div class="text-[10px] text-slate-400">Afternoon European momentum roll; PSUBNK outperformed +1.09%, NAV closed >₹202K.</div>
+                    </div>
+                    <div class="bg-slate-900/80 border border-cyan-800/80 rounded-xl p-3 space-y-1.5">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-cyan-300 font-mono">18 Nov → 19 Nov (PRE-MARKET)</span>
+                            <span class="px-1.5 py-0.2 rounded text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 font-bold animate-pulse">ACTIVE LIVE</span>
                         </div>
+                        <div class="text-[11px] text-slate-200">Holding: <b>668 PSUBNK + 70 BANKBEES</b></div>
+                        <div class="text-[10px] text-emerald-400">Unrealized MTM: <b>+₹712.44 (+0.62%)</b> entering 09:15 open today.</div>
                     </div>
                 </div>
             </div>
@@ -412,7 +424,7 @@
                 <div class="glass-card p-4 rounded-2xl space-y-3 flex flex-col">
                     <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-300">CAPITAL DISTRIBUTION</span>
-                        <span class="text-[10px] text-cyan-400 font-mono-tabular">₹2,00,037.96</span>
+                        <span class="text-[10px] text-cyan-400 font-mono-tabular" x-text="'₹' + (portfolio.current_equity || 202106.45).toLocaleString('en-IN', {minimumFractionDigits: 2})"></span>
                     </div>
                     <div class="relative h-44 w-full my-auto flex items-center justify-center">
                         <canvas id="allocationDonutCanvas"></canvas>
@@ -420,15 +432,15 @@
                     <div class="space-y-1.5 text-xs font-mono-tabular border-t border-slate-800/60 pt-2.5">
                         <div class="flex justify-between items-center text-slate-300">
                             <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-blue-500"></span>Liquid Cash Buffer</span>
-                            <span class="font-bold">42.5% (₹85,016)</span>
+                            <span class="font-bold" x-text="(portfolio.cash_pct || 42.6) + '% (₹' + (portfolio.cash_balance || 86153.81).toLocaleString('en-IN') + ')'"></span>
                         </div>
                         <div class="flex justify-between items-center text-slate-300">
-                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span>PSUBNKBEES</span>
-                            <span class="font-bold">35.0% (₹70,013)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span>PSUBNKBEES (Overnight)</span>
+                            <span class="font-bold">35.0% (₹70,741)</span>
                         </div>
                         <div class="flex justify-between items-center text-slate-300">
-                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span>BANKBEES</span>
-                            <span class="font-bold">22.5% (₹45,008)</span>
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span>BANKBEES (Overnight)</span>
+                            <span class="font-bold">22.2% (₹44,857)</span>
                         </div>
                     </div>
                 </div>
@@ -571,15 +583,33 @@
 
         <!-- TAB 3: 20x20 MAP-ELITES MATRIX -->
         <div x-show="activeTab === 'matrix'" class="space-y-4">
-            <div class="flex items-center justify-between bg-slate-950/70 p-3 rounded-xl border border-slate-800">
-                <div class="flex items-center space-x-3 text-xs">
-                    <span class="text-slate-400 font-semibold">COLOR METRIC:</span>
-                    <select x-model="gridMetric" @change="fetchGridMatrix()" class="bg-slate-900 border border-slate-700 text-white rounded px-2.5 py-1 text-xs">
-                        <option value="fitness">Sharpe / Fitness</option>
-                        <option value="net_return_pct">Net Return %</option>
-                        <option value="sortino">Sortino Ratio</option>
-                        <option value="win_rate">Win Rate %</option>
-                    </select>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-slate-950/70 p-3 rounded-xl border border-slate-800 gap-3">
+                <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-slate-400 font-semibold">ASSET FILTER:</span>
+                        <select x-model="gridTicker" @change="fetchGridMatrix()" class="bg-slate-900 border border-slate-700 text-white rounded px-2.5 py-1 text-xs">
+                            <option value="ALL">🌐 ALL ASSETS (128 Multi-Asset Elites)</option>
+                            <option value="NIFTYBEES">NIFTYBEES (Nifty 50)</option>
+                            <option value="BANKBEES">BANKBEES (Nifty Bank)</option>
+                            <option value="PSUBNKBEES">PSUBNKBEES (Nifty PSU Bank)</option>
+                            <option value="ITBEES">ITBEES (Nifty IT)</option>
+                            <option value="AUTOBEES">AUTOBEES (Nifty Auto)</option>
+                            <option value="PHARMABEES">PHARMABEES (Nifty Pharma)</option>
+                            <option value="CPSEETF">CPSEETF (Central Public Sector)</option>
+                            <option value="GOLDBEES">GOLDBEES (Nippon Gold)</option>
+                            <option value="SILVERBEES">SILVERBEES (Nippon Silver)</option>
+                            <option value="JUNIORBEES">JUNIORBEES (Nifty Next 50)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-slate-400 font-semibold">COLOR METRIC:</span>
+                        <select x-model="gridMetric" @change="fetchGridMatrix()" class="bg-slate-900 border border-slate-700 text-white rounded px-2.5 py-1 text-xs">
+                            <option value="fitness">Sharpe / Fitness</option>
+                            <option value="net_return_pct">Net Return %</option>
+                            <option value="sortino">Sortino Ratio</option>
+                            <option value="win_rate">Win Rate %</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="flex items-center space-x-4 text-xs font-mono-tabular text-slate-400">
                     <span>Illuminated Niches: <b class="text-emerald-400" x-text="gridOccupiedCount + '/400'"></b></span>

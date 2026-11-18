@@ -259,7 +259,7 @@ class ArchiveStore:
         query = f"SELECT * FROM elites"
         where = []
         params: List[Any] = []
-        if ticker:
+        if ticker and ticker.upper() != "ALL":
             where.append("ticker = ?")
             params.append(ticker)
         if lookback:
@@ -276,24 +276,27 @@ class ArchiveStore:
 
     def get_grid_matrix(
         self,
-        ticker: str = "NIFTYBEES",
+        ticker: str = "ALL",
         lookback: Optional[str] = None,
         metric: str = "fitness"
     ) -> Dict[str, Any]:
-        elites = self.get_top_elites(limit=400, metric=metric, ticker=ticker, lookback=lookback)
+        elites = self.get_top_elites(limit=800, metric=metric, ticker=ticker, lookback=lookback)
         grid = [[None for _ in range(20)] for _ in range(20)]
         top_fitness = 0.0
         best_return = 0.0
+        occupied_set = set()
         for e in elites:
             r = min(19, max(0, int(e["row"])))
             c = min(19, max(0, int(e["col"])))
-            grid[r][c] = e
+            if grid[r][c] is None:
+                grid[r][c] = e
+                occupied_set.add((r, c))
             if e["fitness"] > top_fitness:
                 top_fitness = e["fitness"]
             if e["net_return_pct"] > best_return:
                 best_return = e["net_return_pct"]
 
-        occ_count = len(elites)
+        occ_count = len(occupied_set)
         occ_pct = round((occ_count / 400.0) * 100.0, 1)
         return {
             "status": "ok",
