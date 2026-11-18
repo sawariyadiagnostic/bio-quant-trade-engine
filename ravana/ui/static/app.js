@@ -1,693 +1,399 @@
 /**
- * Bio-Quant Institutional Alpha Cockpit - Main Application Controller
- * Features:
- * 1. 20x20 MAP-Elites WebGL Behavioral Heatmap (400 Niches with Fog-of-War).
- * 2. Dynamic 100+ Asset Universe Selector with automatic leaderboard and grid illumination.
- * 3. Random Seed Governor for speciation and deterministic replay.
- * 4. 3D Phenotype Strategy Manifold (UMAP & HDBSCAN Clones Pruner).
- * 5. 1024D Protein Latent Space Pairwise Cosine Similarity Heatmap.
- * 6. Differential SSE listener with Web Audio sound effects.
- * 7. AG Grid DOM virtualization with transactional delta updates.
- * 8. 5-second dead-man switch heartbeat watchdog.
+ * RAVANA Sovereign Alpha Cockpit - Next-Gen Quant Terminal Controller
+ * Powers live paper trading telemetry, 9 production alphas, portfolio avionics,
+ * 20x20 MAP-Elites matrix, and real-time execution order book.
  */
 
-function cockpitApp() {
+function ravanaCockpit() {
     return {
-        // Core State
-        status: 'STANDBY',
-        instrument: 'NIFTYBEES',
-        lookbackYears: 1.0,
-        generations: 100,
-        populationSize: 100,
-        randomSeed: null,
+        // Core Navigation & HUD State
+        activeTab: 'terminal', // 'terminal' | 'alphas' | 'matrix' | 'orders' | 'security'
+        status: 'LIVE_DAEMON',
+        isFrozen: false,
         isMuted: false,
-        activeTab: 'tactical', // 'tactical' | 'manifold' | 'cosine' | 'leaderboard' | 'telemetry'
-        deadManDisconnected: false,
-        lastHeartbeat: Date.now(),
-        eventSource: null,
-        gridApi: null,
-        rafPending: false,
+        lastSync: new Date().toLocaleTimeString(),
+        syncInterval: null,
 
-        // Compute Target & Remote GPU State
-        computeTarget: 'local',
-        remoteUrl: localStorage.getItem('bioquant_remote_url') || '',
-        remoteGpuStatus: null,
-
-        // Universe Catalog State
-        universeCategories: {},
-        universeCount: 0,
-        residentTickers: [],
-
-        // MAP-Elites Grid State
-        gridMetric: 'fitness',
-        gridOccupancy: 0.0,
-        gridOccupiedCount: 0,
-        currentGridData: null,
-
-        // Manifold State
-        manifoldMethod: 'auto',
-        manifoldClusters: 0,
-        manifoldCompression: 0.0,
-
-        // Logs & Telemetry
-        logs: [],
-        telemetry: {
-            current_gen: 0,
-            total_gens: 100,
-            resident_count: 0,
-            survivor_count: 0,
-            occupancy_pct: 0.0,
-            top_sharpe: 0.0,
-            best_net_return: 0.0,
-            worker_status: 0
+        // Portfolio & Position State
+        portfolio: {
+            initial_capital: 200000.0,
+            current_equity: 200037.96,
+            net_pnl: 37.96,
+            roi_pct: 0.019,
+            cash_balance: 85016.13,
+            cash_pct: 42.5,
+            invested_capital: 115021.83,
+            invested_pct: 57.5,
+            max_drawdown_pct: 0.00,
+            win_rate_pct: 100.0,
+            epochs_completed: 75,
+            total_epochs: 75,
+            regime: {
+                name: "CHOP (Low Volatility Sideways)",
+                variance_ratio_20: 0.68,
+                status: "MEAN_REVERSION_ACTIVE",
+                momentum_z_hurdle: 0.85,
+                target_multiplier: 0.75,
+                inav_hurdle_bps: 10.0,
+                stop_loss_atr: 0.50,
+                take_profit_atr: 0.40,
+            },
+            positions: []
         },
+
+        // 9 Production Strategy Alphas
+        strategies: [],
+
+        // Execution Orders State
+        orders: [],
+        ordersCount: 0,
+        orderSearch: '',
+        orderSideFilter: 'ALL',
+        orderPage: 1,
+        ordersPerPage: 15,
+
+        // 20x20 MAP-Elites State
+        gridMetric: 'fitness',
+        gridData: null,
+        gridOccupiedCount: 0,
+        gridOccupancyPct: 0.0,
+        hoveredCell: null,
+
+        // Live Daemon Logs
+        logs: [],
+
+        // Chart.js Instances
+        equityChart: null,
+        allocationChart: null,
+
+        // Toast Notifications
+        toasts: [],
 
         init() {
-            this.log("Avionics HUD initialized. Connecting telemetry bus...");
-            this.initGrid();
-            this.connectSSE();
-            this.startDeadManWatchdog();
-            this.fetchUniverseAssets();
-            this.fetchGridMatrix();
-            this.fetchLeaderboard();
+            this.showToast('Connecting to RAVANA v4.3 Sovereign Core...', 'info');
+            this.fetchAllData();
+            this.syncInterval = setInterval(() => {
+                this.pollTelemetry();
+            }, 3000);
+
+            // Re-render charts when window resizes
+            window.addEventListener('resize', () => {
+                if (this.equityChart) this.equityChart.resize();
+                if (this.allocationChart) this.allocationChart.resize();
+            });
         },
 
-        log(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString();
-            this.logs.unshift({ time, msg, type });
-            if (this.logs.length > 200) this.logs.pop();
-        },
-
-        toggleMute() {
-            this.isMuted = window.cockpitAudio.toggleMute();
-        },
-
-        randomizeSeed() {
-            this.randomSeed = Math.floor(Math.random() * 900000) + 100000;
-            this.log(`Exploration seed set: ${this.randomSeed}`);
-        },
-
-        setGenerations(val) {
-            this.generations = Math.max(1, parseInt(val) || 1);
-        },
-
-        setPopulation(val) {
-            this.populationSize = Math.max(10, parseInt(val) || 10);
+        showToast(msg, type = 'info') {
+            const id = Date.now() + Math.random();
+            this.toasts.push({ id, msg, type });
+            setTimeout(() => {
+                this.toasts = this.toasts.filter(t => t.id !== id);
+            }, 4000);
         },
 
         setTab(tab) {
             this.activeTab = tab;
-            setTimeout(() => {
-                if (tab === 'tactical' && this.currentGridData) {
-                    const chartDiv = document.getElementById('mapElitesChart');
-                    if (chartDiv && window.Plotly) {
-                        Plotly.Plots.resize(chartDiv);
-                        this.renderMapElitesHeatmap(this.currentGridData);
-                    }
-                } else if (tab === 'manifold') {
-                    const chartDiv = document.getElementById('manifoldChart3d');
-                    if (chartDiv && window.Plotly) Plotly.Plots.resize(chartDiv);
-                    this.fetchManifold();
-                } else if (tab === 'cosine') {
-                    const chartDiv = document.getElementById('cosineHeatmapChart');
-                    if (chartDiv && window.Plotly) Plotly.Plots.resize(chartDiv);
-                    this.fetchCosine();
-                }
-            }, 50);
-        },
-
-        // Universe Catalog & Asset Selection
-        async fetchUniverseAssets() {
-            try {
-                const res = await fetch('/api/universe/assets');
-                const data = await res.json();
-                if (data.status === 'ok') {
-                    this.universeCategories = data.categories || {};
-                    this.universeCount = data.total_count || 0;
-                    this.residentTickers = data.resident_tickers || [];
-                }
-            } catch (err) {
-                this.log(`Failed to discover universe assets: ${err}`, 'warning');
-            }
-        },
-
-        async onAssetChange() {
-            this.log(`Switched target asset to ${this.instrument} (${this.lookbackYears}y)`);
-            await this.fetchGridMatrix();
-            await this.fetchLeaderboard();
-            if (this.activeTab === 'manifold') {
-                await this.fetchManifold();
-            } else if (this.activeTab === 'cosine') {
-                await this.fetchCosine();
-            }
-        },
-
-        // 1. Differential SSE Telemetry Stream
-        connectSSE() {
-            if (this.eventSource) {
-                this.eventSource.close();
-            }
-
-            this.eventSource = new EventSource('/api/stream/evolution');
-
-            this.eventSource.addEventListener('connected', () => {
-                this.lastHeartbeat = Date.now();
-                this.deadManDisconnected = false;
-                this.log("Connected to Differential SSE telemetry bus.");
-            });
-
-            this.eventSource.addEventListener('ping', () => {
-                this.lastHeartbeat = Date.now();
-                this.deadManDisconnected = false;
-            });
-
-            this.eventSource.addEventListener('tick', (e) => {
-                this.lastHeartbeat = Date.now();
-                this.deadManDisconnected = false;
-                const data = JSON.parse(e.data);
-                this.telemetry = data;
-
-                if (data.worker_status === 1) {
-                    this.status = 'EVOLVING';
-                } else if (data.worker_status === 3 && this.status !== 'COMPLETE') {
-                    this.status = 'COMPLETE';
-                } else if (data.worker_status === 2 && this.status !== 'ABORTED') {
-                    this.status = 'ABORTED';
-                }
-
-                // Batch redraw via 250ms RequestAnimationFrame throttler
-                this.scheduleChartUpdate(data);
-            });
-
-            this.eventSource.addEventListener('elite_added', (e) => {
-                const elite = JSON.parse(e.data);
-                this.log(`New Elite Champion discovered: ${elite.formula_str || 'Alpha'} (Sharpe: ${elite.fitness?.toFixed(2)})`, 'success');
-                window.cockpitAudio.playEliteSound();
-
-                // Delta upsert to AG Grid virtualized table
-                if (this.gridApi) {
-                    this.gridApi.applyTransactionAsync({ update: [elite] });
-                }
-
-                // Incrementally paint cell in 20x20 Heatmap
-                this.patchHeatmapCell(elite);
-            });
-
-            this.eventSource.addEventListener('complete', () => {
-                if (this.status !== 'COMPLETE') {
-                    this.status = 'COMPLETE';
-                    this.log("Evolution cycle complete. Champions committed to SQLite WAL.", 'success');
-                    window.cockpitAudio.playCompleteSound();
-                    this.fetchLeaderboard();
-                    this.fetchGridMatrix();
-                }
-            });
-
-            this.eventSource.addEventListener('abort', () => {
-                if (this.status !== 'ABORTED') {
-                    this.status = 'ABORTED';
-                    this.log("Worker execution aborted by operator.", 'warning');
-                    this.fetchLeaderboard();
-                    this.fetchGridMatrix();
-                }
-            });
-
-            this.eventSource.onerror = () => {
-                // Native SSE reconnection handled by browser EventSource
-            };
-        },
-
-        // 2. 5-Second Dead-Man Switch Watchdog
-        scheduleChartUpdate(telemetry) {
-            if (this.rafPending) return;
-            this.rafPending = true;
-
-            window.requestAnimationFrame(() => {
-                this.updatePlotlyHeader(telemetry);
-                this.rafPending = false;
-            });
-        },
-
-        updatePlotlyHeader(telemetry) {
-            const chartDiv = document.getElementById('mapElitesChart');
-            if (!chartDiv || !window.Plotly) return;
-            if (this.status === 'EVOLVING') {
-                Plotly.relayout(chartDiv, {
-                    'title.text': `🗺️ MAP-Elites 400-Niche Space: ${this.instrument} (Live Gen ${telemetry.current_gen}/${telemetry.total_gens} · ${this.gridOccupancy}%)`
+            if (tab === 'terminal') {
+                this.$nextTick(() => {
+                    this.initOrUpdateCharts();
                 });
+            } else if (tab === 'matrix') {
+                this.fetchGridMatrix();
             }
         },
 
-        startDeadManWatchdog() {
-            setInterval(() => {
-                const silenceMs = Date.now() - this.lastHeartbeat;
-                if (silenceMs > 5000 && this.status === 'EVOLVING') {
-                    if (!this.deadManDisconnected) {
-                        this.deadManDisconnected = true;
-                        this.log("WARNING: Engine heartbeat lost (>5s). Worker may be stalled.", 'error');
-                    }
-                } else if (silenceMs <= 5000) {
-                    this.deadManDisconnected = false;
+        async fetchAllData() {
+            await Promise.all([
+                this.fetchPortfolioSummary(),
+                this.fetchStrategies(),
+                this.fetchOrders(),
+                this.fetchGridMatrix(),
+                this.fetchPaperStatus()
+            ]);
+            this.$nextTick(() => {
+                this.initOrUpdateCharts();
+            });
+        },
+
+        async pollTelemetry() {
+            try {
+                await Promise.all([
+                    this.fetchPortfolioSummary(),
+                    this.fetchPaperStatus()
+                ]);
+                this.lastSync = new Date().toLocaleTimeString();
+            } catch (err) {
+                console.warn('[Cockpit] Telemetry poll failed:', err);
+            }
+        },
+
+        async fetchPortfolioSummary() {
+            try {
+                const res = await fetch('/api/portfolio/summary');
+                if (!res.ok) return;
+                const data = await res.json();
+                this.portfolio = data;
+            } catch (e) {
+                console.error('Failed to fetch portfolio summary:', e);
+            }
+        },
+
+        async fetchPaperStatus() {
+            try {
+                const res = await fetch('/api/paper/status');
+                if (!res.ok) return;
+                const data = await res.json();
+                this.ordersCount = data.orders_count || this.ordersCount;
+                if (data.recent_logs && data.recent_logs.length > 0) {
+                    this.logs = data.recent_logs;
                 }
-            }, 1000);
+            } catch (e) {
+                console.error('Failed to fetch paper status:', e);
+            }
         },
 
-        // 3. AG Grid Virtualization
-        initGrid() {
-            const gridDiv = document.querySelector('#leaderboardGrid');
-            if (!gridDiv || !window.agGrid) return;
-
-            const gridOptions = {
-                columnDefs: [
-                    { field: 'ticker', headerName: 'Ticker', width: 100, pinned: 'left' },
-                    { field: 'fitness', headerName: 'Sharpe / Fitness', width: 140, sort: 'desc', valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(3) : '-' },
-                    { field: 'sortino', headerName: 'Sortino', width: 110, valueFormatter: p => (p.value !== undefined && p.value !== null) ? p.value.toFixed(2) : '-' },
-                    { 
-                        field: 'cagr_pct', 
-                        headerName: 'CAGR %', 
-                        width: 110, 
-                        valueFormatter: p => {
-                            if (p.value === undefined || p.value === null || isNaN(p.value)) return '-';
-                            let val = parseFloat(p.value);
-                            if (val <= 1.0 && val > 0.0) val = val * 100.0;
-                            return val > 10000 ? '>10,000%' : val.toFixed(1) + '%';
-                        }
-                    },
-                    { 
-                        field: 'max_drawdown', 
-                        headerName: 'Max DD %', 
-                        width: 120, 
-                        valueFormatter: p => {
-                            if (p.value === undefined || p.value === null || isNaN(p.value)) return '-';
-                            let val = parseFloat(p.value);
-                            if (val <= 1.0 && val > 0.0) val = val * 100.0;
-                            return val.toFixed(1) + '%';
-                        }
-                    },
-                    { 
-                        field: 'win_rate', 
-                        headerName: 'Win Rate %', 
-                        width: 120, 
-                        valueFormatter: p => {
-                            if (p.value === undefined || p.value === null || isNaN(p.value)) return '-';
-                            let val = parseFloat(p.value);
-                            if (val > 100.0) val = val / 100.0;
-                            else if (val <= 1.0 && val > 0.0) val = val * 100.0;
-                            return val.toFixed(1) + '%';
-                        }
-                    },
-                    { field: 'trades_count', headerName: 'Trades', width: 90 },
-                    { field: 'formula_str', headerName: 'Genomic Alpha Expression', flex: 1, minWidth: 250 }
-                ],
-                defaultColDef: {
-                    sortable: true,
-                    filter: true,
-                    resizable: true
-                },
-                getRowId: params => `${params.data.ticker || 'ASSET'}_${params.data.niche_row}_${params.data.niche_col}`,
-                rowModelType: 'clientSide',
-                animateRows: true,
-                rowData: []
-            };
-
-            this.gridApi = agGrid.createGrid(gridDiv, gridOptions);
+        async fetchStrategies() {
+            try {
+                const res = await fetch('/api/strategies/catalog');
+                if (!res.ok) return;
+                const data = await res.json();
+                this.strategies = data.strategies || [];
+            } catch (e) {
+                console.error('Failed to fetch strategies catalog:', e);
+            }
         },
 
-        // 4. MAP-Elites 20x20 Behavioral Space Heatmap
+        async fetchOrders() {
+            try {
+                const res = await fetch('/api/orders/all?limit=200');
+                if (!res.ok) return;
+                const data = await res.json();
+                this.orders = data.orders || [];
+                this.ordersCount = data.total || this.orders.length;
+            } catch (e) {
+                console.error('Failed to fetch orders:', e);
+            }
+        },
+
         async fetchGridMatrix() {
             try {
-                const lookbackParam = this.lookbackYears ? `${parseInt(this.lookbackYears)}y` : 'all';
-                const url = `/api/elites/grid?ticker=${this.instrument}&lookback=${lookbackParam}&metric=${this.gridMetric}`;
-                const res = await fetch(url);
+                const res = await fetch(`/api/elites/grid?ticker=NIFTYBEES&metric=${this.gridMetric}`);
+                if (!res.ok) return;
                 const data = await res.json();
-                if (data.status === 'ok') {
-                    this.currentGridData = data;
-                    this.gridOccupancy = data.occupancy_pct || 0.0;
-                    this.gridOccupiedCount = data.occupied_count || 0;
-                    this.renderMapElitesHeatmap(data);
-                }
-            } catch (err) {
-                this.log(`Failed to fetch 20x20 grid matrix: ${err}`, 'error');
+                this.gridData = data.grid || [];
+                this.gridOccupiedCount = data.occupied || 0;
+                this.gridOccupancyPct = data.occupancy_pct || 0.0;
+            } catch (e) {
+                console.error('Failed to fetch grid matrix:', e);
             }
         },
 
-        renderMapElitesHeatmap(data) {
-            const chartDiv = document.getElementById('mapElitesChart');
-            if (!chartDiv || !window.Plotly) return;
-
-            const metricLabels = {
-                'fitness': 'Sharpe / Fitness',
-                'net_return_pct': 'Net Return %',
-                'cagr_pct': 'Annual CAGR %',
-                'max_drawdown': 'Max Drawdown %',
-                'win_rate': 'Win Rate %',
-                'trades_count': 'Trades'
-            };
-
-            const trace = {
-                z: data.z,
-                x: data.x_bins,
-                y: data.y_bins,
-                text: data.hover_text,
-                hovertemplate: '%{text}<extra></extra>',
-                type: 'heatmap',
-                colorscale: this.gridMetric === 'max_drawdown' ? 'Reds' : 'Viridis',
-                colorbar: {
-                    title: metricLabels[this.gridMetric] || this.gridMetric.toUpperCase(),
-                    tickfont: { color: '#94a3b8' },
-                    titlefont: { color: '#e2e8f0', size: 11 }
-                },
-                xgap: 2,
-                ygap: 2
-            };
-
-            const layout = {
-                paper_bgcolor: '#0f172a',
-                plot_bgcolor: '#0b0f19',
-                font: { color: '#94a3b8', family: 'monospace' },
-                margin: { t: 40, b: 50, l: 80, r: 20 },
-                xaxis: { title: 'Turnover Factor Tau (Annualized Portfolio Velocity)', gridcolor: '#1e293b' },
-                yaxis: { title: 'Volatile Regime Sigma (Annualized Standard Deviation)', gridcolor: '#1e293b' },
-                title: {
-                    text: `🗺️ MAP-Elites 400-Niche Space: ${this.instrument} (${data.occupied_count}/400 Illuminated · ${data.occupancy_pct}%)`,
-                    font: { color: '#38bdf8', size: 13 }
-                }
-            };
-
-            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false });
-        },
-
-        patchHeatmapCell(elite) {
-            if (!this.currentGridData || !this.currentGridData.z) return;
-            const r = parseInt(elite.niche_row);
-            const c = parseInt(elite.niche_col);
-            if (r >= 0 && r < 20 && c >= 0 && c < 20) {
-                const metricVal = parseFloat(elite[this.gridMetric] ?? elite.fitness ?? 0.0);
-                if (this.currentGridData.z[r][c] === null) {
-                    this.gridOccupiedCount += 1;
-                    this.gridOccupancy = parseFloat(((this.gridOccupiedCount / 400.0) * 100.0).toFixed(1));
-                }
-                this.currentGridData.z[r][c] = metricVal;
-                const fShort = (elite.formula_str || '').slice(0, 50);
-                this.currentGridData.hover_text[r][c] = `Niche [${r}, ${c}]<br>Formula: ${fShort}..<br>Sharpe: ${elite.fitness?.toFixed(2)}<br>CAGR: ${elite.cagr_pct?.toFixed(1)}%<br>Trades: ${elite.trades_count}`;
-
-                const chartDiv = document.getElementById('mapElitesChart');
-                if (chartDiv && window.Plotly) {
-                    Plotly.restyle(chartDiv, {
-                        z: [this.currentGridData.z],
-                        text: [this.currentGridData.hover_text]
-                    });
-                }
+        filteredOrders() {
+            let list = this.orders;
+            if (this.orderSearch.trim()) {
+                const q = this.orderSearch.trim().toUpperCase();
+                list = list.filter(o => o.ticker.includes(q) || o.order_id.includes(q));
             }
+            if (this.orderSideFilter !== 'ALL') {
+                list = list.filter(o => o.side === this.orderSideFilter);
+            }
+            return list;
         },
 
-        // 5. 3D Phenotype Manifold (UMAP & HDBSCAN Clones Pruner)
-        async fetchManifold() {
-            const chartDiv = document.getElementById('manifoldChart3d');
-            if (!chartDiv || !window.Plotly) return;
+        paginatedOrders() {
+            const list = this.filteredOrders();
+            const start = (this.orderPage - 1) * this.ordersPerPage;
+            return list.slice(start, start + this.ordersPerPage);
+        },
 
+        totalPages() {
+            return Math.max(1, Math.ceil(this.filteredOrders().length / this.ordersPerPage));
+        },
+
+        nextPage() {
+            if (this.orderPage < this.totalPages()) this.orderPage++;
+        },
+
+        prevPage() {
+            if (this.orderPage > 1) this.orderPage--;
+        },
+
+        async initOrUpdateCharts() {
+            await this.initEquityChart();
+            this.initAllocationChart();
+        },
+
+        async initEquityChart() {
+            const ctx = document.getElementById('equityCurveCanvas');
+            if (!ctx) return;
+
+            let labels = [];
+            let equityData = [];
             try {
-                this.log(`Computing 3D Phenotype Manifold for ${this.instrument} (${this.manifoldMethod})...`);
-                const url = `/api/elites/manifold?ticker=${this.instrument}&method=${this.manifoldMethod}&limit=50`;
-                const res = await fetch(url);
+                const res = await fetch('/api/portfolio/equity_history');
                 const data = await res.json();
-                if (data.status === 'ok') {
-                    this.manifoldClusters = data.clusters_count || 0;
-                    this.manifoldCompression = parseFloat(((data.compression_ratio || 0.0) * 100.0).toFixed(1));
-                    this.renderManifoldPlot(data);
-                } else {
-                    this.log(`Manifold note: ${data.message || 'Need more resident champions.'}`, 'warning');
-                }
+                labels = data.labels || [];
+                equityData = data.equity || [];
             } catch (err) {
-                this.log(`Failed to fetch manifold: ${err}`, 'error');
+                console.warn('Could not load equity history:', err);
             }
-        },
 
-        renderManifoldPlot(data) {
-            const chartDiv = document.getElementById('manifoldChart3d');
-            if (!chartDiv || !window.Plotly || !data.points || data.points.length === 0) return;
-
-            const pts = data.points;
-            const trace = {
-                x: pts.map(p => p.x),
-                y: pts.map(p => p.y),
-                z: pts.map(p => p.z),
-                mode: 'markers',
-                type: 'scatter3d',
-                marker: {
-                    size: pts.map(p => p.is_orthogonal ? 11 : (p.is_survivor ? 8 : 5)),
-                    color: pts.map(p => p.cluster),
-                    colorscale: 'Turbo',
-                    showscale: true,
-                    colorbar: {
-                        title: { text: 'Cluster ID', font: { color: '#e2e8f0', size: 10 } },
-                        tickfont: { color: '#94a3b8' }
-                    },
-                    opacity: pts.map(p => p.is_survivor ? 0.95 : 0.45)
-                },
-                text: pts.map(p => {
-                    const fStr = (p.formula || '').slice(0, 60);
-                    const tag = p.is_orthogonal ? 'Orthogonal Stream' : (p.is_survivor ? 'Occam Survivor' : 'Pruned Clone');
-                    return `<b>Cluster ${p.cluster} (${tag})</b><br>` +
-                           `Formula: ${fStr}..<br>` +
-                           `Sharpe: ${p.fitness?.toFixed(2)} | CAGR: ${p.cagr_pct?.toFixed(1)}% | MaxDD: ${p.max_drawdown?.toFixed(1)}%`;
-                }),
-                hovertemplate: '%{text}<extra></extra>'
-            };
-
-            const layout = {
-                paper_bgcolor: '#0f172a',
-                font: { color: '#94a3b8', family: 'monospace' },
-                scene: {
-                    bgcolor: '#0b0f19',
-                    xaxis: {
-                        title: { text: 'Dim 1 (AST Topology)', font: { color: '#94a3b8' } },
-                        backgroundcolor: '#0f172a',
-                        gridcolor: '#1e293b',
-                        showbackground: true,
-                        zerolinecolor: '#334155'
-                    },
-                    yaxis: {
-                        title: { text: 'Dim 2 (Regime Sensitivity)', font: { color: '#94a3b8' } },
-                        backgroundcolor: '#0f172a',
-                        gridcolor: '#1e293b',
-                        showbackground: true,
-                        zerolinecolor: '#334155'
-                    },
-                    zaxis: {
-                        title: { text: 'Dim 3 (Execution Trajectory)', font: { color: '#94a3b8' } },
-                        backgroundcolor: '#0f172a',
-                        gridcolor: '#1e293b',
-                        showbackground: true,
-                        zerolinecolor: '#334155'
-                    },
-                    camera: {
-                        eye: { x: 1.5, y: 1.5, z: 1.2 }
-                    }
-                },
-                margin: { t: 30, b: 20, l: 20, r: 20 },
-                title: {
-                    text: `🌌 3D Strategy Manifold & Occam Pruning: ${this.instrument} (${pts.length} Champions · ${data.clusters_count} Clusters · ${this.manifoldCompression}% Clones Pruned)`,
-                    font: { color: '#c084fc', size: 13 }
-                }
-            };
-
-            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false });
-        },
-
-        // 6. 1024D Protein Latent Space Cosine Similarity Heatmap
-        async fetchCosine() {
-            const chartDiv = document.getElementById('cosineHeatmapChart');
-            if (!chartDiv || !window.Plotly) return;
-
-            try {
-                this.log(`Computing 1024D latent cosine similarity for ${this.instrument}...`);
-                const url = `/api/elites/manifold?ticker=${this.instrument}&method=fast&limit=25`;
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data.status === 'ok' && data.cosine_matrix && data.cosine_matrix.length > 0) {
-                    this.renderCosineHeatmap(data);
-                }
-            } catch (err) {
-                this.log(`Failed to fetch cosine matrix: ${err}`, 'error');
-            }
-        },
-
-        renderCosineHeatmap(data) {
-            const chartDiv = document.getElementById('cosineHeatmapChart');
-            if (!chartDiv || !window.Plotly) return;
-
-            const trace = {
-                z: data.cosine_matrix,
-                x: data.labels,
-                y: data.labels,
-                type: 'heatmap',
-                colorscale: 'Viridis',
-                zmin: 0.0,
-                zmax: 1.0,
-                colorbar: { title: 'Cosine Sim', tickfont: { color: '#94a3b8' } },
-                xgap: 1,
-                ygap: 1
-            };
-
-            const layout = {
-                paper_bgcolor: '#0f172a',
-                plot_bgcolor: '#0b0f19',
-                font: { color: '#94a3b8', family: 'monospace', size: 10 },
-                margin: { t: 40, b: 100, l: 120, r: 20 },
-                title: {
-                    text: `🧬 1024D Latent Space Diversity: ${this.instrument} (Unit-Norm Pairwise Cosine Matrix)`,
-                    font: { color: '#34d399', size: 13 }
-                }
-            };
-
-            Plotly.newPlot(chartDiv, [trace], layout, { responsive: true, displayModeBar: false });
-        },
-
-        // API Node Actions
-        async ingestData() {
-            this.status = 'INGESTING';
-            this.log(`Node 1: Ingesting ${this.instrument} (${this.lookbackYears}y)...`);
-            try {
-                const res = await fetch('/api/pipeline/ingest', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ instrument: this.instrument, lookback_years: parseFloat(this.lookbackYears) })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    this.status = 'STANDBY';
-                    this.log(`Node 1 Success: Loaded ${data.bars_count} bars for ${data.instrument}`, 'success');
-                } else {
-                    this.status = 'ERROR';
-                    this.log(`Ingest Error: ${data.detail}`, 'error');
-                }
-            } catch (err) {
-                this.status = 'ERROR';
-                this.log(`Ingest Network Error: ${err}`, 'error');
-            }
-        },
-
-        async testRemoteGpu() {
-            if (!this.remoteUrl) {
-                this.remoteGpuStatus = { online: false, message: 'Please enter a Cloudflare Tunnel URL.' };
+            if (this.equityChart) {
+                this.equityChart.data.labels = labels;
+                this.equityChart.data.datasets[0].data = equityData;
+                this.equityChart.update();
                 return;
             }
-            localStorage.setItem('bioquant_remote_url', this.remoteUrl);
-            this.remoteGpuStatus = { online: false, message: 'Testing remote connection...' };
-            try {
-                const res = await fetch('/api/remote/health', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: this.remoteUrl })
-                });
-                const data = await res.json();
-                if (data.online) {
-                    this.remoteGpuStatus = {
-                        online: true,
-                        message: `🟢 ${data.device || 'GPU'} (${data.vram_gb || '16'} GB) · ${data.latency_ms}ms`
-                    };
-                    this.log(`Remote GPU verified: ${data.device} (${data.latency_ms}ms latency)`, 'success');
-                } else {
-                    this.remoteGpuStatus = { online: false, message: `❌ ${data.error || 'Connection failed'}` };
-                    this.log(`Remote GPU check failed: ${data.error}`, 'error');
+
+            if (typeof Chart === 'undefined') return;
+
+            const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 240);
+            gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+            this.equityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Portfolio Equity (INR)',
+                        data: equityData,
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        pointHoverRadius: 5,
+                        pointHoverBackgroundColor: '#10b981',
+                        fill: true,
+                        backgroundColor: gradient,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            titleColor: '#94a3b8',
+                            bodyColor: '#f1f5f9',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: (ctx) => ` NAV: ₹${ctx.parsed.y.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(51, 65, 85, 0.2)' },
+                            ticks: { color: '#64748b', maxTicksLimit: 12, font: { family: 'monospace', size: 10 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(51, 65, 85, 0.2)' },
+                            ticks: {
+                                color: '#64748b',
+                                font: { family: 'monospace', size: 10 },
+                                callback: (val) => '₹' + val.toLocaleString('en-IN')
+                            }
+                        }
+                    }
                 }
-            } catch (err) {
-                this.remoteGpuStatus = { online: false, message: `❌ Failed: ${err}` };
-            }
+            });
         },
 
-        async startEvolution() {
-            if (this.computeTarget === 'remote') {
-                if (!this.remoteUrl) {
-                    this.log("Please provide a Kaggle Cloudflare Tunnel URL before starting.", "error");
-                    this.remoteGpuStatus = { online: false, message: 'Please enter a Cloudflare Tunnel URL.' };
-                    return;
-                }
-                localStorage.setItem('bioquant_remote_url', this.remoteUrl);
+        initAllocationChart() {
+            const ctx = document.getElementById('allocationDonutCanvas');
+            if (!ctx || typeof Chart === 'undefined') return;
+
+            const cashPct = this.portfolio.cash_pct || 42.5;
+            const psuPct = 35.0;
+            const bankPct = 22.5;
+
+            if (this.allocationChart) {
+                this.allocationChart.data.datasets[0].data = [cashPct, psuPct, bankPct];
+                this.allocationChart.update();
+                return;
             }
 
-            this.status = 'EVOLVING';
-            const targetLabel = this.computeTarget === 'remote' ? 'Kaggle Cloud GPU' : 'Local CPU (Cores 2-3)';
-            const seedStr = this.randomSeed ? ` (Seed: ${this.randomSeed})` : '';
-            this.log(`Node 2: Dispatching compute to ${targetLabel} for ${this.instrument}, ${this.generations} generations${seedStr}...`);
-            try {
-                const payload = {
-                    instrument: this.instrument,
-                    generations: parseInt(this.generations),
-                    population_size: parseInt(this.populationSize),
-                    lookback_years: parseFloat(this.lookbackYears),
-                    compute_target: this.computeTarget,
-                    remote_url: this.remoteUrl
-                };
-                if (this.randomSeed !== null && !isNaN(this.randomSeed)) {
-                    payload.seed = parseInt(this.randomSeed);
+            this.allocationChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Cash Buffer', 'PSUBNKBEES', 'BANKBEES'],
+                    datasets: [{
+                        data: [cashPct, psuPct, bankPct],
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
+                        borderColor: '#0b101e',
+                        borderWidth: 3,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '72%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a',
+                            borderColor: '#334155',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: (ctx) => ` ${ctx.label}: ${ctx.parsed}%`
+                            }
+                        }
+                    }
                 }
-                const res = await fetch('/api/pipeline/evolve', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    const modeMsg = data.compute_target === 'remote' ? 'Kaggle GPU Worker via Cloudflare Tunnel' : 'Local Cores 2-3';
-                    this.log(`Node 2 Started: Compute running on ${modeMsg} (Seed: ${data.seed ?? 'auto'}).`, 'success');
-                } else {
-                    this.log(`Evolve start error: ${data.detail}`, 'error');
-                }
-            } catch (err) {
-                this.log(`Evolve Network Error: ${err}`, 'error');
-            }
+            });
         },
 
-        async abortEvolution() {
-            this.log("Node 2: Signaling sub-millisecond atomic abort to worker...", 'warning');
-            try {
-                const res = await fetch('/api/pipeline/abort', { method: 'POST' });
-                const data = await res.json();
-                this.log(`Abort response: ${data.status}`, 'warning');
-            } catch (err) {
-                this.log(`Abort Network Error: ${err}`, 'error');
-            }
-        },
-
-        async emergencyFreeze() {
-            window.cockpitAudio.playPanicSound();
-            this.log("EMERGENCY STAGE 1: Freezing all local outbounds (<0.5ms)...", 'error');
+        async triggerFreeze() {
             try {
                 const res = await fetch('/api/emergency/freeze', { method: 'POST' });
                 const data = await res.json();
-                this.status = 'FROZEN';
-                this.log(`STAGE 1 FROZEN in ${data.elapsed_us?.toFixed(1)}us. SHM signaled: ${data.shm_signaled}`, 'error');
+                this.isFrozen = true;
+                this.showToast('🚨 EMERGENCY FREEZE ACTIVATED: Execution queue locked.', 'warning');
             } catch (err) {
-                this.log(`Freeze Error: ${err}`, 'error');
+                this.showToast('Failed to trigger freeze: ' + err, 'error');
             }
         },
 
-        async emergencyPanic() {
-            window.cockpitAudio.playPanicSound();
-            this.log("EMERGENCY STAGE 2: Dispatched parallel liquidation to 100% cash...", 'error');
+        async triggerPanic() {
+            if (!confirm('DANGER: Confirm emergency panic liquidation to 100% cash?')) return;
             try {
                 const res = await fetch('/api/emergency/panic', { method: 'POST' });
                 const data = await res.json();
-                this.status = 'PANICKED';
-                this.log(`STAGE 2 COMPLETE in ${data.elapsed_ms?.toFixed(2)}ms. Orders cancelled: ${data.orders_cancelled_count}, Positions closed: ${data.positions_liquidated_count}`, 'error');
+                this.isFrozen = true;
+                this.showToast('⚡ PANIC FLATTEN COMPLETE: All open orders cancelled.', 'error');
+                this.fetchAllData();
             } catch (err) {
-                this.log(`Panic Error: ${err}`, 'error');
+                this.showToast('Failed to execute panic liquidation: ' + err, 'error');
             }
         },
 
-        async fetchLeaderboard() {
-            try {
-                const lookbackParam = this.lookbackYears ? `${parseInt(this.lookbackYears)}y` : 'all';
-                const res = await fetch(`/api/elites/leaderboard?limit=100&metric=sharpe&ticker=${this.instrument}&lookback=${lookbackParam}`);
-                const data = await res.json();
-                if (data.status === 'ok' && this.gridApi) {
-                    this.gridApi.setGridOption('rowData', data.elites);
-                }
-            } catch (err) {
-                this.log(`Failed to fetch leaderboard: ${err}`, 'error');
-            }
+        hoverCell(row, col) {
+            if (!this.gridData) return;
+            const cell = this.gridData[row] ? this.gridData[row][col] : null;
+            this.hoveredCell = cell ? { ...cell, row, col } : null;
+        },
+
+        clearHover() {
+            this.hoveredCell = null;
+        },
+
+        getCellColor(row, col) {
+            if (!this.gridData || !this.gridData[row]) return 'bg-slate-900/60 border-slate-800/40';
+            const cell = this.gridData[row][col];
+            if (!cell) return 'bg-slate-900/40 border-slate-800/30 hover:border-slate-600';
+            const f = cell.fitness || 0;
+            if (f >= 3.5) return 'bg-emerald-500/80 border-emerald-400 text-white shadow-sm shadow-emerald-500/50';
+            if (f >= 3.0) return 'bg-teal-500/70 border-teal-400 text-white';
+            if (f >= 2.5) return 'bg-cyan-600/60 border-cyan-400 text-white';
+            return 'bg-blue-600/50 border-blue-400 text-white';
         }
     };
 }

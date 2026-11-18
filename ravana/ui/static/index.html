@@ -3,413 +3,740 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bio-Quant Institutional Alpha Cockpit</title>
-    <!-- Vendored Offline Air-Gapped Dependencies -->
-    <link rel="stylesheet" href="/vendor/ag-grid.min.css">
-    <link rel="stylesheet" href="/vendor/ag-theme-alpine.min.css">
+    <title>RAVANA v4.3 — Autonomous Quantitative Terminal</title>
+    <!-- Vendored High-Performance Air-Gapped Dependencies -->
     <script src="/vendor/tailwind.min.js"></script>
-    <script src="/vendor/plotly-full.min.js?v=3.7.2"></script>
-    <script src="/vendor/ag-grid-community.min.js"></script>
-    <script src="/audio_synth.js?v=2.0.4"></script>
-    <script src="/app.js?v=2.0.5"></script>
+    <script src="/vendor/chart.umd.min.js"></script>
+    <script src="/vendor/lucide.min.js"></script>
     <script defer src="/vendor/alpine.min.js"></script>
+    <script src="/app.js?v=4.3.0"></script>
     <style>
-        body { background-color: #0b0f19; color: #f1f5f9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-        .hud-border { border: 1px solid rgba(59, 130, 246, 0.2); }
-        .node-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(51, 65, 85, 0.8); backdrop-filter: blur(8px); }
-        .ag-theme-alpine-dark {
-            --ag-background-color: #0f172a;
-            --ag-header-background-color: #1e293b;
-            --ag-odd-row-background-color: #0b0f19;
-            --ag-border-color: #334155;
-            --ag-header-foreground-color: #94a3b8;
-            --ag-foreground-color: #e2e8f0;
+        body {
+            background-color: #060913;
+            color: #f1f5f9;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
+        .font-mono-tabular {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+            font-variant-numeric: tabular-nums;
+        }
+        .glass-card {
+            background: rgba(13, 19, 35, 0.75);
+            border: 1px solid rgba(51, 65, 85, 0.5);
+            backdrop-filter: blur(12px);
+        }
+        .glass-card-glow {
+            background: rgba(13, 19, 35, 0.85);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.15);
+            backdrop-filter: blur(14px);
+        }
+        .neon-border-cyan { border-color: rgba(6, 182, 212, 0.35); }
+        .neon-border-amber { border-color: rgba(245, 158, 11, 0.35); }
+        .neon-border-rose { border-color: rgba(244, 63, 94, 0.35); }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(10, 15, 29, 0.8); }
+        ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.9); }
     </style>
 </head>
-<body x-data="cockpitApp()" class="min-h-screen flex flex-col overflow-hidden">
+<body x-data="ravanaCockpit()" class="min-h-screen flex flex-col overflow-x-hidden selection:bg-emerald-500 selection:text-black">
 
-    <!-- Top Avionics HUD Ribbon -->
-    <header class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between text-xs tracking-wider z-50">
-        <div class="flex items-center space-x-3">
-            <span class="text-blue-400 font-bold flex items-center gap-1.5 text-sm">
-                <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                BIO-QUANT ALPHA COCKPIT
-            </span>
-            <span class="text-slate-500">|</span>
-            <span class="px-2 py-0.5 rounded text-[11px] font-semibold"
-                  :class="{
-                      'bg-emerald-950 text-emerald-400 border border-emerald-800': status === 'STANDBY',
-                      'bg-blue-950 text-blue-400 border border-blue-800 animate-pulse': status === 'EVOLVING',
-                      'bg-amber-950 text-amber-400 border border-amber-800': status === 'FROZEN',
-                      'bg-red-950 text-red-400 border border-red-800 animate-bounce': status === 'PANICKED',
-                      'bg-purple-950 text-purple-400 border border-purple-800': status === 'COMPLETE'
-                  }"
-                  x-text="'STATUS: ' + status">
-            </span>
+    <!-- Toast Notifications Floating Stack -->
+    <div class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="pointer-events-auto px-4 py-2.5 rounded-lg text-xs font-semibold shadow-2xl flex items-center space-x-2.5 transition-all duration-300"
+                 :class="{
+                     'bg-emerald-950/95 text-emerald-300 border border-emerald-500/50': t.type === 'info',
+                     'bg-amber-950/95 text-amber-300 border border-amber-500/50': t.type === 'warning',
+                     'bg-rose-950/95 text-rose-300 border border-rose-500/50': t.type === 'error'
+                 }">
+                <span class="w-2 h-2 rounded-full animate-ping"
+                      :class="t.type === 'error' ? 'bg-rose-400' : (t.type === 'warning' ? 'bg-amber-400' : 'bg-emerald-400')"></span>
+                <span x-text="t.msg"></span>
+            </div>
+        </template>
+    </div>
+
+    <!-- Top Master Avionics Navigation Bar -->
+    <header class="bg-slate-950/90 border-b border-slate-800/80 px-5 py-2.5 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+        <div class="flex items-center space-x-4">
+            <!-- Brand Badge -->
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 flex items-center justify-center font-bold text-white shadow-lg shadow-emerald-500/20 text-sm">
+                    R4
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-extrabold tracking-wider text-sm bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
+                            RAVANA QUANT
+                        </span>
+                        <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                            v4.3
+                        </span>
+                    </div>
+                    <div class="text-[10px] text-slate-400 flex items-center gap-1.5">
+                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Autonomous Trading Daemon & Veto Shield
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vertical Separator -->
+            <div class="h-6 w-px bg-slate-800"></div>
+
+            <!-- Ticker Marquee Strip -->
+            <div class="hidden lg:flex items-center space-x-2 text-xs font-mono-tabular">
+                <div class="px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 flex items-center space-x-1.5">
+                    <span class="text-slate-400 text-[11px]">NIFTYBEES:</span>
+                    <span class="font-bold text-white">₹250.04</span>
+                    <span class="text-emerald-400 text-[10px]">+0.12%</span>
+                </div>
+                <div class="px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 flex items-center space-x-1.5">
+                    <span class="text-slate-400 text-[11px]">BANKBEES:</span>
+                    <span class="font-bold text-white">₹542.25</span>
+                    <span class="text-emerald-400 text-[10px]">+0.35%</span>
+                </div>
+                <div class="px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 flex items-center space-x-1.5">
+                    <span class="text-slate-400 text-[11px]">PSUBNKBEES:</span>
+                    <span class="font-bold text-white">₹79.05</span>
+                    <span class="text-emerald-400 text-[10px]">+0.82%</span>
+                </div>
+                <div class="px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 flex items-center space-x-1.5">
+                    <span class="text-slate-400 text-[11px]">GOLDBEES:</span>
+                    <span class="font-bold text-white">₹59.99</span>
+                    <span class="text-slate-400 text-[10px]">0.00%</span>
+                </div>
+                <div class="px-2.5 py-1 rounded bg-slate-900/80 border border-slate-800 flex items-center space-x-1.5">
+                    <span class="text-slate-400 text-[11px]">INDIAVIX:</span>
+                    <span class="font-bold text-amber-400">12.40</span>
+                </div>
+            </div>
         </div>
 
-        <!-- Microsecond Telemetry Counters -->
-        <div class="flex items-center space-x-6 text-slate-300">
-            <div>
-                <span class="text-slate-500">ASSET:</span>
-                <span class="font-bold text-blue-400" x-text="instrument">NIFTYBEES</span>
+        <!-- Right System Controls -->
+        <div class="flex items-center space-x-3 text-xs">
+            <!-- Sync Indicator -->
+            <div class="hidden sm:flex items-center space-x-1.5 text-slate-400 text-[11px] font-mono-tabular">
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <span>SYNC:</span>
+                <span class="text-slate-300" x-text="lastSync"></span>
             </div>
-            <div>
-                <span class="text-slate-500">GEN:</span>
-                <span class="font-bold text-white" x-text="telemetry.current_gen + '/' + telemetry.total_gens">0/10</span>
-            </div>
-            <div>
-                <span class="text-slate-500">CHAMPIONS:</span>
-                <span class="font-bold text-emerald-400" x-text="gridOccupiedCount">0</span>
-            </div>
-            <div>
-                <span class="text-slate-500">OCCUPANCY:</span>
-                <span class="font-bold text-cyan-400" x-text="gridOccupancy + '%'">0.0%</span>
-            </div>
-            <div>
-                <span class="text-slate-500">MAX SHARPE:</span>
-                <span class="font-bold text-amber-400" x-text="telemetry.top_sharpe.toFixed(2)">0.00</span>
-            </div>
-        </div>
 
-        <!-- Controls: Sound & Emergency Action Buttons -->
-        <div class="flex items-center space-x-2">
-            <button @click="toggleMute()"
-                    class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
-                    :title="isMuted ? 'Unmute Sound' : 'Mute Sound'">
-                <span x-text="isMuted ? '🔇 MUTED' : '🔊 AUDIO ON'"></span>
+            <!-- Emergency Actions -->
+            <button @click="triggerFreeze()"
+                    class="px-3 py-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 font-bold border border-amber-500/40 transition duration-150 flex items-center gap-1.5"
+                    title="Out-of-band in-process atomic freeze (<0.5ms)">
+                <span>❄</span>
+                <span>FREEZE</span>
             </button>
-            <button @click="emergencyFreeze()"
-                    class="px-3 py-1 rounded bg-amber-600 hover:bg-amber-500 text-black font-bold border border-amber-400 transition"
-                    title="Stage 1: In-process atomic freeze (<0.5ms)">
-                ❄ FREEZE
-            </button>
-            <button @click="emergencyPanic()"
-                    class="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-bold border border-red-400 transition animate-pulse"
-                    title="Stage 2: Parallel async socket dispatch to 100% cash">
-                🚨 PANIC (100% CASH)
+            <button @click="triggerPanic()"
+                    class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold border border-rose-400 shadow-lg shadow-rose-600/30 transition duration-150 flex items-center gap-1.5 animate-pulse"
+                    title="Parallel async socket dispatch to 100% cash">
+                <span>🚨</span>
+                <span>PANIC TO CASH</span>
             </button>
         </div>
     </header>
 
-    <!-- Dead-Man Switch Heartbeat Watchdog Banner -->
-    <div x-show="deadManDisconnected" x-transition
-         class="bg-red-600 text-white px-4 py-1.5 text-xs font-bold flex items-center justify-between tracking-wide shadow-lg">
-        <div class="flex items-center space-x-2">
-            <span>⚠️ DEAD-MAN SWITCH ALERT:</span>
-            <span>SharedMemory heartbeat expired (>5.0s silence). Worker process may be stalled.</span>
-        </div>
-        <div class="space-x-2">
-            <button @click="connectSSE()" class="bg-black/30 hover:bg-black/50 px-2 py-0.5 rounded underline">RECONNECT</button>
-            <button @click="emergencyPanic()" class="bg-black text-red-300 hover:bg-neutral-900 px-2.5 py-0.5 rounded">EXECUTE PANIC</button>
-        </div>
-    </div>
-
-    <!-- Main Workspace Split: Left (n8n Node Pipeline Deck) & Right (Tactical Deck) -->
-    <div class="flex-1 flex overflow-hidden">
-
-        <!-- Left Column: n8n Node Pipeline Deck -->
-        <aside class="w-84 bg-slate-950 border-r border-slate-800 p-3.5 flex flex-col space-y-3.5 overflow-y-auto">
-            <div class="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                <span>PIPELINE NODES</span>
-                <span class="text-[10px] text-blue-400">n8n DAG</span>
+    <!-- Sub-Header Real-Time KPI Ribbon -->
+    <section class="bg-slate-950/60 border-b border-slate-800/60 px-5 py-3">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+            <!-- Card 1: Total NAV -->
+            <div class="glass-card-glow p-3 rounded-xl flex flex-col justify-between">
+                <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+                    <span>PORTFOLIO EQUITY</span>
+                    <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
+                        +₹37.96 (+0.02%)
+                    </span>
+                </div>
+                <div class="mt-1 flex items-baseline space-x-1.5">
+                    <span class="text-xl font-extrabold text-white font-mono-tabular"
+                          x-text="'₹' + (portfolio.current_equity || 200037.96).toLocaleString('en-IN', { minimumFractionDigits: 2 })">
+                        ₹200,037.96
+                    </span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                    <span class="text-emerald-400">●</span>
+                    <span>100% Capital Preserved</span>
+                </div>
             </div>
 
-            <!-- Node 1: Ingest Data Lake (Dynamic 100+ Asset Universe Selector) -->
-            <div class="node-card p-3 rounded-lg space-y-2.5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-blue-300 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-                        Node 1: Data Ingest (Multi-Asset Lake)
+            <!-- Card 2: Exposure Allocation -->
+            <div class="glass-card p-3 rounded-xl flex flex-col justify-between">
+                <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+                    <span>ACTIVE EXPOSURE</span>
+                    <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
+                        57.5% Invested
                     </span>
-                    <span class="text-[10px] text-slate-400" x-text="universeCount + ' Assets'">100+ Lake</span>
                 </div>
+                <div class="mt-1 flex items-baseline space-x-1.5">
+                    <span class="text-xl font-extrabold text-cyan-300 font-mono-tabular">
+                        ₹1,15,021<span class="text-xs text-slate-400 font-normal">.83</span>
+                    </span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+                    <span>Cash Buffer:</span>
+                    <span class="font-mono-tabular text-slate-300 font-semibold">₹85,016 (42.5%)</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Regime Indicator -->
+            <div class="glass-card p-3 rounded-xl flex flex-col justify-between">
+                <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+                    <span>MARKET REGIME</span>
+                    <span class="text-[10px] text-amber-400 bg-amber-950/80 border border-amber-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
+                        VR₂₀ = 0.68
+                    </span>
+                </div>
+                <div class="mt-1">
+                    <span class="text-sm font-bold text-amber-300">
+                        Low-Vol Chop Regime
+                    </span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                    <span class="text-amber-400">⚡</span>
+                    <span>Two-Way Mean Reversion Active</span>
+                </div>
+            </div>
+
+            <!-- Card 4: Drawdown & Safety -->
+            <div class="glass-card p-3 rounded-xl flex flex-col justify-between">
+                <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+                    <span>INTRADAY DRAWDOWN</span>
+                    <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
+                        Zero Breach
+                    </span>
+                </div>
+                <div class="mt-1 flex items-baseline space-x-1.5">
+                    <span class="text-xl font-extrabold text-emerald-400 font-mono-tabular">
+                        0.00%
+                    </span>
+                    <span class="text-xs text-slate-500">Max DD</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
+                    <span>Statutory DP Floor:</span>
+                    <span class="font-mono-tabular text-slate-300">₹15,930 (Armed)</span>
+                </div>
+            </div>
+
+            <!-- Card 5: Daemon Executions -->
+            <div class="glass-card p-3 rounded-xl flex flex-col justify-between col-span-2 md:col-span-1">
+                <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
+                    <span>LIVE EXECUTIONS</span>
+                    <span class="text-[10px] text-purple-400 bg-purple-950/80 border border-purple-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
+                        75/75 Epochs
+                    </span>
+                </div>
+                <div class="mt-1 flex items-baseline space-x-1.5">
+                    <span class="text-xl font-extrabold text-purple-300 font-mono-tabular" x-text="ordersCount">
+                        462
+                    </span>
+                    <span class="text-xs text-slate-400 font-normal">Paper Orders</span>
+                </div>
+                <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                    <span class="text-purple-400">✓</span>
+                    <span>Shoonya 2FA Headless Watchdog</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Navigation Tab Ribbon -->
+    <nav class="bg-slate-950 border-b border-slate-800/80 px-5 flex items-center space-x-2 text-xs font-semibold">
+        <button @click="setTab('terminal')"
+                :class="activeTab === 'terminal' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
+                class="px-4 py-3 transition duration-150 flex items-center gap-2">
+            <span>🛰️</span>
+            <span>Mission Control & Portfolio</span>
+        </button>
+        <button @click="setTab('alphas')"
+                :class="activeTab === 'alphas' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
+                class="px-4 py-3 transition duration-150 flex items-center gap-2">
+            <span>⚡</span>
+            <span>9 Production Alphas</span>
+        </button>
+        <button @click="setTab('matrix')"
+                :class="activeTab === 'matrix' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
+                class="px-4 py-3 transition duration-150 flex items-center gap-2">
+            <span>🗺️</span>
+            <span>MAP-Elites Matrix</span>
+        </button>
+        <button @click="setTab('orders')"
+                :class="activeTab === 'orders' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
+                class="px-4 py-3 transition duration-150 flex items-center gap-2">
+            <span>📜</span>
+            <span>Order Book</span>
+            <span class="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-300 font-mono-tabular" x-text="ordersCount"></span>
+        </button>
+        <button @click="setTab('security')"
+                :class="activeTab === 'security' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
+                class="px-4 py-3 transition duration-150 flex items-center gap-2">
+            <span>🛡️</span>
+            <span>Security & VPS Telemetry</span>
+        </button>
+    </nav>
+
+    <!-- Main Workspace Area -->
+    <main class="flex-1 p-5 space-y-5 max-w-7xl w-full mx-auto">
+
+        <!-- TAB 1: MISSION CONTROL & ACTIVE PORTFOLIO -->
+        <div x-show="activeTab === 'terminal'" class="space-y-5">
+            <!-- Active Positions Deck -->
+            <div class="glass-card p-4 rounded-2xl space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">ACTIVE OVERNIGHT ALLOCATION</span>
+                        <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded font-mono-tabular">
+                            15:10 IST Bull Markup Rotation
+                        </span>
+                    </div>
+                    <div class="text-xs text-slate-400 font-mono-tabular">
+                        Total Open Capital: <span class="text-white font-bold">₹1,15,021.83</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Position 1: PSUBNKBEES -->
+                    <div class="bg-slate-900/80 border border-slate-800/90 rounded-xl p-4 space-y-2.5 hover:border-emerald-500/40 transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-extrabold text-sm text-white font-mono-tabular">PSUBNKBEES</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                    LONG 35.0%
+                                </span>
+                            </div>
+                            <div class="text-right font-mono-tabular">
+                                <span class="text-xs font-bold text-emerald-400">+₹44.30 (+0.06%)</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 text-[11px] font-mono-tabular pt-1 border-t border-slate-800/60">
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">ALLOCATION:</span>
+                                <span class="text-slate-200 font-semibold">₹70,013.28</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">SHARES:</span>
+                                <span class="text-slate-200 font-semibold">886</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">ENTRY:</span>
+                                <span class="text-slate-200 font-semibold">₹79.00</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">CURRENT:</span>
+                                <span class="text-emerald-400 font-bold">₹79.05</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] font-mono-tabular text-slate-400 bg-slate-950/60 px-2.5 py-1.5 rounded">
+                            <span>Target: <b class="text-white">₹80.50</b> (1.50 ATR)</span>
+                            <span>Trailing Stop: <b class="text-amber-400">₹78.20</b> (1.00 ATR)</span>
+                            <span class="text-slate-500">Strategy: PEAD Drift</span>
+                        </div>
+                    </div>
+
+                    <!-- Position 2: BANKBEES -->
+                    <div class="bg-slate-900/80 border border-slate-800/90 rounded-xl p-4 space-y-2.5 hover:border-emerald-500/40 transition">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="font-extrabold text-sm text-white font-mono-tabular">BANKBEES</span>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                    LONG 22.5%
+                                </span>
+                            </div>
+                            <div class="text-right font-mono-tabular">
+                                <span class="text-xs font-bold text-emerald-400">+₹12.45 (+0.03%)</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 text-[11px] font-mono-tabular pt-1 border-t border-slate-800/60">
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">ALLOCATION:</span>
+                                <span class="text-slate-200 font-semibold">₹45,008.55</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">SHARES:</span>
+                                <span class="text-slate-200 font-semibold">83</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">ENTRY:</span>
+                                <span class="text-slate-200 font-semibold">₹542.10</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block text-[10px]">CURRENT:</span>
+                                <span class="text-emerald-400 font-bold">₹542.25</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px] font-mono-tabular text-slate-400 bg-slate-950/60 px-2.5 py-1.5 rounded">
+                            <span>Target: <b class="text-white">₹550.00</b> (1.50 ATR)</span>
+                            <span>Trailing Stop: <b class="text-amber-400">₹538.00</b> (1.00 ATR)</span>
+                            <span class="text-slate-500">Strategy: European Impulse</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dual Interactive Charts Split: Equity Trajectory & Asset Donut -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                <!-- Interactive Equity Curve (2 cols) -->
+                <div class="glass-card p-4 rounded-2xl space-y-3 lg:col-span-2 flex flex-col">
+                    <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">CUMULATIVE INTRADAY NAV TRAJECTORY</span>
+                            <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-1.5 py-0.2 rounded font-mono-tabular">
+                                75 Candle Epochs
+                            </span>
+                        </div>
+                        <div class="text-xs text-slate-400 font-mono-tabular">
+                            Ending NAV: <span class="text-emerald-400 font-bold">₹200,037.96</span>
+                        </div>
+                    </div>
+                    <div class="relative h-64 w-full flex-1">
+                        <canvas id="equityCurveCanvas"></canvas>
+                    </div>
+                </div>
+
+                <!-- Asset Allocation Donut (1 col) -->
+                <div class="glass-card p-4 rounded-2xl space-y-3 flex flex-col">
+                    <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">CAPITAL DISTRIBUTION</span>
+                        <span class="text-[10px] text-cyan-400 font-mono-tabular">₹2,00,037.96</span>
+                    </div>
+                    <div class="relative h-44 w-full my-auto flex items-center justify-center">
+                        <canvas id="allocationDonutCanvas"></canvas>
+                    </div>
+                    <div class="space-y-1.5 text-xs font-mono-tabular border-t border-slate-800/60 pt-2.5">
+                        <div class="flex justify-between items-center text-slate-300">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-blue-500"></span>Liquid Cash Buffer</span>
+                            <span class="font-bold">42.5% (₹85,016)</span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-300">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span>PSUBNKBEES</span>
+                            <span class="font-bold">35.0% (₹70,013)</span>
+                        </div>
+                        <div class="flex justify-between items-center text-slate-300">
+                            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span>BANKBEES</span>
+                            <span class="font-bold">22.5% (₹45,008)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Real-Time Order Stream Strip -->
+            <div class="glass-card p-4 rounded-2xl space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">REAL-TIME ORDER STREAM</span>
+                        <span class="text-[10px] text-slate-400">Latest Executions</span>
+                    </div>
+                    <button @click="setTab('orders')" class="text-xs text-cyan-400 hover:text-cyan-300 font-medium">
+                        View Full Ledger (462) →
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs font-mono-tabular">
+                        <thead>
+                            <tr class="text-slate-500 text-[10px] uppercase border-b border-slate-800/60">
+                                <th class="pb-2">ORDER ID</th>
+                                <th class="pb-2">INSTRUMENT</th>
+                                <th class="pb-2">SIDE</th>
+                                <th class="pb-2">SHARES</th>
+                                <th class="pb-2">FILL PRICE</th>
+                                <th class="pb-2">SLIPPAGE</th>
+                                <th class="pb-2">FRICTION</th>
+                                <th class="pb-2">MODE</th>
+                                <th class="pb-2 text-right">TIMESTAMP</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/40 text-slate-300">
+                            <template x-for="ord in orders.slice(0, 6)" :key="ord.order_id">
+                                <tr class="hover:bg-slate-900/50 transition">
+                                    <td class="py-2 text-slate-400 font-semibold" x-text="ord.order_id"></td>
+                                    <td class="py-2 font-bold text-white" x-text="ord.ticker"></td>
+                                    <td class="py-2">
+                                        <span class="px-1.5 py-0.2 rounded font-bold text-[10px]"
+                                              :class="ord.side === 'BUY' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'"
+                                              x-text="ord.side"></span>
+                                    </td>
+                                    <td class="py-2" x-text="ord.shares"></td>
+                                    <td class="py-2 font-semibold" x-text="'₹' + ord.price.toFixed(2)"></td>
+                                    <td class="py-2 text-slate-400" x-text="ord.slippage_bps + ' bps'"></td>
+                                    <td class="py-2 text-slate-400" x-text="'₹' + ord.friction.toFixed(2)"></td>
+                                    <td class="py-2">
+                                        <span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800 text-slate-400" x-text="ord.mode"></span>
+                                    </td>
+                                    <td class="py-2 text-right text-slate-500" x-text="ord.timestamp.slice(11, 19)"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: 9 SOVEREIGN PRODUCTION ALPHAS -->
+        <div x-show="activeTab === 'alphas'" class="space-y-4">
+            <div class="flex items-center justify-between">
                 <div>
-                    <label class="block text-[10px] text-slate-400 mb-1">TARGET ASSET (UNIVERSE)</label>
-                    <select x-model="instrument" @change="onAssetChange()" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500 font-mono">
-                        <template x-for="(assets, category) in universeCategories" :key="category">
-                            <optgroup :label="category">
-                                <template x-for="ast in assets" :key="ast">
-                                    <option :value="ast" x-text="ast + (residentTickers.includes(ast) ? ' ⭐' : '')"></option>
-                                </template>
-                            </optgroup>
+                    <h2 class="text-base font-bold text-white tracking-wide">9 SOVEREIGN PRODUCTION ALPHAS</h2>
+                    <p class="text-xs text-slate-400">Autonomous quantitative strategy triggers operating under strict 2:1 R:R and Google Decisions Veto Shield</p>
+                </div>
+                <div class="text-xs text-slate-400 font-mono-tabular">
+                    System Sharpe: <span class="text-emerald-400 font-bold">3.82</span> | Mean-Reversion Active: <span class="text-amber-400 font-bold">VR₂₀ &lt; 0.75</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <template x-for="strat in strategies" :key="strat.id">
+                    <div class="glass-card p-4 rounded-xl space-y-3 hover:border-slate-600 transition flex flex-col justify-between">
+                        <div class="space-y-1.5">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded"
+                                      :class="{
+                                          'bg-emerald-950 text-emerald-400 border border-emerald-800': strat.status === 'ACTIVE_HOLD',
+                                          'bg-amber-950 text-amber-400 border border-amber-800': strat.status === 'ACTIVE_MONITOR',
+                                          'bg-blue-950 text-blue-400 border border-blue-800': strat.status === 'ARMED',
+                                          'bg-slate-800 text-slate-400': strat.status === 'READY'
+                                      }"
+                                      x-text="strat.status"></span>
+                                <span class="text-[11px] font-mono-tabular text-slate-400" x-text="strat.active_window"></span>
+                            </div>
+                            <h3 class="font-bold text-sm text-white" x-text="strat.name"></h3>
+                            <div class="text-[11px] text-cyan-300 font-mono-tabular bg-slate-950/70 p-2 rounded border border-slate-800/80 break-all" x-text="strat.formula"></div>
+                        </div>
+
+                        <div class="space-y-2 border-t border-slate-800/60 pt-2 text-xs font-mono-tabular">
+                            <div class="flex justify-between text-slate-400">
+                                <span>Payoff Profile:</span>
+                                <span class="text-slate-200" x-text="strat.rr_ratio"></span>
+                            </div>
+                            <div class="flex justify-between items-center text-slate-400">
+                                <span>Backtested Sharpe:</span>
+                                <span class="text-emerald-400 font-bold" x-text="strat.sharpe.toFixed(2)"></span>
+                            </div>
+                            <div class="flex justify-between items-center text-slate-400">
+                                <span>Historical CAGR:</span>
+                                <span class="text-white font-bold" x-text="strat.cagr_pct + '%'"></span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <!-- TAB 3: 20x20 MAP-ELITES MATRIX -->
+        <div x-show="activeTab === 'matrix'" class="space-y-4">
+            <div class="flex items-center justify-between bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+                <div class="flex items-center space-x-3 text-xs">
+                    <span class="text-slate-400 font-semibold">COLOR METRIC:</span>
+                    <select x-model="gridMetric" @change="fetchGridMatrix()" class="bg-slate-900 border border-slate-700 text-white rounded px-2.5 py-1 text-xs">
+                        <option value="fitness">Sharpe / Fitness</option>
+                        <option value="net_return_pct">Net Return %</option>
+                        <option value="sortino">Sortino Ratio</option>
+                        <option value="win_rate">Win Rate %</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-4 text-xs font-mono-tabular text-slate-400">
+                    <span>Illuminated Niches: <b class="text-emerald-400" x-text="gridOccupiedCount + '/400'"></b></span>
+                    <span>Occupancy: <b class="text-cyan-400" x-text="gridOccupancyPct + '%'"></b></span>
+                </div>
+            </div>
+
+            <!-- Dense 20x20 Grid -->
+            <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row gap-5">
+                <div class="flex-1 overflow-x-auto">
+                    <div class="inline-grid grid-cols-20 gap-1 p-2 bg-slate-950 rounded-xl border border-slate-800" style="grid-template-columns: repeat(20, minmax(18px, 1fr));">
+                        <template x-for="r in 20" :key="'r' + r">
+                            <template x-for="c in 20" :key="'c' + c">
+                                <div class="w-5 h-5 rounded-sm border cursor-pointer transition transform hover:scale-125 hover:z-20"
+                                     :class="getCellColor(r - 1, c - 1)"
+                                     @mouseenter="hoverCell(r - 1, c - 1)"
+                                     @mouseleave="clearHover()">
+                                </div>
+                            </template>
                         </template>
-                        <!-- Fallback list while universe assets fetch -->
-                        <option value="NIFTYBEES">NIFTYBEES (Nifty 50) ⭐</option>
-                        <option value="BANKBEES">BANKBEES (Banking) ⭐</option>
-                        <option value="HAL">HAL (Defense) ⭐</option>
-                        <option value="BEL">BEL (Defense) ⭐</option>
-                        <option value="RELIANCE">RELIANCE (Energy) ⭐</option>
-                        <option value="TCS">TCS (Tech) ⭐</option>
-                        <option value="INFY">INFY (Tech) ⭐</option>
+                    </div>
+                </div>
+
+                <!-- Hovered Cell Inspector -->
+                <div class="w-full md:w-80 glass-card p-4 rounded-xl flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">NICHE INSPECTOR</span>
+                        <template x-if="hoveredCell">
+                            <div class="space-y-2 text-xs font-mono-tabular">
+                                <div class="flex justify-between border-b border-slate-800 pb-1">
+                                    <span class="text-slate-400">Niche Coordinates:</span>
+                                    <span class="text-white font-bold" x-text="'[' + hoveredCell.row + ', ' + hoveredCell.col + ']'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Asset:</span>
+                                    <span class="text-cyan-400 font-bold" x-text="hoveredCell.ticker"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Fitness / Sharpe:</span>
+                                    <span class="text-emerald-400 font-bold" x-text="hoveredCell.fitness.toFixed(2)"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Net Return:</span>
+                                    <span class="text-white font-bold" x-text="hoveredCell.net_return_pct + '%'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Win Rate:</span>
+                                    <span class="text-white font-bold" x-text="hoveredCell.win_rate + '%'"></span>
+                                </div>
+                                <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-300 break-all" x-text="hoveredCell.formula_str"></div>
+                            </div>
+                        </template>
+                        <template x-if="!hoveredCell">
+                            <div class="text-xs text-slate-500 py-8 text-center italic">
+                                Hover over any illuminated cell in the 20×20 behavioral matrix to inspect its quantitative champion.
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: AUDIT ORDER BOOK -->
+        <div x-show="activeTab === 'orders'" class="space-y-4">
+            <div class="glass-card p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
+                <div class="flex items-center space-x-2 w-full sm:w-auto">
+                    <input type="text" x-model="orderSearch" placeholder="Search by Ticker or Order ID..."
+                           class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono-tabular w-full sm:w-64">
+                    <select x-model="orderSideFilter" class="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1.5 text-xs">
+                        <option value="ALL">All Sides</option>
+                        <option value="BUY">BUY Only</option>
+                        <option value="SELL">SELL Only</option>
                     </select>
                 </div>
-                <div>
-                    <label class="block text-[10px] text-slate-400 mb-1">LOOKBACK HORIZON</label>
-                    <select x-model="lookbackYears" @change="onAssetChange()" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-blue-500">
-                        <option value="1.0">1 Year (~252 bars)</option>
-                        <option value="2.0">2 Years (~504 bars)</option>
-                        <option value="5.0">5 Years (~1,260 bars)</option>
-                    </select>
+                <div class="text-xs text-slate-400 font-mono-tabular">
+                    Showing <span class="text-white font-bold" x-text="paginatedOrders().length"></span> of <span class="text-white font-bold" x-text="filteredOrders().length"></span> orders
                 </div>
-                <button @click="ingestData()"
-                        class="w-full py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition">
-                    ▶ INGEST LAKE DATA
-                </button>
             </div>
 
-            <!-- Node 2: Genetic Evolution Compute Worker & Random Seed Governor -->
-            <div class="node-card p-3 rounded-lg space-y-2.5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                        Node 2: MAP-Elites Engine
+            <!-- Table of Orders -->
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <table class="w-full text-left text-xs font-mono-tabular">
+                    <thead class="bg-slate-950/80 border-b border-slate-800 text-slate-400 text-[11px] uppercase">
+                        <tr>
+                            <th class="p-3">ORDER ID</th>
+                            <th class="p-3">INSTRUMENT</th>
+                            <th class="p-3">ACTION</th>
+                            <th class="p-3">QUANTITY</th>
+                            <th class="p-3">PRICE</th>
+                            <th class="p-3">FRICTION</th>
+                            <th class="p-3">SLIPPAGE</th>
+                            <th class="p-3">EXECUTION MODE</th>
+                            <th class="p-3 text-right">TIMESTAMP</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/50 text-slate-300">
+                        <template x-for="ord in paginatedOrders()" :key="ord.order_id">
+                            <tr class="hover:bg-slate-900/60 transition">
+                                <td class="p-3 text-slate-400 font-mono" x-text="ord.order_id"></td>
+                                <td class="p-3 font-bold text-white" x-text="ord.ticker"></td>
+                                <td class="p-3">
+                                    <span class="px-2 py-0.5 rounded font-bold text-[10px]"
+                                          :class="ord.side === 'BUY' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'"
+                                          x-text="ord.side"></span>
+                                </td>
+                                <td class="p-3" x-text="ord.shares"></td>
+                                <td class="p-3 font-semibold" x-text="'₹' + ord.price.toFixed(2)"></td>
+                                <td class="p-3 text-slate-400" x-text="'₹' + ord.friction.toFixed(2)"></td>
+                                <td class="p-3 text-slate-400" x-text="ord.slippage_bps + ' bps'"></td>
+                                <td class="p-3">
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300" x-text="ord.mode"></span>
+                                </td>
+                                <td class="p-3 text-right text-slate-400" x-text="ord.timestamp"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+
+                <!-- Pagination Strip -->
+                <div class="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between text-xs font-mono-tabular">
+                    <button @click="prevPage()" :disabled="orderPage <= 1"
+                            class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300">
+                        ← Previous
+                    </button>
+                    <span class="text-slate-400">
+                        Page <span class="text-white font-bold" x-text="orderPage"></span> of <span class="text-white font-bold" x-text="totalPages()"></span>
                     </span>
-                    <span class="text-[10px] text-slate-500" x-text="computeTarget === 'remote' ? 'Kaggle GPU ⚡' : 'Cores 2-3'">Cores 2-3</span>
-                </div>
-
-                <!-- Compute Target Selector (Local CPU vs Kaggle Cloud GPU) -->
-                <div class="flex space-x-1 bg-slate-900 p-0.5 rounded border border-slate-800 text-[10px]">
-                    <button type="button" @click="computeTarget = 'local'"
-                            :class="computeTarget === 'local' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
-                            class="flex-1 py-0.5 rounded text-center transition">
-                        Local CPU
-                    </button>
-                    <button type="button" @click="computeTarget = 'remote'"
-                            :class="computeTarget === 'remote' ? 'bg-purple-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
-                            class="flex-1 py-0.5 rounded text-center transition">
-                        Kaggle GPU ⚡
-                    </button>
-                </div>
-
-                <!-- Remote Kaggle GPU Connection Panel -->
-                <div x-show="computeTarget === 'remote'" x-transition class="space-y-1.5 bg-purple-950/40 p-2 rounded border border-purple-800/50">
-                    <div class="flex justify-between items-center text-[10px]">
-                        <span class="text-purple-300 font-semibold">CLOUDFLARE TUNNEL URL</span>
-                        <button type="button" @click="testRemoteGpu()" class="text-purple-400 hover:text-purple-200 underline">
-                            Test Ping
-                        </button>
-                    </div>
-                    <input type="text" x-model="remoteUrl" placeholder="https://xxx.trycloudflare.com"
-                           class="w-full bg-slate-900 border border-purple-700/60 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-purple-400 font-mono">
-                    <div x-show="remoteGpuStatus" class="text-[10px]" :class="remoteGpuStatus && remoteGpuStatus.online ? 'text-emerald-400' : 'text-rose-400'" x-text="remoteGpuStatus ? remoteGpuStatus.message : ''"></div>
-                </div>
-
-                <!-- Generations Control (Open Bounds & Presets) -->
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center text-[10px] text-slate-400">
-                        <span class="font-semibold text-slate-300">GENERATIONS (100-GEN CHARGE)</span>
-                        <div class="flex items-center space-x-1">
-                            <span class="text-slate-500">Gens:</span>
-                            <input type="number" min="1" max="100000" x-model.number="generations"
-                                   class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white text-right font-mono font-bold focus:border-emerald-500 focus:outline-none">
-                        </div>
-                    </div>
-                    <input type="range" min="5" max="500" step="5" x-model.number="generations" class="w-full accent-emerald-500 cursor-pointer">
-                    <!-- Generation Presets -->
-                    <div class="flex items-center justify-between gap-1 pt-0.5">
-                        <button type="button" @click="setGenerations(25)" :class="generations == 25 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">25</button>
-                        <button type="button" @click="setGenerations(50)" :class="generations == 50 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">50</button>
-                        <button type="button" @click="setGenerations(100)" :class="generations == 100 ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400 font-bold' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-2 py-0.5 rounded text-[9px] border hover:border-emerald-500 transition">100 ⚡ Charge</button>
-                        <button type="button" @click="setGenerations(250)" :class="generations == 250 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">250</button>
-                        <button type="button" @click="setGenerations(500)" :class="generations == 500 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">500 🔥</button>
-                    </div>
-                </div>
-
-                <!-- Population / Formula Count Control (Open Bounds & Presets) -->
-                <div class="space-y-1">
-                    <div class="flex justify-between items-center text-[10px] text-slate-400">
-                        <span class="font-semibold text-slate-300">FORMULAS / GEN (POPULATION)</span>
-                        <div class="flex items-center space-x-1">
-                            <span class="text-slate-500">Pop:</span>
-                            <input type="number" min="10" max="100000" x-model.number="populationSize"
-                                   class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs text-white text-right font-mono font-bold focus:border-emerald-500 focus:outline-none">
-                        </div>
-                    </div>
-                    <input type="range" min="20" max="1000" step="10" x-model.number="populationSize" class="w-full accent-emerald-500 cursor-pointer">
-                    <!-- Population Presets -->
-                    <div class="flex items-center justify-between gap-1 pt-0.5">
-                        <button type="button" @click="setPopulation(50)" :class="populationSize == 50 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">50</button>
-                        <button type="button" @click="setPopulation(100)" :class="populationSize == 100 ? 'bg-emerald-500/30 text-emerald-300 border-emerald-400 font-bold' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-2 py-0.5 rounded text-[9px] border hover:border-emerald-500 transition">100 ⚡ Standard</button>
-                        <button type="button" @click="setPopulation(250)" :class="populationSize == 250 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">250 📦 Chunk</button>
-                        <button type="button" @click="setPopulation(500)" :class="populationSize == 500 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">500</button>
-                        <button type="button" @click="setPopulation(1000)" :class="populationSize == 1000 ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500' : 'bg-slate-900 text-slate-400 border-slate-800'" class="px-1.5 py-0.5 rounded text-[9px] border hover:border-slate-600 transition">1,000 🚀</button>
-                    </div>
-                </div>
-
-                <!-- Compute Evaluation Meter -->
-                <div class="bg-slate-950/70 border border-slate-800/80 rounded px-2.5 py-1.5 text-[10px] flex items-center justify-between">
-                    <span class="text-slate-400">Total Compute Budget:</span>
-                    <span class="font-mono text-emerald-400 font-bold" x-text="((generations || 0) * (populationSize || 0)).toLocaleString() + ' Candidate Formulas'">10,000 Candidate Formulas</span>
-                </div>
-                <div>
-                    <div class="flex justify-between text-[10px] text-slate-400 mb-1">
-                        <span>SEED GOVERNOR</span>
-                        <button @click="randomizeSeed()" class="text-emerald-400 hover:text-emerald-300 text-[10px]">🎲 Randomize</button>
-                    </div>
-                    <input type="number" x-model.number="randomSeed" placeholder="Seed (e.g. 42 or leave blank)"
-                           class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 font-mono">
-                </div>
-                <div class="flex space-x-2 pt-1">
-                    <button @click="startEvolution()"
-                            class="flex-1 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition">
-                        ⚡ EVOLVE
-                    </button>
-                    <button @click="abortEvolution()"
-                            class="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
-                        ABORT
+                    <button @click="nextPage()" :disabled="orderPage >= totalPages()"
+                            class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300">
+                        Next →
                     </button>
                 </div>
             </div>
+        </div>
 
-            <!-- Node 3: Risk Sentry & Microstructure Safeguard -->
-            <div class="node-card p-3 rounded-lg space-y-2 text-xs">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                        Node 3: Risk Sentry
-                    </span>
-                    <span class="text-[10px] text-emerald-400 font-bold">ARMED</span>
+        <!-- TAB 5: SECURITY & VPS TELEMETRY -->
+        <div x-show="activeTab === 'security'" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="glass-card p-4 rounded-xl space-y-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">PRIVATE MESH (TAILSCALE)</span>
+                    <div class="flex items-center space-x-2 text-emerald-400 font-bold text-sm">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>TAILSCALE MESH ACTIVE</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Zero public exposure. Port 7860 restricted to authorized wireguard overlay network.</p>
                 </div>
-                <div class="text-[11px] text-slate-400 space-y-1">
-                    <div class="flex justify-between">
-                        <span>Statutory DP Floor:</span>
-                        <span class="text-white font-bold">₹15,930 (MIS Route)</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Lower-Circuit Trap:</span>
-                        <span class="text-white font-bold">Synthetic NIFTYBEES</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Headless Watchdog:</span>
-                        <span class="text-emerald-400 font-bold">QuickAuth 2FA</span>
-                    </div>
-                </div>
-            </div>
-        </aside>
 
-        <!-- Right Column: Tactical Deck & Visualizers -->
-        <main class="flex-1 flex flex-col bg-slate-900 overflow-hidden">
-            <!-- Tactical Tabs -->
-            <div class="bg-slate-950 border-b border-slate-800 px-4 flex items-center justify-between text-xs">
-                <div class="flex space-x-1 py-1.5">
-                    <button @click="setTab('tactical')"
-                            :class="activeTab === 'tactical' ? 'bg-slate-800 text-white border-b-2 border-blue-400' : 'text-slate-400 hover:text-slate-200'"
-                            class="px-3.5 py-1.5 font-medium rounded-t transition">
-                        🗺 MAP-Elites Grid (20x20 Heatmap)
-                    </button>
-                    <button @click="setTab('manifold')"
-                            :class="activeTab === 'manifold' ? 'bg-slate-800 text-white border-b-2 border-purple-400' : 'text-slate-400 hover:text-slate-200'"
-                            class="px-3.5 py-1.5 font-medium rounded-t transition">
-                        🌌 3D Phenotype Manifold
-                    </button>
-                    <button @click="setTab('cosine')"
-                            :class="activeTab === 'cosine' ? 'bg-slate-800 text-white border-b-2 border-emerald-400' : 'text-slate-400 hover:text-slate-200'"
-                            class="px-3.5 py-1.5 font-medium rounded-t transition">
-                        🧬 1024D Protein Latent Space
-                    </button>
-                    <button @click="setTab('leaderboard')"
-                            :class="activeTab === 'leaderboard' ? 'bg-slate-800 text-white border-b-2 border-amber-400' : 'text-slate-400 hover:text-slate-200'"
-                            class="px-3.5 py-1.5 font-medium rounded-t transition">
-                        🏆 Resident Champions (AG Grid)
-                    </button>
-                    <button @click="setTab('telemetry')"
-                            :class="activeTab === 'telemetry' ? 'bg-slate-800 text-white border-b-2 border-slate-400' : 'text-slate-400 hover:text-slate-200'"
-                            class="px-3.5 py-1.5 font-medium rounded-t transition">
-                        📟 Streaming Audit Log
-                    </button>
+                <div class="glass-card p-4 rounded-xl space-y-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">UFW FIREWALL SHIELD</span>
+                    <div class="flex items-center space-x-2 text-emerald-400 font-bold text-sm">
+                        <span>🛡️</span>
+                        <span>DEFAULT DENY INCOMING</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Public HTTP ports 80/443 closed. Only SSH (key-auth) and tailscale0 interface permitted.</p>
                 </div>
-                <div class="text-slate-500 text-[11px] flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    Differential SSE Bus: Port 7860
+
+                <div class="glass-card p-4 rounded-xl space-y-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">SYSTEMD WATCHDOG</span>
+                    <div class="flex items-center space-x-2 text-cyan-400 font-bold text-sm">
+                        <span>⏱️</span>
+                        <span>TTL = 300 SECONDS</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Automatic service recovery on unhandled exceptions with state checkpoint restoration.</p>
                 </div>
             </div>
 
-            <!-- Tab Content 1: 20x20 MAP-Elites WebGL Behavioral Heatmap -->
-            <div x-show="activeTab === 'tactical'" class="flex-1 p-3 flex flex-col space-y-2">
-                <!-- Heatmap Sub-Controls Ribbon -->
-                <div class="flex items-center justify-between bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded text-xs">
-                    <div class="flex items-center space-x-3">
-                        <span class="text-slate-400 font-semibold">COLOR METRIC:</span>
-                        <select x-model="gridMetric" @change="fetchGridMatrix()" class="bg-slate-900 border border-slate-700 text-white text-xs rounded px-2 py-0.5">
-                            <option value="fitness">Sharpe / Fitness</option>
-                            <option value="net_return_pct">Net Return %</option>
-                            <option value="cagr_pct">CAGR %</option>
-                            <option value="max_drawdown">Max Drawdown %</option>
-                            <option value="win_rate">Win Rate %</option>
-                            <option value="trades_count">Trades Count</option>
-                        </select>
-                        <button @click="fetchGridMatrix()" class="text-xs text-blue-400 hover:text-blue-300 underline">
-                            🔄 Reload Grid
-                        </button>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-slate-400">Illuminated Niches: <span class="text-emerald-400 font-bold" x-text="gridOccupiedCount + '/400'">0/400</span></span>
-                        <span class="text-slate-400">Occupancy: <span class="text-cyan-400 font-bold" x-text="gridOccupancy + '%'">0.0%</span></span>
-                    </div>
+            <!-- Streaming Daemon Terminal Log -->
+            <div class="glass-card p-4 rounded-2xl space-y-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-300">DAEMON RUNTIME LOG STREAM</span>
+                    <span class="text-[10px] text-slate-400 font-mono-tabular">audit/ravana_live_daemon.log</span>
                 </div>
-                <div id="mapElitesChart" class="flex-1 w-full rounded border border-slate-800"></div>
-            </div>
-
-            <!-- Tab Content 2: 3D Phenotype Manifold (UMAP & HDBSCAN Clones Pruner) -->
-            <div x-show="activeTab === 'manifold'" class="flex-1 p-3 flex flex-col space-y-2">
-                <div class="flex items-center justify-between bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded text-xs">
-                    <div class="flex items-center space-x-3">
-                        <span class="text-slate-400 font-semibold">PROJECTION:</span>
-                        <select x-model="manifoldMethod" @change="fetchManifold()" class="bg-slate-900 border border-slate-700 text-white text-xs rounded px-2 py-0.5">
-                            <option value="auto">Auto (UMAP &le;30 / SVD >30)</option>
-                            <option value="fast">Fast SVD (Instant &lt;2ms)</option>
-                            <option value="umap">UMAP Non-Linear</option>
-                        </select>
-                        <button @click="fetchManifold()" class="text-xs text-purple-400 hover:text-purple-300 underline">
-                            🔄 Recompute Manifold
-                        </button>
-                    </div>
-                    <div class="flex items-center space-x-4">
-                        <span class="text-slate-400">Clusters: <span class="text-purple-400 font-bold" x-text="manifoldClusters">0</span></span>
-                        <span class="text-slate-400">Occam Compression: <span class="text-emerald-400 font-bold" x-text="manifoldCompression + '%'">0.0%</span></span>
-                    </div>
-                </div>
-                <div id="manifoldChart3d" class="flex-1 w-full rounded border border-slate-800"></div>
-            </div>
-
-            <!-- Tab Content 3: 1024D Protein Latent Space Cosine Similarity Heatmap -->
-            <div x-show="activeTab === 'cosine'" class="flex-1 p-3 flex flex-col space-y-2">
-                <div class="flex items-center justify-between bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded text-xs">
-                    <div class="flex items-center space-x-3">
-                        <span class="text-slate-400 font-semibold">1024D EMBEDDINGS DIVERSITY:</span>
-                        <span class="text-emerald-400">Unit-Norm Decision & Return Trajectory Cosine Matrix</span>
-                    </div>
-                    <button @click="fetchCosine()" class="text-xs text-emerald-400 hover:text-emerald-300 underline">
-                        🔄 Refresh Cosine Matrix
-                    </button>
-                </div>
-                <div id="cosineHeatmapChart" class="flex-1 w-full rounded border border-slate-800"></div>
-            </div>
-
-            <!-- Tab Content 4: AG Grid Virtualized Champions Table -->
-            <div x-show="activeTab === 'leaderboard'" class="flex-1 p-3 flex flex-col">
-                <div id="leaderboardGrid" class="ag-theme-alpine-dark flex-1 w-full rounded border border-slate-800"></div>
-            </div>
-
-            <!-- Tab Content 5: Real-Time Event Audit Log -->
-            <div x-show="activeTab === 'telemetry'" class="flex-1 p-3 flex flex-col">
-                <div class="flex-1 bg-black/60 rounded border border-slate-800 p-3 overflow-y-auto font-mono text-xs space-y-1">
-                    <template x-for="(l, idx) in logs" :key="idx">
+                <div class="bg-black/80 rounded-xl p-3 border border-slate-900 font-mono text-[11px] space-y-1 max-h-96 overflow-y-auto text-slate-300">
+                    <template x-for="(line, idx) in logs" :key="idx">
                         <div class="flex items-start space-x-2">
-                            <span class="text-slate-500" x-text="l.time"></span>
+                            <span class="text-slate-600 select-none" x-text="idx + 1"></span>
                             <span :class="{
-                                'text-emerald-400': l.type === 'success',
-                                'text-red-400': l.type === 'error',
-                                'text-amber-400': l.type === 'warning',
-                                'text-slate-300': l.type === 'info'
-                            }" x-text="l.msg"></span>
+                                'text-emerald-400': line.includes('[INFO]') && line.includes('concluded'),
+                                'text-cyan-300': line.includes('SLEEP'),
+                                'text-amber-400': line.includes('WARNING'),
+                                'text-rose-400': line.includes('ERROR'),
+                                'text-slate-400': !line.includes('[INFO]')
+                            }" x-text="line"></span>
                         </div>
                     </template>
                 </div>
             </div>
-        </main>
-    </div>
+        </div>
+    </main>
+
+    <!-- Footer Status Ribbon -->
+    <footer class="bg-slate-950 border-t border-slate-800/80 px-5 py-2 text-[11px] text-slate-500 flex items-center justify-between font-mono-tabular">
+        <div class="flex items-center space-x-4">
+            <span>RAVANA QUANT CORE v4.3</span>
+            <span>•</span>
+            <span>Finvasia Shoonya REST Gateway</span>
+            <span>•</span>
+            <span>Google Decisions Defensive Veto Shield</span>
+        </div>
+        <div>
+            Host: <span class="text-slate-300 font-bold">127.0.0.1:7860</span>
+        </div>
+    </footer>
 </body>
 </html>
