@@ -1,9 +1,20 @@
 """Institutional ETF-to-benchmark tracking spread and basis alignment module."""
 from __future__ import annotations
 
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 import numpy as np
 import pandas as pd
+
+
+CANONICAL_ETF_CONTRACT_MULTIPLIERS: Dict[str, float] = {
+    "NIFTYBEES": 100.0,
+    "BANKBEES": 100.0,
+    "PSUBNKBEES": 100.0,
+    "JUNIORBEES": 100.0,
+    "CPSEETF": 100.0,
+    "AUTOBEES": 100.0,
+    "PHARMABEES": 100.0,
+}
 
 
 class ETFBUSpreadAligner:
@@ -72,7 +83,7 @@ class ETFBUSpreadAligner:
     ) -> pd.Series:
         """Resolve multiplier using contract specification or strictly causal rolling/expanding median."""
         if self.contract_multiplier is not None and self.contract_multiplier > 0:
-            return pd.Series(self.contract_multiplier, index=etf_close.index)
+            return pd.Series(float(self.contract_multiplier), index=etf_close.index)
 
         # Strictly causal ratio lagged by 1 bar to prevent future information leakage
         raw_ratios = (idx_close / np.maximum(0.01, etf_close)).shift(1)
@@ -81,7 +92,18 @@ class ETFBUSpreadAligner:
         expanding_mult = raw_ratios.expanding(min_periods=1).median()
         combined = rolling_mult.fillna(expanding_mult)
         first_valid = combined.dropna().iloc[0] if not combined.dropna().empty else 1.0
-        return combined.fillna(first_valid).round(2)
+        resolved_series = combined.fillna(first_valid).round(2)
+
+        # Invariant snap: eliminate rolling basis noise if within 5% of canonical specification
+        if ticker:
+            sym_clean = ticker.upper().replace(".NS", "").replace(".BO", "").strip()
+            if sym_clean in CANONICAL_ETF_CONTRACT_MULTIPLIERS:
+                canonical = CANONICAL_ETF_CONTRACT_MULTIPLIERS[sym_clean]
+                median_est = float(resolved_series.median())
+                if abs(median_est - canonical) / canonical <= 0.05:
+                    return pd.Series(canonical, index=etf_close.index)
+
+        return resolved_series
 
     def _compute_rolling_signals(self, df: pd.DataFrame) -> pd.DataFrame:
         """Compute causal rolling basis z-score, rolling beta, and rolling correlation."""

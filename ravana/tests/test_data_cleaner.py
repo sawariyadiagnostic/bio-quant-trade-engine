@@ -197,6 +197,22 @@ class TestDataQualityEngine(unittest.TestCase):
         self.assertAlmostEqual(spread_it["Multiplier"].iloc[-1], 954.55, delta=5.0)
         self.assertLess(abs(spread_it["Basis_Bps"].iloc[-1]), 25.0)
 
+    def test_canonical_etf_multiplier_snap(self) -> None:
+        """Verify canonical ETF multipliers snap to 100.0 to eliminate rolling median basis noise."""
+        np.random.seed(42)
+        aligner = ETFBUSpreadAligner(rolling_window=30)
+
+        # Realistic NIFTYBEES: Index ~24500, ETF tracking ~245 with slight micro-tick noise (99.8 - 100.2)
+        idx_c = 24500.0 + np.cumsum(np.random.normal(0, 5.0, len(self.full_times)))
+        etf_c = (idx_c / 100.0) * (1.0 + np.random.normal(0, 0.001, len(self.full_times)))
+        df_etf = pd.DataFrame({"Close": etf_c}, index=self.full_times)
+        df_idx = pd.DataFrame({"Close": idx_c}, index=self.full_times)
+
+        spread = aligner.align(df_etf, df_idx, ticker="NIFTYBEES.NS")
+        self.assertIsNotNone(spread)
+        # Should snap exactly to 100.0 across all rows
+        self.assertTrue((spread["Multiplier"] == 100.0).all())
+
     def test_data_cleaning_engine_full_pipeline(self) -> None:
         """Verify DataCleaningEngine transforms IngestedDataset into CleanedDataset contract with zero NaNs."""
         df_etf = self._make_intraday_bar(self.full_times, base_price=510.0)
