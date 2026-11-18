@@ -46,14 +46,8 @@
     <!-- Toast Notifications Floating Stack -->
     <div class="fixed top-4 right-4 z-50 flex flex-col space-y-2 pointer-events-none">
         <template x-for="t in toasts" :key="t.id">
-            <div class="pointer-events-auto px-4 py-2.5 rounded-lg text-xs font-semibold shadow-2xl flex items-center space-x-2.5 transition-all duration-300"
-                 :class="{
-                     'bg-emerald-950/95 text-emerald-300 border border-emerald-500/50': t.type === 'info',
-                     'bg-amber-950/95 text-amber-300 border border-amber-500/50': t.type === 'warning',
-                     'bg-rose-950/95 text-rose-300 border border-rose-500/50': t.type === 'error'
-                 }">
-                <span class="w-2 h-2 rounded-full animate-ping"
-                      :class="t.type === 'error' ? 'bg-rose-400' : (t.type === 'warning' ? 'bg-amber-400' : 'bg-emerald-400')"></span>
+            <div class="pointer-events-auto px-4 py-2.5 rounded-lg text-xs font-semibold shadow-2xl flex items-center space-x-2.5 transition-all duration-300" :class="{ 'bg-emerald-950/95 text-emerald-300 border border-emerald-500/50': t.type === 'info', 'bg-amber-950/95 text-amber-300 border border-amber-500/50': t.type === 'warning', 'bg-rose-950/95 text-rose-300 border border-rose-500/50': t.type === 'error' }">
+                <span class="w-2 h-2 rounded-full animate-ping" :class="t.type === 'error' ? 'bg-rose-400' : (t.type === 'warning' ? 'bg-amber-400' : 'bg-emerald-400')"></span>
                 <span x-text="t.msg"></span>
             </div>
         </template>
@@ -69,12 +63,8 @@
                 </div>
                 <div>
                     <div class="flex items-center space-x-2">
-                        <span class="font-extrabold tracking-wider text-sm bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">
-                            RAVANA QUANT
-                        </span>
-                        <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
-                            v4.3
-                        </span>
+                        <span class="font-extrabold tracking-wider text-sm bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 bg-clip-text text-transparent">RAVANA QUANT</span>
+                        <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">v4.3</span>
                     </div>
                     <div class="text-[10px] text-slate-400 flex items-center gap-1.5">
                         <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -125,18 +115,8 @@
             </div>
 
             <!-- Emergency Actions -->
-            <button @click="triggerFreeze()"
-                    class="px-3 py-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 font-bold border border-amber-500/40 transition duration-150 flex items-center gap-1.5"
-                    title="Out-of-band in-process atomic freeze (<0.5ms)">
-                <span>❄</span>
-                <span>FREEZE</span>
-            </button>
-            <button @click="triggerPanic()"
-                    class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold border border-rose-400 shadow-lg shadow-rose-600/30 transition duration-150 flex items-center gap-1.5 animate-pulse"
-                    title="Parallel async socket dispatch to 100% cash">
-                <span>🚨</span>
-                <span>PANIC TO CASH</span>
-            </button>
+            <button @click="triggerFreeze()" class="px-3 py-1.5 rounded-lg bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 font-bold border border-amber-500/40 transition duration-150 flex items-center gap-1.5" title="Out-of-band in-process atomic freeze (<0.5ms)"><span>❄</span> <span>FREEZE</span></button>
+            <button @click="triggerPanic()" class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold border border-rose-400 shadow-lg shadow-rose-600/30 transition duration-150 flex items-center gap-1.5 animate-pulse" title="Parallel async socket dispatch to 100% cash"><span>🚨</span> <span>PANIC TO CASH</span></button>
         </div>
     </header>
 
@@ -147,15 +127,10 @@
             <div class="glass-card-glow p-3 rounded-xl flex flex-col justify-between">
                 <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                     <span>PORTFOLIO EQUITY</span>
-                    <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
-                        +₹2,106.45 (+1.05%)
-                    </span>
+                    <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono-tabular">+₹2,106.45 (+1.05%)</span>
                 </div>
                 <div class="mt-1 flex items-baseline space-x-1.5">
-                    <span class="text-xl font-extrabold text-white font-mono-tabular"
-                          x-text="'₹' + (portfolio.current_equity || 202106.45).toLocaleString('en-IN', { minimumFractionDigits: 2 })">
-                        ₹202,106.45
-                    </span>
+                    <span class="text-xl font-extrabold text-white font-mono-tabular" x-text="'₹' + (portfolio.current_equity || 202106.45).toLocaleString('en-IN', { minimumFractionDigits: 2 })">₹202,106.45</span>
                 </div>
                 <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                     <span class="text-emerald-400">●</span>
@@ -167,9 +142,7 @@
             <div class="glass-card p-3 rounded-xl flex flex-col justify-between">
                 <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                     <span>ACTIVE EXPOSURE</span>
-                    <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
-                        57.4% Invested
-                    </span>
+                    <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/50 px-1.5 py-0.5 rounded font-mono-tabular">57.4% Invested</span>
                 </div>
                 <div class="mt-1 flex items-baseline space-x-1.5">
                     <span class="text-xl font-extrabold text-cyan-300 font-mono-tabular">
@@ -186,14 +159,10 @@
             <div class="glass-card p-3 rounded-xl flex flex-col justify-between">
                 <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                     <span>MARKET REGIME</span>
-                    <span class="text-[10px] text-amber-400 bg-amber-950/80 border border-amber-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
-                        VR₂₀ = 0.68
-                    </span>
+                    <span class="text-[10px] text-amber-400 bg-amber-950/80 border border-amber-800/50 px-1.5 py-0.5 rounded font-mono-tabular">VR₂₀ = 0.68</span>
                 </div>
                 <div class="mt-1">
-                    <span class="text-sm font-bold text-amber-300">
-                        Low-Vol Chop Regime
-                    </span>
+                    <span class="text-sm font-bold text-amber-300">Low-Vol Chop Regime</span>
                 </div>
                 <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                     <span class="text-amber-400">⚡</span>
@@ -205,14 +174,10 @@
             <div class="glass-card p-3 rounded-xl flex flex-col justify-between">
                 <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                     <span>INTRADAY DRAWDOWN</span>
-                    <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
-                        Zero Breach
-                    </span>
+                    <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-1.5 py-0.5 rounded font-mono-tabular">Zero Breach</span>
                 </div>
                 <div class="mt-1 flex items-baseline space-x-1.5">
-                    <span class="text-xl font-extrabold text-emerald-400 font-mono-tabular">
-                        0.00%
-                    </span>
+                    <span class="text-xl font-extrabold text-emerald-400 font-mono-tabular">0.00%</span>
                     <span class="text-xs text-slate-500">Max DD</span>
                 </div>
                 <div class="text-[10px] text-slate-400 mt-1 flex items-center justify-between">
@@ -225,14 +190,10 @@
             <div class="glass-card p-3 rounded-xl flex flex-col justify-between col-span-2 md:col-span-1">
                 <div class="text-[11px] font-semibold text-slate-400 flex items-center justify-between">
                     <span>LIVE EXECUTIONS</span>
-                    <span class="text-[10px] text-purple-400 bg-purple-950/80 border border-purple-800/50 px-1.5 py-0.5 rounded font-mono-tabular">
-                        75/75 Epochs
-                    </span>
+                    <span class="text-[10px] text-purple-400 bg-purple-950/80 border border-purple-800/50 px-1.5 py-0.5 rounded font-mono-tabular">75/75 Epochs</span>
                 </div>
                 <div class="mt-1 flex items-baseline space-x-1.5">
-                    <span class="text-xl font-extrabold text-purple-300 font-mono-tabular" x-text="ordersCount">
-                        462
-                    </span>
+                    <span class="text-xl font-extrabold text-purple-300 font-mono-tabular" x-text="ordersCount">462</span>
                     <span class="text-xs text-slate-400 font-normal">Paper Orders</span>
                 </div>
                 <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
@@ -245,37 +206,15 @@
 
     <!-- Navigation Tab Ribbon -->
     <nav class="bg-slate-950 border-b border-slate-800/80 px-5 flex items-center space-x-2 text-xs font-semibold">
-        <button @click="setTab('terminal')"
-                :class="activeTab === 'terminal' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
-                class="px-4 py-3 transition duration-150 flex items-center gap-2">
-            <span>🛰️</span>
-            <span>Mission Control & Portfolio</span>
-        </button>
-        <button @click="setTab('alphas')"
-                :class="activeTab === 'alphas' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
-                class="px-4 py-3 transition duration-150 flex items-center gap-2">
-            <span>⚡</span>
-            <span>9 Production Alphas</span>
-        </button>
-        <button @click="setTab('matrix')"
-                :class="activeTab === 'matrix' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
-                class="px-4 py-3 transition duration-150 flex items-center gap-2">
-            <span>🗺️</span>
-            <span>MAP-Elites Matrix</span>
-        </button>
-        <button @click="setTab('orders')"
-                :class="activeTab === 'orders' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
-                class="px-4 py-3 transition duration-150 flex items-center gap-2">
+        <button @click="setTab('terminal')" :class="activeTab === 'terminal' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'" class="px-4 py-3 transition duration-150 flex items-center gap-2"><span>🛰️</span> <span>Mission Control & Portfolio</span></button>
+        <button @click="setTab('alphas')" :class="activeTab === 'alphas' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'" class="px-4 py-3 transition duration-150 flex items-center gap-2"><span>⚡</span> <span>9 Production Alphas</span></button>
+        <button @click="setTab('matrix')" :class="activeTab === 'matrix' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'" class="px-4 py-3 transition duration-150 flex items-center gap-2"><span>🗺️</span> <span>MAP-Elites Matrix</span></button>
+        <button @click="setTab('orders')" :class="activeTab === 'orders' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'" class="px-4 py-3 transition duration-150 flex items-center gap-2">
             <span>📜</span>
             <span>Order Book</span>
             <span class="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-300 font-mono-tabular" x-text="ordersCount"></span>
         </button>
-        <button @click="setTab('security')"
-                :class="activeTab === 'security' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'"
-                class="px-4 py-3 transition duration-150 flex items-center gap-2">
-            <span>🛡️</span>
-            <span>Security & VPS Telemetry</span>
-        </button>
+        <button @click="setTab('security')" :class="activeTab === 'security' ? 'text-emerald-400 border-b-2 border-emerald-400 bg-slate-900/60' : 'text-slate-400 hover:text-slate-200'" class="px-4 py-3 transition duration-150 flex items-center gap-2"><span>🛡️</span> <span>Security & VPS Telemetry</span></button>
     </nav>
 
     <!-- Main Workspace Area -->
@@ -288,9 +227,7 @@
                 <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
                     <div class="flex items-center space-x-2">
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-300">ACTIVE OVERNIGHT ALLOCATION</span>
-                        <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded font-mono-tabular">
-                            15:10 IST Bull Markup Rotation
-                        </span>
+                        <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded font-mono-tabular">15:10 IST Bull Markup Rotation</span>
                         <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded font-mono-tabular flex items-center gap-1">
                             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                             OVERNIGHT HOLD ACTIVE
@@ -307,14 +244,12 @@
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-2">
                                     <span class="font-extrabold text-sm text-white font-mono-tabular" x-text="pos.ticker"></span>
-                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800"
-                                          x-text="'LONG ' + pos.allocation_pct + '%'">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800" x-text="'LONG ' + pos.allocation_pct + '%'">
                                     </span>
                                     <span class="px-1.5 py-0.2 rounded text-[9px] bg-slate-800 text-cyan-300 font-mono">OVERNIGHT CARRY</span>
                                 </div>
                                 <div class="text-right font-mono-tabular">
-                                    <span class="text-xs font-bold text-emerald-400"
-                                          x-text="'+₹' + pos.unrealized_pnl.toFixed(2) + ' (+' + ((pos.unrealized_pnl / pos.capital_inr) * 100).toFixed(2) + '%)'">
+                                    <span class="text-xs font-bold text-emerald-400" x-text="'+₹' + pos.unrealized_pnl.toFixed(2) + ' (+' + ((pos.unrealized_pnl / pos.capital_inr) * 100).toFixed(2) + '%)'">
                                     </span>
                                 </div>
                             </div>
@@ -351,9 +286,7 @@
                 <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <div class="flex items-center space-x-2">
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-300">OVERNIGHT MACRO ALLOCATION & MULTI-SESSION CONTINUATION</span>
-                        <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded font-mono-tabular">
-                            15:10 IST Daily Execution
-                        </span>
+                        <span class="text-[10px] text-cyan-400 bg-cyan-950/80 border border-cyan-800/60 px-1.5 py-0.2 rounded font-mono-tabular">15:10 IST Daily Execution</span>
                     </div>
                     <div class="flex items-center space-x-3 text-xs font-mono-tabular text-slate-400">
                         <span>DP Charges Saved: <b class="text-emerald-400">₹34.00</b></span>
@@ -395,24 +328,15 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800/80 pb-2.5 gap-2">
                         <div class="flex items-center space-x-2">
                             <span class="text-xs font-bold uppercase tracking-wider text-slate-300">CUMULATIVE MULTI-DAY NAV TRAJECTORY</span>
-                            <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-1.5 py-0.2 rounded font-mono-tabular"
-                                  x-text="(portfolio.epochs_completed || 225) + ' Candle Epochs'">
+                            <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-1.5 py-0.2 rounded font-mono-tabular" x-text="(portfolio.epochs_completed || 225) + ' Candle Epochs'">
                             </span>
                         </div>
                         <!-- Day Filter Controls -->
                         <div class="flex items-center space-x-1 text-[11px] font-mono-tabular">
-                            <button @click="setEquityDay('all')"
-                                    :class="selectedEquityDay === 'all' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'"
-                                    class="px-2.5 py-1 rounded transition">All 3 Days</button>
-                            <button @click="setEquityDay('2026-11-16')"
-                                    :class="selectedEquityDay === '2026-11-16' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'"
-                                    class="px-2.5 py-1 rounded transition">16 Nov</button>
-                            <button @click="setEquityDay('2026-11-17')"
-                                    :class="selectedEquityDay === '2026-11-17' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'"
-                                    class="px-2.5 py-1 rounded transition">17 Nov ⚡</button>
-                            <button @click="setEquityDay('2026-11-18')"
-                                    :class="selectedEquityDay === '2026-11-18' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'"
-                                    class="px-2.5 py-1 rounded transition">18 Nov</button>
+                            <button @click="setEquityDay('all')" :class="selectedEquityDay === 'all' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded transition">All 3 Days</button>
+                            <button @click="setEquityDay('2026-11-16')" :class="selectedEquityDay === '2026-11-16' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded transition">16 Nov</button>
+                            <button @click="setEquityDay('2026-11-17')" :class="selectedEquityDay === '2026-11-17' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded transition">17 Nov ⚡</button>
+                            <button @click="setEquityDay('2026-11-18')" :class="selectedEquityDay === '2026-11-18' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'" class="px-2.5 py-1 rounded transition">18 Nov</button>
                         </div>
                     </div>
                     <div class="relative h-64 w-full flex-1">
@@ -451,9 +375,7 @@
                 <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
                     <div class="flex items-center space-x-2">
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-300">MULTI-DAY SESSION PERFORMANCE BREAKDOWN (16, 17, 18 NOV 2026)</span>
-                        <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-1.5 py-0.2 rounded font-mono-tabular">
-                            +₹2,106.45 Cumulative Net Alpha
-                        </span>
+                        <span class="text-[10px] text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-1.5 py-0.2 rounded font-mono-tabular">+₹2,106.45 Cumulative Net Alpha</span>
                     </div>
                     <div class="text-xs text-slate-400 font-mono-tabular">
                         Pre-Market Today (19 Nov): <span class="text-emerald-400 font-bold">READY</span>
@@ -464,8 +386,7 @@
                         <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-2 hover:border-slate-700 transition">
                             <div class="flex items-center justify-between">
                                 <span class="font-bold text-xs text-white font-mono-tabular" x-text="day.date"></span>
-                                <span class="text-xs font-bold font-mono-tabular"
-                                      :class="day.net_pnl >= 0 ? 'text-emerald-400' : 'text-slate-400'"
+                                <span class="text-xs font-bold font-mono-tabular" :class="day.net_pnl >= 0 ? 'text-emerald-400' : 'text-slate-400'"
                                       x-text="(day.net_pnl >= 0 ? '+' : '') + '₹' + day.net_pnl.toFixed(2) + ' (' + (day.pnl_pct >= 0 ? '+' : '') + day.pnl_pct.toFixed(2) + '%)'">
                                 </span>
                             </div>
@@ -511,9 +432,7 @@
                                     <td class="py-2 text-slate-400 font-semibold" x-text="ord.order_id"></td>
                                     <td class="py-2 font-bold text-white" x-text="ord.ticker"></td>
                                     <td class="py-2">
-                                        <span class="px-1.5 py-0.2 rounded font-bold text-[10px]"
-                                              :class="ord.side === 'BUY' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'"
-                                              x-text="ord.side"></span>
+                                        <span class="px-1.5 py-0.2 rounded font-bold text-[10px]" :class="ord.side === 'BUY' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'" x-text="ord.side"></span>
                                     </td>
                                     <td class="py-2" x-text="ord.shares"></td>
                                     <td class="py-2 font-semibold" x-text="'₹' + ord.price.toFixed(2)"></td>
@@ -548,14 +467,7 @@
                     <div class="glass-card p-4 rounded-xl space-y-3 hover:border-slate-600 transition flex flex-col justify-between">
                         <div class="space-y-1.5">
                             <div class="flex items-center justify-between">
-                                <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded"
-                                      :class="{
-                                          'bg-emerald-950 text-emerald-400 border border-emerald-800': strat.status === 'ACTIVE_HOLD',
-                                          'bg-amber-950 text-amber-400 border border-amber-800': strat.status === 'ACTIVE_MONITOR',
-                                          'bg-blue-950 text-blue-400 border border-blue-800': strat.status === 'ARMED',
-                                          'bg-slate-800 text-slate-400': strat.status === 'READY'
-                                      }"
-                                      x-text="strat.status"></span>
+                                <span class="text-[10px] font-bold tracking-wider px-2 py-0.5 rounded" :class="{ 'bg-emerald-950 text-emerald-400 border border-emerald-800': strat.status === 'ACTIVE_HOLD', 'bg-amber-950 text-amber-400 border border-amber-800': strat.status === 'ACTIVE_MONITOR', 'bg-blue-950 text-blue-400 border border-blue-800': strat.status === 'ARMED', 'bg-slate-800 text-slate-400': strat.status === 'READY' }" x-text="strat.status"></span>
                                 <span class="text-[11px] font-mono-tabular text-slate-400" x-text="strat.active_window"></span>
                             </div>
                             <h3 class="font-bold text-sm text-white" x-text="strat.name"></h3>
@@ -617,29 +529,36 @@
                 </div>
             </div>
 
-            <!-- Dense 20x20 Grid -->
+            <!-- Dense 20x20 Grid: 60 FPS Canvas Avionics Engine -->
             <div class="glass-card p-4 rounded-2xl flex flex-col md:flex-row gap-5">
-                <div class="flex-1 overflow-x-auto">
-                    <div class="inline-grid grid-cols-20 gap-1 p-2 bg-slate-950 rounded-xl border border-slate-800" style="grid-template-columns: repeat(20, minmax(18px, 1fr));">
-                        <template x-for="r in 20" :key="'r' + r">
-                            <template x-for="c in 20" :key="'c' + c">
-                                <div class="w-5 h-5 rounded-sm border cursor-pointer transition transform hover:scale-125 hover:z-20"
-                                     :class="getCellColor(r - 1, c - 1)"
-                                     @mouseenter="hoverCell(r - 1, c - 1)"
-                                     @mouseleave="clearHover()">
-                                </div>
-                            </template>
-                        </template>
+                <div class="flex-1 flex flex-col items-center justify-center bg-slate-950/80 rounded-xl p-3 border border-slate-800 relative">
+                    <div class="w-full flex justify-between items-center text-[10px] font-mono-tabular text-slate-500 mb-1 px-1">
+                        <span>▲ HIGH VOLATILITY (0.40)</span>
+                        <span class="text-slate-400 font-semibold tracking-wider">BEHAVIORAL MAP: VOLATILITY vs. TURNOVER</span>
+                        <span>DOWNSIDE RISK</span>
+                    </div>
+
+                    <div class="relative w-full max-w-[500px] aspect-square">
+                        <canvas id="mapElitesCanvas" class="w-full h-full rounded-lg cursor-crosshair border border-slate-800/80 shadow-2xl"></canvas>
+                    </div>
+
+                    <div class="w-full flex justify-between items-center text-[10px] font-mono-tabular text-slate-500 mt-2 px-1">
+                        <span>LOW TURNOVER (0.00)</span>
+                        <span class="text-emerald-400 font-bold">PORTFOLIO CHURN / REBALANCE INTENSITY ▶</span>
+                        <span>HIGH FREQUENCY (1.00)</span>
                     </div>
                 </div>
 
-                <!-- Hovered Cell Inspector -->
+                <!-- Hovered / Selected Cell Inspector -->
                 <div class="w-full md:w-80 glass-card p-4 rounded-xl flex flex-col justify-between">
                     <div>
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">NICHE INSPECTOR</span>
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">NICHE INSPECTOR</span>
+                            <span class="text-[10px] bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-slate-400 font-mono-tabular" x-text="hoveredCell ? 'ACTIVE' : 'HOVER NICHE'"></span>
+                        </div>
                         <template x-if="hoveredCell">
                             <div class="space-y-2 text-xs font-mono-tabular">
-                                <div class="flex justify-between border-b border-slate-800 pb-1">
+                                <div class="flex justify-between border-b border-slate-800/60 pb-1">
                                     <span class="text-slate-400">Niche Coordinates:</span>
                                     <span class="text-white font-bold" x-text="'[' + hoveredCell.row + ', ' + hoveredCell.col + ']'"></span>
                                 </div>
@@ -659,14 +578,45 @@
                                     <span class="text-slate-400">Win Rate:</span>
                                     <span class="text-white font-bold" x-text="hoveredCell.win_rate + '%'"></span>
                                 </div>
-                                <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-300 break-all" x-text="hoveredCell.formula_str"></div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Sortino Ratio:</span>
+                                    <span class="text-emerald-400 font-bold" x-text="(hoveredCell.sortino || 0).toFixed(2)"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Max Drawdown:</span>
+                                    <span class="text-rose-400 font-bold" x-text="(hoveredCell.max_drawdown || 0) + '%'"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">Trades Executed:</span>
+                                    <span class="text-slate-300" x-text="hoveredCell.trades_count || 0"></span>
+                                </div>
+                                <div class="mt-3 pt-2 border-t border-slate-800">
+                                    <span class="text-slate-400 block text-[10px] uppercase font-bold mb-1">AST Formula:</span>
+                                    <p class="text-[11px] text-emerald-400 bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 font-mono break-all" x-text="hoveredCell.formula_str"></p>
+                                </div>
                             </div>
                         </template>
                         <template x-if="!hoveredCell">
-                            <div class="text-xs text-slate-500 py-8 text-center italic">
-                                Hover over any illuminated cell in the 20×20 behavioral matrix to inspect its quantitative champion.
+                            <div class="h-48 flex flex-col items-center justify-center text-center p-4 text-slate-500">
+                                <svg class="w-8 h-8 mb-2 opacity-40 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                                <span class="text-xs">Hover over any illuminated niche on the radar canvas to inspect its quantitative champion.</span>
                             </div>
                         </template>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                        <span class="flex items-center space-x-1.5">
+                            <span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 shadow-sm shadow-emerald-500/50 inline-block"></span>
+                            <span>Top-Tier</span>
+                        </span>
+                        <span class="flex items-center space-x-1.5">
+                            <span class="w-2.5 h-2.5 rounded-sm bg-cyan-500 inline-block"></span>
+                            <span>Mid-Tier</span>
+                        </span>
+                        <span class="flex items-center space-x-1.5">
+                            <span class="w-2.5 h-2.5 rounded-sm bg-slate-800 border border-slate-700 inline-block"></span>
+                            <span>Empty</span>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -676,8 +626,7 @@
         <div x-show="activeTab === 'orders'" class="space-y-4">
             <div class="glass-card p-4 rounded-xl flex flex-col sm:flex-row justify-between items-center gap-3">
                 <div class="flex items-center space-x-2 w-full sm:w-auto">
-                    <input type="text" x-model="orderSearch" placeholder="Search by Ticker or Order ID..."
-                           class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono-tabular w-full sm:w-64">
+                    <input type="text" x-model="orderSearch" placeholder="Search by Ticker or Order ID..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500 font-mono-tabular w-full sm:w-64">
                     <select x-model="orderSideFilter" class="bg-slate-900 border border-slate-700 text-white rounded-lg px-2.5 py-1.5 text-xs">
                         <option value="ALL">All Sides</option>
                         <option value="BUY">BUY Only</option>
@@ -711,9 +660,7 @@
                                 <td class="p-3 text-slate-400 font-mono" x-text="ord.order_id"></td>
                                 <td class="p-3 font-bold text-white" x-text="ord.ticker"></td>
                                 <td class="p-3">
-                                    <span class="px-2 py-0.5 rounded font-bold text-[10px]"
-                                          :class="ord.side === 'BUY' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'"
-                                          x-text="ord.side"></span>
+                                    <span class="px-2 py-0.5 rounded font-bold text-[10px]" :class="ord.side === 'BUY' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'" x-text="ord.side"></span>
                                 </td>
                                 <td class="p-3" x-text="ord.shares"></td>
                                 <td class="p-3 font-semibold" x-text="'₹' + ord.price.toFixed(2)"></td>
@@ -730,8 +677,7 @@
 
                 <!-- Pagination Strip -->
                 <div class="p-3 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between text-xs font-mono-tabular">
-                    <button @click="prevPage()" :disabled="orderPage <= 1"
-                            class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300">
+                    <button @click="prevPage()" :disabled="orderPage <= 1" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-slate-300">
                         ← Previous
                     </button>
                     <span class="text-slate-400">
@@ -786,13 +732,7 @@
                     <template x-for="(line, idx) in logs" :key="idx">
                         <div class="flex items-start space-x-2">
                             <span class="text-slate-600 select-none" x-text="idx + 1"></span>
-                            <span :class="{
-                                'text-emerald-400': line.includes('[INFO]') && line.includes('concluded'),
-                                'text-cyan-300': line.includes('SLEEP'),
-                                'text-amber-400': line.includes('WARNING'),
-                                'text-rose-400': line.includes('ERROR'),
-                                'text-slate-400': !line.includes('[INFO]')
-                            }" x-text="line"></span>
+                            <span :class="{ 'text-emerald-400': line.includes('[INFO]') && line.includes('concluded'), 'text-cyan-300': line.includes('SLEEP'), 'text-amber-400': line.includes('WARNING'), 'text-rose-400': line.includes('ERROR'), 'text-slate-400': !line.includes('[INFO]') }" x-text="line"></span>
                         </div>
                     </template>
                 </div>

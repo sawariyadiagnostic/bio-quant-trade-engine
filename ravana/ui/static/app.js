@@ -61,6 +61,9 @@ function ravanaCockpit() {
         gridOccupiedCount: 0,
         gridOccupancyPct: 0.0,
         hoveredCell: null,
+        gridHoverRow: null,
+        gridHoverCol: null,
+        gridCanvasInitialized: false,
 
         // Overnight Macro Allocation & Multi-Day Carry State
         overnight: null,
@@ -105,6 +108,9 @@ function ravanaCockpit() {
                 });
             } else if (tab === 'matrix') {
                 this.fetchGridMatrix();
+                this.$nextTick(() => {
+                    this.initCanvasGrid();
+                });
             }
             this.$nextTick(() => {
                 if (window.lucide && typeof lucide.createIcons === 'function') {
@@ -226,6 +232,9 @@ function ravanaCockpit() {
                 this.gridData = data.grid || [];
                 this.gridOccupiedCount = data.occupied || 0;
                 this.gridOccupancyPct = data.occupancy_pct || 0.0;
+                this.$nextTick(() => {
+                    this.renderGridCanvas();
+                });
             } catch (e) {
                 console.error('Failed to fetch grid matrix:', e);
             }
@@ -429,14 +438,68 @@ function ravanaCockpit() {
             this.hoveredCell = null;
         },
 
-        getCellColor(row, col) {
-            if (!this.gridData || !this.gridData[row]) return 'bg-slate-900/60 border-slate-800/40';
-            const cell = this.gridData[row][col];
-            if (!cell) return 'bg-slate-900/40 border-slate-800/30 hover:border-slate-600';
+        initCanvasGrid() {
+            const canvas = document.getElementById('mapElitesCanvas');
+            if (!canvas || this.gridCanvasInitialized) {
+                this.renderGridCanvas();
+                return;
+            }
+            this.gridCanvasInitialized = true;
 
+            const getCoords = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const cellW = rect.width / 20;
+                const cellH = rect.height / 20;
+                return {
+                    row: Math.min(19, Math.max(0, Math.floor(y / cellH))),
+                    col: Math.min(19, Math.max(0, Math.floor(x / cellW)))
+                };
+            };
+
+            canvas.addEventListener('mousemove', (e) => {
+                const { row, col } = getCoords(e);
+                if (this.gridHoverRow !== row || this.gridHoverCol !== col) {
+                    this.gridHoverRow = row;
+                    this.gridHoverCol = col;
+                    this.hoverCell(row, col);
+                    this.renderGridCanvas();
+                }
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                this.gridHoverRow = null;
+                this.gridHoverCol = null;
+                this.clearHover();
+                this.renderGridCanvas();
+            });
+
+            canvas.addEventListener('click', (e) => {
+                const { row, col } = getCoords(e);
+                this.hoverCell(row, col);
+                this.renderGridCanvas();
+            });
+
+            window.addEventListener('resize', () => {
+                if (this.activeTab === 'matrix') {
+                    this.renderGridCanvas();
+                }
+            });
+
+            this.renderGridCanvas();
+        },
+
+        _getCellFillStroke(cell, isHovered) {
+            if (!cell) {
+                return {
+                    fill: isHovered ? '#1e293b' : '#090d16',
+                    stroke: isHovered ? '#38bdf8' : '#1e293b66',
+                    isElite: false
+                };
+            }
             let val = cell.fitness || 0;
             let high = 3.4, mid = 3.0, low = 2.6;
-
             if (this.gridMetric === 'net_return_pct') {
                 val = cell.net_return_pct || 0;
                 high = 32.0; mid = 26.0; low = 20.0;
@@ -448,10 +511,101 @@ function ravanaCockpit() {
                 high = 71.0; mid = 66.0; low = 62.0;
             }
 
-            if (val >= high) return 'bg-emerald-500/80 border-emerald-400 text-white shadow-sm shadow-emerald-500/50';
-            if (val >= mid) return 'bg-teal-500/70 border-teal-400 text-white';
-            if (val >= low) return 'bg-cyan-600/60 border-cyan-400 text-white';
-            return 'bg-blue-600/50 border-blue-400 text-white';
+            if (val >= high) {
+                return { fill: isHovered ? '#10b981' : '#059669', stroke: '#34d399', isElite: true };
+            }
+            if (val >= mid) {
+                return { fill: isHovered ? '#14b8a6' : '#0d9488', stroke: '#2dd4bf', isElite: false };
+            }
+            if (val >= low) {
+                return { fill: isHovered ? '#06b6d4' : '#0891b2', stroke: '#38bdf8', isElite: false };
+            }
+            return { fill: isHovered ? '#2563eb' : '#1d4ed8', stroke: '#60a5fa', isElite: false };
+        },
+
+        renderGridCanvas() {
+            const canvas = document.getElementById('mapElitesCanvas');
+            if (!canvas) return;
+            const parent = canvas.parentElement;
+            if (!parent) return;
+
+            const rect = parent.getBoundingClientRect();
+            const size = Math.floor(Math.min(rect.width || 480, rect.height || 480, 500));
+            if (size <= 0) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            canvas.style.width = size + 'px';
+            canvas.style.height = size + 'px';
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(dpr, dpr);
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, size, size);
+
+            const n = 20, pad = 2;
+            const cellW = (size - (n + 1) * pad) / n;
+            const cellH = (size - (n + 1) * pad) / n;
+
+            for (let r = 0; r < n; r++) {
+                for (let c = 0; c < n; c++) {
+                    const x = pad + c * (cellW + pad);
+                    const y = pad + r * (cellH + pad);
+                    const cell = (this.gridData && this.gridData[r]) ? this.gridData[r][c] : null;
+                    const isHovered = (this.gridHoverRow === r && this.gridHoverCol === c);
+                    const style = this._getCellFillStroke(cell, isHovered);
+
+                    ctx.fillStyle = style.fill;
+                    ctx.strokeStyle = style.stroke;
+                    ctx.lineWidth = isHovered ? 2 : 1;
+                    this._drawRoundedRect(ctx, x, y, cellW, cellH, 3, true, true);
+
+                    if (style.isElite) {
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                        ctx.fillRect(x + 2, y + 2, 2, 2);
+                    }
+                }
+            }
+
+            if (this.gridHoverRow !== null && this.gridHoverCol !== null) {
+                this._drawGridCrosshair(ctx, size, pad, cellW, cellH);
+            }
+        },
+
+        _drawGridCrosshair(ctx, size, pad, cellW, cellH) {
+            const hx = pad + this.gridHoverCol * (cellW + pad) + cellW / 2;
+            const hy = pad + this.gridHoverRow * (cellH + pad) + cellH / 2;
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([3, 3]);
+
+            ctx.beginPath();
+            ctx.moveTo(0, hy);
+            ctx.lineTo(size, hy);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(hx, 0);
+            ctx.lineTo(hx, size);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        },
+
+        _drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+            if (fill) ctx.fill();
+            if (stroke) ctx.stroke();
         }
     };
 }
