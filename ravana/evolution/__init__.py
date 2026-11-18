@@ -3,6 +3,7 @@
 from ravana.evolution.config import EvolutionConfig, EvolutionResult, Individual
 from ravana.evolution.graveyard import IdeaGraveyard
 from ravana.evolution.engine import GeneticAlphaEngine
+from ravana.evolution.map_elites import EliteIndividual, MapElitesArchive
 
 __all__ = [
     "EvolutionConfig",
@@ -10,4 +11,6 @@ __all__ = [
     "Individual",
     "IdeaGraveyard",
     "GeneticAlphaEngine",
+    "EliteIndividual",
+    "MapElitesArchive",
 ]

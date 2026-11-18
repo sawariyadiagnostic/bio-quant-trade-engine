@@ -57,3 +57,4 @@ class EvolutionResult:
     generation_history: List[Dict[str, Any]]
     graveyard_count: int
     total_trials_evaluated: int = 0
+    archive: Optional[Any] = None

@@ -22,6 +22,7 @@ from ravana.domain.formula_ast import (
 )
 from ravana.evolution.config import EvolutionConfig, EvolutionResult, Individual
 from ravana.evolution.graveyard import IdeaGraveyard
+from ravana.evolution.map_elites import MapElitesArchive
 from ravana.features.config import FeatureRegistry
 from ravana.fitness import FitnessConfig, MultiObjectiveFitnessEngine, ObjectiveWeights
 from ravana.fitness.metrics import compute_ic_and_rank_ic
@@ -41,6 +42,7 @@ class GeneticAlphaEngine:
         self.graveyard = IdeaGraveyard()
         self.champion: Optional[Individual] = None
         self.total_trials_evaluated: int = 0
+        self.archive = MapElitesArchive()
 
     def _active_vocab(self, features_df: Optional[pd.DataFrame] = None) -> List[str]:
         """Resolve active feature vocabulary present in the input dataframe."""
@@ -138,6 +140,20 @@ class GeneticAlphaEngine:
             ind.rank_ic = m.rank_ic
             ind.fitness = m.composite_fitness
             ind.metrics = m.to_dict()
+
+            if np.isfinite(m.composite_fitness) and m.composite_fitness > -5.0:
+                self.archive.add(
+                    formula_str=ind.formula_str(),
+                    volatility=float(min(0.40, max(0.01, m.max_drawdown * 1.5))),
+                    turnover=float(min(1.0, max(0.0, m.turnover))),
+                    fitness=float(m.composite_fitness),
+                    ic=float(m.ic),
+                    rank_ic=float(m.rank_ic),
+                    dsr=float(m.dsr),
+                    sharpe=float(m.annualized_sharpe),
+                    max_drawdown=float(m.max_drawdown),
+                    tree=ind.tree,
+                )
 
         self._apply_phenotypic_niching(population, sig_entry)
         population.sort(key=lambda x: x.fitness if x.fitness is not None else -999.0, reverse=True)
@@ -305,4 +321,5 @@ class GeneticAlphaEngine:
             generation_history=history,
             graveyard_count=self.graveyard.size(),
             total_trials_evaluated=self.total_trials_evaluated,
+            archive=self.archive,
         )
