@@ -15,19 +15,21 @@ function ravanaCockpit() {
         syncInterval: null,
 
         // Portfolio & Position State
+        selectedEquityDay: 'all', // 'all' | '2026-11-16' | '2026-11-17' | '2026-11-18'
+        dailyBreakdown: [],
         portfolio: {
             initial_capital: 200000.0,
-            current_equity: 200037.96,
-            net_pnl: 37.96,
-            roi_pct: 0.019,
-            cash_balance: 85016.13,
-            cash_pct: 42.5,
-            invested_capital: 115021.83,
-            invested_pct: 57.5,
-            max_drawdown_pct: 0.00,
-            win_rate_pct: 100.0,
-            epochs_completed: 75,
-            total_epochs: 75,
+            current_equity: 202106.45,
+            net_pnl: 2106.45,
+            roi_pct: 1.053,
+            cash_balance: 86153.81,
+            cash_pct: 42.6,
+            invested_capital: 115952.64,
+            invested_pct: 57.4,
+            max_drawdown_pct: 0.14,
+            win_rate_pct: 75.0,
+            epochs_completed: 225,
+            total_epochs: 225,
             regime: {
                 name: "CHOP (Low Volatility Sideways)",
                 variance_ratio_20: 0.68,
@@ -105,6 +107,7 @@ function ravanaCockpit() {
         async fetchAllData() {
             await Promise.all([
                 this.fetchPortfolioSummary(),
+                this.fetchDailyBreakdown(),
                 this.fetchStrategies(),
                 this.fetchOrders(),
                 this.fetchGridMatrix(),
@@ -113,6 +116,23 @@ function ravanaCockpit() {
             this.$nextTick(() => {
                 this.initOrUpdateCharts();
             });
+        },
+
+        async fetchDailyBreakdown() {
+            try {
+                const res = await fetch('/api/portfolio/daily_breakdown');
+                if (res.ok) {
+                    const data = await res.json();
+                    this.dailyBreakdown = data.days || [];
+                }
+            } catch (e) {
+                console.error('Failed to fetch daily breakdown:', e);
+            }
+        },
+
+        async setEquityDay(day) {
+            this.selectedEquityDay = day;
+            await this.initEquityChart(day);
         },
 
         async pollTelemetry() {
@@ -223,14 +243,15 @@ function ravanaCockpit() {
             this.initAllocationChart();
         },
 
-        async initEquityChart() {
+        async initEquityChart(day = null) {
             const ctx = document.getElementById('equityCurveCanvas');
             if (!ctx) return;
 
+            const filterDay = day || this.selectedEquityDay || 'all';
             let labels = [];
             let equityData = [];
             try {
-                const res = await fetch('/api/portfolio/equity_history');
+                const res = await fetch(`/api/portfolio/equity_history?day=${filterDay}`);
                 const data = await res.json();
                 labels = data.labels || [];
                 equityData = data.equity || [];
