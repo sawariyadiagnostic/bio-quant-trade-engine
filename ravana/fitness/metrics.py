@@ -88,9 +88,13 @@ def compute_oos_strategy_returns(
 
 
 def compute_annualized_sharpe(
-    returns: np.ndarray, rf_annual: float = 0.065, periods_per_year: float = 252.0
+    returns: np.ndarray,
+    rf_annual: float = 0.065,
+    periods_per_year: float = 252.0,
+    adjust_autocorrelation: bool = True,
+    autocorr_lags: int = 5,
 ) -> float:
-    """Compute annualized Sharpe ratio using sample standard deviation."""
+    """Compute annualized Sharpe ratio with Andrew Lo (2002) autocorrelation adjustment."""
     valid_rets = returns[np.isfinite(returns)]
     if len(valid_rets) < 5:
         return 0.0
@@ -102,7 +106,28 @@ def compute_annualized_sharpe(
 
     rf_per_period = rf_annual / periods_per_year
     excess_mean = mean_ret - rf_per_period
-    return float((excess_mean / std_ret) * np.sqrt(periods_per_year))
+    raw_sharpe = float((excess_mean / std_ret) * np.sqrt(periods_per_year))
+
+    if not adjust_autocorrelation or len(valid_rets) <= 2 * autocorr_lags or autocorr_lags < 1:
+        return raw_sharpe
+
+    # Andrew Lo (2002) serial correlation adjustment factor eta
+    # eta = sqrt(max(0.1, 1 + 2 * sum_{k=1}^q (1 - k/(q+1)) * rho_k))
+    demeaned = valid_rets - mean_ret
+    denom = float(np.sum(demeaned ** 2))
+    if denom < 1e-12:
+        return raw_sharpe
+
+    rho_sum = 0.0
+    for k in range(1, autocorr_lags + 1):
+        cov_k = float(np.sum(demeaned[k:] * demeaned[:-k]))
+        rho_k = float(cov_k / denom)
+        weight_k = 1.0 - (k / (autocorr_lags + 1))
+        rho_sum += weight_k * rho_k
+
+    eta_sq = max(0.1, 1.0 + 2.0 * rho_sum)
+    eta = float(np.sqrt(eta_sq))
+    return float(raw_sharpe / eta)
 
 
 def compute_max_drawdown(returns: np.ndarray) -> float:

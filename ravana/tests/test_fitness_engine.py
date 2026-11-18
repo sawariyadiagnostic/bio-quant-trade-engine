@@ -114,6 +114,33 @@ class TestMultiObjectiveFitness(unittest.TestCase):
         self.assertGreater(metrics[0].composite_fitness, metrics[1].composite_fitness)
         self.assertTrue(any(m.is_pareto_optimal for m in metrics))
 
+    def test_andrew_lo_autocorrelation_adjustment(self) -> None:
+        """Verify Andrew Lo (2002) adjustment properly deflates trending autocorrelation."""
+        # Generate persistent trending series (positive autocorrelation AR(1): rho ~ 0.7)
+        np.random.seed(123)
+        n = 500
+        ar_rets = np.zeros(n)
+        for t in range(1, n):
+            ar_rets[t] = 0.001 + 0.65 * ar_rets[t - 1] + np.random.normal(0, 0.01)
+
+        raw_sr = compute_annualized_sharpe(ar_rets, adjust_autocorrelation=False)
+        lo_sr = compute_annualized_sharpe(ar_rets, adjust_autocorrelation=True, autocorr_lags=5)
+        # Because rho > 0, eta > 1.0, so lo_sr must be strictly lower than raw_sr
+        self.assertGreater(raw_sr, lo_sr)
+        self.assertGreater(lo_sr, 0.0)
+
+    def test_fitness_config_intraday_resolution(self) -> None:
+        """Verify FitnessConfig auto-resolves annualization factor across timeframes."""
+        cfg_5m = FitnessConfig(timeframe="5m")
+        self.assertEqual(cfg_5m.annualization_factor, 18900.0)
+        self.assertTrue(cfg_5m.adjust_autocorrelation)
+
+        cfg_1d = FitnessConfig(timeframe="1d")
+        self.assertEqual(cfg_1d.annualization_factor, 252.0)
+
+        cfg_1m = FitnessConfig(timeframe="1m")
+        self.assertEqual(cfg_1m.annualization_factor, 94500.0)
+
 
 if __name__ == "__main__":
     unittest.main()

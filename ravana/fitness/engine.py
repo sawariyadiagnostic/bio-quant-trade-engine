@@ -46,6 +46,8 @@ class MultiObjectiveFitnessEngine:
             strat_rets,
             rf_annual=self.config.risk_free_rate,
             periods_per_year=self.config.annualization_factor,
+            adjust_autocorrelation=self.config.adjust_autocorrelation,
+            autocorr_lags=self.config.autocorr_lags,
         )
         var_trials = (
             empirical_var_annual
@@ -108,6 +110,8 @@ class MultiObjectiveFitnessEngine:
                     compute_strategy_returns(signals_matrix[i], target, long_only=True),
                     rf_annual=self.config.risk_free_rate,
                     periods_per_year=self.config.annualization_factor,
+                    adjust_autocorrelation=self.config.adjust_autocorrelation,
+                    autocorr_lags=self.config.autocorr_lags,
                 )
                 for i in range(n_alphas)
             ]

@@ -17,8 +17,8 @@ class TestTwoWayChopMeanReversion(unittest.TestCase):
             bb_upper=0.85,
             ofi_threshold=0.05,
             vr_ceiling=0.75,
-            micro_stop_mult=0.40,
-            micro_target_mult=0.50,
+            micro_stop_mult=0.25,
+            micro_target_mult=0.55,
         )
 
     def _create_mock_df(
@@ -118,6 +118,16 @@ class TestTwoWayChopMeanReversion(unittest.TestCase):
         series = self.trigger.evaluate(df, "AUTOBEES")
         self.assertIsInstance(series, pd.Series)
         self.assertGreaterEqual(series.max(), 0.80)
+
+    def test_risk_reward_asymmetry(self) -> None:
+        """Verify micro_target_mult / micro_stop_mult guarantees >= 2.20:1 R:R asymmetry."""
+        rr_ratio = self.trigger.micro_target_mult / self.trigger.micro_stop_mult
+        self.assertGreaterEqual(rr_ratio, 2.20)
+        # Default instance verification
+        default_trig = TwoWayChopMeanReversionTrigger()
+        self.assertAlmostEqual(default_trig.micro_stop_mult, 0.25)
+        self.assertAlmostEqual(default_trig.micro_target_mult, 0.55)
+        self.assertGreaterEqual(default_trig.micro_target_mult / default_trig.micro_stop_mult, 2.20)
 
 
 if __name__ == "__main__":

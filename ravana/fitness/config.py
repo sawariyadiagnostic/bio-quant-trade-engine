@@ -25,10 +25,20 @@ class FitnessConfig:
     weights: ObjectiveWeights = field(default_factory=ObjectiveWeights)
     fdr_alpha: float = 0.05  # Benjamini-Hochberg False Discovery Rate threshold
     risk_free_rate: float = 0.065  # Indian 91-day T-bill risk-free rate annualized (6.5%)
-    annualization_factor: float = 252.0  # Daily sessions per year
+    timeframe: str = "5m"  # Default intraday bar timeframe ("5m", "1m", "1d")
+    annualization_factor: float = 18900.0  # Annualization periods (18,900 for 5m, 252 for daily)
     variance_of_trials: float = 0.5  # Prior variance of Sharpe ratios across tested trials
     num_tested_trials: int = 100  # Number of tested hypotheses for DSR multiple-testing adjustment
     min_track_record_bars: int = 30  # Minimum valid observations required for statistics
+    adjust_autocorrelation: bool = True  # Andrew Lo (2002) serial correlation adjustment
+    autocorr_lags: int = 5  # Autocorrelation lags for Lo correction
+
+    def __post_init__(self) -> None:
+        """Resolve default annualization factor based on timeframe if not explicitly overridden."""
+        if self.timeframe in ("1d", "daily") and self.annualization_factor == 18900.0:
+            self.annualization_factor = 252.0
+        elif self.timeframe == "1m" and self.annualization_factor == 18900.0:
+            self.annualization_factor = 94500.0
 
 
 @dataclass

@@ -3,7 +3,7 @@
 Capitalizes on mean-reverting stationary noise regimes (Variance Ratio VR_20 < 0.75):
 1. Fades extreme Bollinger Band extensions (Lower Band <= 0.15, Upper Band >= 0.85).
 2. Requires order flow imbalance confirmation (OFI_1 / OFI_5 >= +0.05 for longs, <= -0.05 for shorts).
-3. Executes micro Risk-to-Reward trades (0.40 ATR stop, 0.50 ATR target to VWAP).
+3. Executes micro Risk-to-Reward trades (0.25 ATR stop, 0.55 ATR target to VWAP, >= 2.2:1 R:R).
 4. Strictly active only during morning (09:35-11:15) and afternoon (13:00-14:30) liquidity windows.
 """
 from __future__ import annotations
@@ -51,8 +51,8 @@ class TwoWayChopMeanReversionTrigger(StructuralTrigger):
         bb_upper: float = 0.85,
         ofi_threshold: float = 0.05,
         vr_ceiling: float = 0.75,
-        micro_stop_mult: float = 0.40,
-        micro_target_mult: float = 0.50,
+        micro_stop_mult: float = 0.25,
+        micro_target_mult: float = 0.55,
         allowed_symbols: Optional[Set[str]] = None,
     ) -> None:
         self.bb_lower = float(bb_lower)
