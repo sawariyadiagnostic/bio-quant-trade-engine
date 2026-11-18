@@ -25,7 +25,7 @@ from ravana.risk.circuit_breaker import CircuitBreakerKillSwitch, CircuitBreaker
 from ravana.risk.config import DrawdownState
 from ravana.risk.engine import AllocationResult
 from ravana.risk.sizing import VolatilitySizedAllocation
-from src.execution.shoonya_gateway import ShoonyaCredentials
+from ravana.execution.shoonya_gateway import ShoonyaCredentials
 
 
 def _create_sample_sized_allocation() -> VolatilitySizedAllocation:

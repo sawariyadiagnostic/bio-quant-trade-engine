@@ -22,8 +22,8 @@ from ravana.backtest.orders import Order, OrderSide, OrderStatus, Trade
 from ravana.backtest.slippage import MicrostructureSlippageModel
 from ravana.execution.router import BrokerGateway
 from ravana.risk.circuit_breaker import CircuitBreakerStatus
-from src.execution.shoonya_gateway import ShoonyaCredentials, ShoonyaGateway
-from src.execution.shoonya_watchdog import ShoonyaSessionWatchdog
+from ravana.execution.shoonya_gateway import ShoonyaCredentials, ShoonyaGateway
+from ravana.execution.shoonya_watchdog import ShoonyaSessionWatchdog
 
 
 @dataclass

@@ -1,1 +1,0 @@
-"""Manifold & Embedding Bounded Context."""
