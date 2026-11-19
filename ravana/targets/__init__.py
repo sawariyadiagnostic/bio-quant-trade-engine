@@ -9,13 +9,14 @@ Exports:
 - IntradayFrictionModel: Indian statutory intraday friction model.
 """
 
-from ravana.targets.builder import MultiHorizonTargetBuilder, OvernightTargetBuilder
+from ravana.targets.builder import MultiHorizonTargetBuilder, OvernightTargetBuilder, TripleBarrierTargetBuilder
 from ravana.targets.config import TargetConfig, TargetHorizon
 from ravana.targets.costs import DeliveryFrictionModel, IntradayFrictionModel
 
 __all__ = [
     "MultiHorizonTargetBuilder",
     "OvernightTargetBuilder",
+    "TripleBarrierTargetBuilder",
     "TargetConfig",
     "TargetHorizon",
     "DeliveryFrictionModel",

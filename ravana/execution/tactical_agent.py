@@ -52,19 +52,22 @@ class TacticalExecutionAgent:
         intent: StrategicIntent,
         current_bar: pd.Series,
     ) -> float:
-        """Calculate passive limit bid price at micro-VWAP or best bid."""
+        """Calculate passive limit bid/ask price at micro-VWAP or inside touch."""
         curr_close = float(current_bar["Close"])
         curr_low = float(current_bar["Low"])
+        curr_high = float(current_bar["High"])
         curr_vwap = float(current_bar.get("VWAP", curr_close))
+        spread_half = curr_close * (self.default_spread_bps / 10000.0)
 
-        # 1-tick passive buffer (~5 bps) to earn the spread
-        spread_discount = curr_close * (self.default_spread_bps / 10000.0)
-        best_bid = curr_close - spread_discount
+        if intent.side == OrderSide.BUY:
+            best_bid = curr_close - spread_half
+            target_limit = min(best_bid, curr_vwap, intent.alpha_reference_price)
+            return float(min(target_limit, curr_close))
 
-        # Target price: the lower of micro-VWAP, best bid, or alpha reference price
-        target_limit = min(best_bid, curr_vwap, intent.alpha_reference_price)
-        # Bounded between bar low and bar high
-        return float(np.clip(target_limit, curr_low, curr_close))
+        # SELL order: post passive ask above close/micro-VWAP
+        best_ask = curr_close + spread_half
+        target_limit = max(best_ask, curr_vwap, intent.alpha_reference_price)
+        return float(max(target_limit, curr_close))
 
     def evaluate_tactical_fill(
         self,
@@ -73,9 +76,8 @@ class TacticalExecutionAgent:
         bar_ts: pd.Timestamp,
         bars_waited: int,
     ) -> TacticalExecutionResult:
-        """Evaluate if tactical limit order is filled on the incoming execution bar."""
+        """Evaluate if tactical limit order is filled on incoming execution bar."""
         if bars_waited > intent.max_wait_bars:
-            # Timed out: return unfilled
             return TacticalExecutionResult(
                 is_filled=False,
                 filled_shares=0,
@@ -86,10 +88,9 @@ class TacticalExecutionAgent:
                 reason="TACTICAL_TIMEOUT",
             )
 
-        # Check iNAV spread gating if tracking spread is present
-        spread_bps = float(bar.get("SPREAD_BPS", 0.0))
-        if spread_bps > intent.inav_max_premium_bps:
-            # Adverse selection: ETF is trading at too high a premium vs underlying index
+        # Check iNAV spread gating
+        spread_bps = float(bar.get("SPREAD_BPS", bar.get("Basis_Bps", 0.0)))
+        if intent.side == OrderSide.BUY and spread_bps > intent.inav_max_premium_bps:
             return TacticalExecutionResult(
                 is_filled=False,
                 filled_shares=0,
@@ -102,20 +103,46 @@ class TacticalExecutionAgent:
 
         limit_price = self.calculate_passive_limit_price(intent, bar)
         bar_low = float(bar["Low"])
+        bar_high = float(bar["High"])
+        curr_close = float(bar["Close"])
 
-        # Passive Limit Buy fills if the market traded down to our limit price
-        if bar_low <= limit_price:
-            savings_bps = ((intent.alpha_reference_price - limit_price) / intent.alpha_reference_price) * 10000.0
+        # Passive Limit Fill checks
+        if intent.side == OrderSide.BUY and bar_low <= limit_price:
+            savings = ((intent.alpha_reference_price - limit_price) / intent.alpha_reference_price) * 10000.0
             return TacticalExecutionResult(
                 is_filled=True,
                 filled_shares=intent.shares,
                 executed_price=limit_price,
-                spread_savings_bps=max(0.0, float(savings_bps)),
+                spread_savings_bps=max(0.0, float(savings)),
                 bars_waited=bars_waited,
                 fill_timestamp=bar_ts,
                 reason="LIMIT_DIP_FILLED",
             )
+        if intent.side == OrderSide.SELL and bar_high >= limit_price:
+            savings = ((limit_price - intent.alpha_reference_price) / intent.alpha_reference_price) * 10000.0
+            return TacticalExecutionResult(
+                is_filled=True,
+                filled_shares=intent.shares,
+                executed_price=limit_price,
+                spread_savings_bps=max(0.0, float(savings)),
+                bars_waited=bars_waited,
+                fill_timestamp=bar_ts,
+                reason="LIMIT_LIFT_FILLED",
+            )
 
+        # 3-Bar Escalation Rule: Sweep inside touch if conviction >= 0.70 or exiting
+        if bars_waited == intent.max_wait_bars and (intent.conviction >= 0.70 or intent.side == OrderSide.SELL):
+            return TacticalExecutionResult(
+                is_filled=True,
+                filled_shares=intent.shares,
+                executed_price=curr_close,
+                spread_savings_bps=0.0,
+                bars_waited=bars_waited,
+                fill_timestamp=bar_ts,
+                reason="ESCALATION_SWEEP_FILLED",
+            )
+
+        wait_reason = "WAITING_FOR_DIP" if intent.side == OrderSide.BUY else "WAITING_FOR_LIFT"
         return TacticalExecutionResult(
             is_filled=False,
             filled_shares=0,
@@ -123,5 +150,5 @@ class TacticalExecutionAgent:
             spread_savings_bps=0.0,
             bars_waited=bars_waited,
             fill_timestamp=bar_ts,
-            reason="WAITING_FOR_DIP",
+            reason=wait_reason,
         )

@@ -251,6 +251,26 @@ class MapElitesArchive:
         finally:
             conn.close()
 
+    def get_best_champion(self, ticker: Optional[str] = None) -> Optional[EliteIndividual]:
+        """Retrieve highest fitness elite, optionally filtering by ticker, ensuring AST tree is parsed."""
+        candidates = list(self.archive.values())
+        if ticker and ticker.upper() != "ALL":
+            filtered = [e for e in candidates if e.ticker.upper() == ticker.upper()]
+            if filtered:
+                candidates = filtered
+
+        if not candidates:
+            return None
+
+        best = max(candidates, key=lambda e: e.fitness)
+        if best.tree is None and best.formula_str:
+            try:
+                from ravana.domain.formula_parser import FormulaParser
+                best.tree = FormulaParser.parse(best.formula_str)
+            except Exception:
+                pass
+        return best
+
     def _ensure_table_exists(self, conn: sqlite3.Connection) -> None:
         """Create elites table if not already present."""
         conn.execute("""

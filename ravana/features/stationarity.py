@@ -155,3 +155,53 @@ class RollingOUHalfLife:
         hl = hl.clip(lower=self.min_half_life, upper=self.max_half_life)
         hl = hl.ffill().fillna(self.max_half_life)
         return hl
+
+
+class FastFractionalDiff:
+    """Computes fast fractional differentiation (1 - B)^d using truncated binomial weights.
+
+    Preserves maximum long memory correlation with the original series while achieving
+    covariance stationarity (Marcos Lopez de Prado, Advances in Financial Machine Learning, Ch 5).
+    """
+
+    def __init__(self, d: float = 0.40, threshold: float = 1e-4) -> None:
+        self.d = float(np.clip(d, 0.0, 1.0))
+        self.threshold = max(1e-6, float(threshold))
+        self.weights = self._generate_weights()
+
+    def _generate_weights(self) -> np.ndarray:
+        """Generate truncated binomial weights w_k = -w_{k-1} * (d - k + 1) / k."""
+        w = [1.0]
+        k = 1
+        while True:
+            w_k = -w[-1] / k * (self.d - k + 1)
+            if abs(w_k) < self.threshold or k > 2000:
+                break
+            w.append(w_k)
+            k += 1
+        return np.array(w, dtype=np.float64)
+
+    def compute(self, series: pd.Series) -> pd.Series:
+        """Compute fractionally differentiated series using causal convolution."""
+        vals = series.to_numpy(dtype=np.float64)
+        n = len(vals)
+        res = np.zeros(n, dtype=np.float64)
+        w = self.weights
+        lw = len(w)
+
+        for i in range(n):
+            k = min(i + 1, lw)
+            res[i] = np.dot(w[:k], vals[i - k + 1 : i + 1][::-1])
+
+        return pd.Series(res, index=series.index, name=f"FRAC_DIFF_{self.d:.2f}")
+
+    def memory_correlation(self, raw: pd.Series, frac: pd.Series) -> float:
+        """Compute Pearson correlation between raw price and fractionally diffed series."""
+        raw_vals = raw.to_numpy(dtype=np.float64)
+        frac_vals = frac.to_numpy(dtype=np.float64)
+        valid = np.isfinite(raw_vals) & np.isfinite(frac_vals)
+        if np.sum(valid) < 10:
+            return 0.0
+        corr = np.corrcoef(raw_vals[valid], frac_vals[valid])[0, 1]
+        return float(np.nan_to_num(corr, nan=0.0))
+

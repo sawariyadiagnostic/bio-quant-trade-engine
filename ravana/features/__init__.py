@@ -11,13 +11,14 @@ Exports:
 
 from ravana.features.config import FeatureConfig, FeatureName, FeatureRegistry
 from ravana.features.matrix_engine import FeatureMatrixEngine
-from ravana.features.stationarity import RollingADF, RollingOUHalfLife
+from ravana.features.stationarity import FastFractionalDiff, RollingADF, RollingOUHalfLife
 
 __all__ = [
     "FeatureConfig",
     "FeatureName",
     "FeatureRegistry",
     "FeatureMatrixEngine",
+    "FastFractionalDiff",
     "RollingADF",
     "RollingOUHalfLife",
 ]

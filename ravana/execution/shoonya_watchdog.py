@@ -5,8 +5,9 @@ TOTP generation via pyotp for zero-touch headless authentication during
 pre-market readiness (08:45 IST) and active market sessions.
 """
 from __future__ import annotations
+import threading
 import time
-from typing import Any
+from typing import Any, Optional
 import pyotp
 from loguru import logger
 
@@ -22,14 +23,53 @@ class ShoonyaSessionWatchdog:
     ):
         self.gateway = gateway
         self.totp_secret = totp_secret
-        self.interval_seconds = interval_seconds
+        self.interval_seconds = max(1.0, float(interval_seconds))
         self.last_ping_time = time.time()
         self.last_auth_time = time.time() if getattr(gateway, "susertoken", None) else 0.0
+        self._stop_event = threading.Event()
+        self._heartbeat_thread: Optional[threading.Thread] = None
+
+    def wait_for_totp_epoch_buffer(self, min_buffer_seconds: float = 4.0) -> None:
+        """Wait if current 30s TOTP cycle has less than min_buffer_seconds remaining."""
+        remaining = 30.0 - (time.time() % 30.0)
+        if remaining < min_buffer_seconds:
+            time.sleep(remaining + 0.1)
+
+    def start_heartbeat(self) -> None:
+        """Start active 60-second background keepalive heartbeat thread."""
+        if self._heartbeat_thread is not None and self._heartbeat_thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._heartbeat_thread = threading.Thread(
+            target=self._heartbeat_loop,
+            name="ShoonyaSessionHeartbeat",
+            daemon=True,
+        )
+        self._heartbeat_thread.start()
+        logger.info("[Watchdog] Active background heartbeat thread started.")
+
+    def stop_heartbeat(self) -> None:
+        """Signal and join the background heartbeat thread."""
+        self._stop_event.set()
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join(timeout=2.0)
+            self._heartbeat_thread = None
+        logger.info("[Watchdog] Background heartbeat stopped.")
+
+    def _heartbeat_loop(self) -> None:
+        """Periodic background probe and auto-heal loop."""
+        while not self._stop_event.is_set():
+            try:
+                self.probe_and_heal()
+            except Exception as e:
+                logger.error(f"[Watchdog] Heartbeat loop error: {e}")
+            self._stop_event.wait(timeout=self.interval_seconds)
 
     def generate_totp(self) -> str:
-        """Generates the current 6-digit RFC 6238 TOTP token."""
+        """Generates the current 6-digit RFC 6238 TOTP token with epoch buffer protection."""
         if not self.totp_secret:
             raise ValueError("TOTP secret key is empty or not configured.")
+        self.wait_for_totp_epoch_buffer()
         totp = pyotp.TOTP(self.totp_secret)
         return str(totp.now())
 

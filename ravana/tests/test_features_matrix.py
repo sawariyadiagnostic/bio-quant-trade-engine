@@ -14,7 +14,7 @@ import pandas as pd
 import torch
 
 from ravana.features.config import FeatureConfig, FeatureRegistry
-from ravana.features.stationarity import RollingADF, RollingOUHalfLife
+from ravana.features.stationarity import FastFractionalDiff, RollingADF, RollingOUHalfLife
 from ravana.features.technical_primitives import (
     log_returns,
     realized_volatility,
@@ -86,6 +86,45 @@ class TestFeatureStationarity(unittest.TestCase):
 
         self.assertTrue(np.all(np.isfinite(adf_res)))
         self.assertTrue(np.all(np.isfinite(ou_res)))
+
+    def test_fractional_diff_weights_and_memory(self) -> None:
+        """Verify FastFractionalDiff maintains high memory correlation while differencing."""
+        diff_0 = FastFractionalDiff(d=0.0)
+        diff_1 = FastFractionalDiff(d=1.0)
+        diff_40 = FastFractionalDiff(d=0.40, threshold=1e-4)
+
+        # d=0 should have single weight 1.0
+        self.assertEqual(len(diff_0.weights), 1)
+        self.assertAlmostEqual(diff_0.weights[0], 1.0)
+
+        # d=1 should have weights [1.0, -1.0]
+        self.assertEqual(len(diff_1.weights), 2)
+        self.assertAlmostEqual(diff_1.weights[0], 1.0)
+        self.assertAlmostEqual(diff_1.weights[1], -1.0)
+
+        # d=0.25 on random walk preserves memory correlation >= 0.75
+        diff_25 = FastFractionalDiff(d=0.25, threshold=1e-4)
+        frac_series_25 = diff_25.compute(self.random_walk)
+        corr_25 = diff_25.memory_correlation(self.random_walk.iloc[30:], frac_series_25.iloc[30:])
+        self.assertGreater(corr_25, 0.75)
+
+        # d=0.40 preserves substantial memory (>0.55), far higher than d=1.0 (~0.0)
+        frac_series_40 = diff_40.compute(self.random_walk)
+        corr_40 = diff_40.memory_correlation(self.random_walk.iloc[30:], frac_series_40.iloc[30:])
+        self.assertGreater(corr_40, 0.55)
+        self.assertTrue(np.all(np.isfinite(frac_series_40)))
+
+    def test_fractional_diff_stationarity_gain(self) -> None:
+        """Verify frac diff improves stationarity t-statistic relative to raw random walk."""
+        diff_40 = FastFractionalDiff(d=0.40)
+        frac_rw = diff_40.compute(self.random_walk)
+        adf_calc = RollingADF(window=60)
+        raw_adf = adf_calc.compute(self.random_walk)
+        frac_adf = adf_calc.compute(frac_rw)
+
+        # Frac diff ADF t-stat should be more negative than raw random walk
+        self.assertLess(frac_adf.iloc[60:].mean(), raw_adf.iloc[60:].mean())
+
 
 
 class TestTechnicalPrimitives(unittest.TestCase):

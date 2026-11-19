@@ -25,6 +25,7 @@ import pandas as pd
 from ravana.backtest.config import AssetType, TradingRegime
 from ravana.backtest.orders import Order, OrderSide, OrderStatus, Trade
 from ravana.daemon.data_feeder import SECTOR_MAP, SectorDataFeeder
+from ravana.execution.liquid_sweep_manager import LiquidSweepManager, SweepOrderIntent
 from ravana.execution.shoonya_adapter import (
     ShoonyaBrokerGateway,
     ShoonyaGatewayConfig,
@@ -42,6 +43,7 @@ from ravana.strategies.state_ledger import SQLiteStateLedger
 from ravana.decisions.client import GeminiDecisionClient
 from ravana.decisions.universe_allocator import UniverseAlphaCrown
 from ravana.decisions.veto_guard import DecisionVetoGuard
+from ravana.evolution.map_elites import MapElitesArchive
 from ravana.risk.decision_shield import DecisionRiskShield
 
 logger = logging.getLogger("ravana.daemon")
@@ -53,7 +55,7 @@ class DaemonConfig:
 
     initial_capital_inr: float = 200000.0
     risk_budget_pct: float = 0.0025  # ₹500 max loss on ₹2 Lakh
-    max_concurrent_positions: int = 2
+    max_concurrent_positions: int = 4
     max_mis_leverage: float = 2.0
     max_cnc_leverage: float = 0.98
     min_trade_notional: float = 30000.0
@@ -115,6 +117,14 @@ class AutonomousExecutionDaemon:
         self.current_capital: float = self.config.initial_capital_inr
         self.open_trades: Dict[str, ActiveTradeTracker] = {}
         self.closed_trades_history: List[Dict[str, Any]] = []
+
+        # Wire Muscle 9 MAP-Elites Champion Archive
+        self.archive = MapElitesArchive()
+        self.archive.load_from_db()
+
+        # Wire Muscle 7 Automated Cash Yield Sweep
+        self.sweep_manager = LiquidSweepManager()
+        self.held_liquid_units: int = 0
 
         if self.config.enable_gemini_decisions:
             self.decision_client = GeminiDecisionClient(mock=self.config.gemini_mock)
@@ -539,7 +549,9 @@ class AutonomousExecutionDaemon:
         logger.info("Pre-evaluating multi-sector signals across all 10 ETF pairs...")
         sector_signals_by_ts: Dict[pd.Timestamp, List[TriggerSignal]] = {}
         for sym, df in datasets.items():
-            sigs = self.strategy.generate_signals(df, sym)
+            champ = self.archive.get_best_champion(ticker=sym)
+            ast_node = champ.tree if champ else None
+            sigs = self.strategy.generate_signals(df, sym, ast_node=ast_node)
             for s in sigs:
                 if s.action == TriggerAction.BUY and s.conviction >= self.config.conviction_threshold:
                     if s.timestamp not in sector_signals_by_ts:
@@ -606,3 +618,46 @@ class AutonomousExecutionDaemon:
             "open_positions": len(self.open_trades),
             "trigger_pnl": trigger_pnl,
         }
+
+    def evaluate_eod_lifecycle(
+        self,
+        current_ts: pd.Timestamp,
+        current_bars: Optional[Dict[str, pd.Series]] = None,
+    ) -> Dict[str, Any]:
+        """Execute institutional EOD gates: 15:10 Swing, 15:14 MIS Cutoff, 15:22 Cash Sweep."""
+        time_str = current_ts.strftime("%H:%M")
+        actions: Dict[str, Any] = {"time": time_str, "converted_cnc": [], "closed_mis": [], "sweep": None}
+
+        # 1. 15:10 IST: Swing evaluation gate (convert high-conviction persistent trades to CNC)
+        if "15:10" <= time_str < "15:14":
+            for ticker, trade in list(self.open_trades.items()):
+                if trade.product_type == "MIS":
+                    bar = (current_bars or {}).get(ticker)
+                    vr = float(bar.get("VARIANCE_RATIO_20", 1.0)) if bar is not None else 1.0
+                    notional = trade.shares * (float(bar["Close"]) if bar is not None else trade.entry_price)
+                    if vr >= 1.10 and notional >= 35000.0:
+                        trade.product_type = "CNC"
+                        actions["converted_cnc"].append(ticker)
+
+        # 2. 15:14 IST: Mandatory MIS square-off defense
+        if time_str >= "15:14":
+            for ticker, trade in list(self.open_trades.items()):
+                if trade.product_type == "MIS":
+                    bar = (current_bars or {}).get(ticker)
+                    exit_px = float(bar["Close"]) if bar is not None else trade.entry_price
+                    self._close_full_trade(trade, exit_px, current_ts, "MANDATORY_MIS_1514_CUTOFF")
+                    actions["closed_mis"].append(ticker)
+
+        # 3. 15:22 IST: Automated Cash Yield Sweep into LIQUIDBEES
+        if time_str >= "15:22":
+            sweep_intent = self.sweep_manager.evaluate_eod_sweep(current_ts, self.current_capital)
+            if sweep_intent is not None:
+                self.held_liquid_units += sweep_intent.units
+                self.current_capital -= sweep_intent.notional_inr
+                actions["sweep"] = {
+                    "units": sweep_intent.units,
+                    "notional_inr": sweep_intent.notional_inr,
+                    "remaining_cash": self.current_capital,
+                }
+
+        return actions

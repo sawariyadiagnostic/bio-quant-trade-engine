@@ -521,5 +521,52 @@ class TestDecisionRiskShieldInitialization(unittest.TestCase):
         self.assertIsNone(shield.ledger)
 
 
+class TestCrossAssetMacroShock(unittest.TestCase):
+    """Test deterministic macro tripwires and Gemini crisis veto."""
+
+    def setUp(self) -> None:
+        self.mock_client = MagicMock(spec=GeminiDecisionClient)
+        self.shield = DecisionRiskShield(client=self.mock_client)
+
+    def test_vix_spike_tripwire(self) -> None:
+        snap = {"india_vix_delta_pct": 0.16, "nifty_5m_ret": -0.002, "gold_ret": 0.0}
+        is_shock, reason, prob = self.shield.evaluate_cross_asset_macro_shock(snap)
+        self.assertTrue(is_shock)
+        self.assertEqual(reason, "MACRO_VIX_SPIKE_PANIC")
+        self.mock_client.evaluate.assert_not_called()
+
+    def test_nifty_gap_down_tripwire(self) -> None:
+        snap = {"india_vix_delta_pct": 0.05, "nifty_5m_ret": -0.014, "gold_ret": 0.0}
+        is_shock, reason, prob = self.shield.evaluate_cross_asset_macro_shock(snap)
+        self.assertTrue(is_shock)
+        self.assertEqual(reason, "MACRO_INDEX_GAP_DOWN")
+        self.mock_client.evaluate.assert_not_called()
+
+    def test_safe_haven_divergence_tripwire(self) -> None:
+        snap = {"india_vix_delta_pct": 0.05, "nifty_5m_ret": -0.009, "gold_ret": 0.018}
+        is_shock, reason, prob = self.shield.evaluate_cross_asset_macro_shock(snap)
+        self.assertTrue(is_shock)
+        self.assertEqual(reason, "MACRO_SAFE_HAVEN_DIVERGENCE")
+        self.mock_client.evaluate.assert_not_called()
+
+    def test_gemini_macro_crisis_veto(self) -> None:
+        self.mock_client.evaluate.return_value = BatchResponse(
+            results={
+                "is_systemic_macro_shock": DecisionResult(
+                    key="is_systemic_macro_shock",
+                    decision_type=DecisionType.NOUL,
+                    probability=0.82,
+                )
+            },
+            status="OK",
+        )
+        snap = {"india_vix_delta_pct": 0.02, "nifty_5m_ret": -0.003, "gold_ret": 0.001}
+        is_shock, reason, prob = self.shield.evaluate_cross_asset_macro_shock(snap)
+        self.assertTrue(is_shock)
+        self.assertEqual(reason, "GEMINI_MACRO_CRISIS_VETO")
+        self.assertAlmostEqual(prob, 0.82)
+
+
+
 if __name__ == "__main__":
     unittest.main()

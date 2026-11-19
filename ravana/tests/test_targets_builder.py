@@ -14,7 +14,7 @@ import pandas as pd
 
 from ravana.targets.config import TargetConfig, TargetHorizon
 from ravana.targets.costs import DeliveryFrictionModel, IntradayFrictionModel
-from ravana.targets.builder import MultiHorizonTargetBuilder, OvernightTargetBuilder
+from ravana.targets.builder import MultiHorizonTargetBuilder, OvernightTargetBuilder, TripleBarrierTargetBuilder
 
 
 class TestDeliveryFrictionModel(unittest.TestCase):
@@ -275,6 +275,66 @@ class TestOvernightTargetBuilder(unittest.TestCase):
         # Entry bar in session 0 should hold across 3 days
         session_0_entry = np.where(targets["is_entry_bar"] == 1)[0][0]
         self.assertGreaterEqual(targets["calendar_hold_days"].iloc[session_0_entry], 3)
+
+
+class TestTripleBarrierTargetBuilder(unittest.TestCase):
+    """Test Marcos Lopez de Prado Triple Barrier Method and Meta-Labeling."""
+
+    def setUp(self) -> None:
+        dates = pd.date_range("2026-01-05 09:15", "2026-01-05 15:25", freq="5min", tz="Asia/Kolkata")
+        n = len(dates)
+        self.df = pd.DataFrame(
+            {
+                "Open": np.full(n, 100.0),
+                "High": np.full(n, 100.5),
+                "Low": np.full(n, 99.5),
+                "Close": np.full(n, 100.0),
+                "Volume": np.full(n, 1000.0),
+                "ATR_14": np.full(n, 1.0),
+            },
+            index=dates,
+        )
+
+    def test_upper_profit_take_barrier_hit(self) -> None:
+        """Verify upper profit-take barrier hit generates label +1 with PROFIT_TAKE reason."""
+        df = self.df.copy()
+        # Bar 0 enters at Bar 1 Open (100.0). Upper barrier = 100 + 1.5 * 1.0 = 101.5
+        # Set Bar 3 High to 102.0 to trigger profit take
+        df.iloc[3, df.columns.get_loc("High")] = 102.0
+
+        builder = TripleBarrierTargetBuilder(pt_mult=1.5, sl_mult=0.75, max_holding_bars=10)
+        res = builder.build_barriers(df)
+
+        self.assertEqual(res["barrier_label"].iloc[0], 1)
+        self.assertEqual(res["exit_reason"].iloc[0], "PROFIT_TAKE")
+        self.assertGreater(res["net_return"].iloc[0], 0.0)
+
+    def test_lower_stop_loss_barrier_hit(self) -> None:
+        """Verify lower stop-loss barrier hit generates label -1 with STOP_LOSS reason."""
+        df = self.df.copy()
+        # Bar 0 enters at Bar 1 Open (100.0). Lower barrier = 100 - 0.75 * 1.0 = 99.25
+        # Set Bar 2 Low to 99.0 to trigger stop loss
+        df.iloc[2, df.columns.get_loc("Low")] = 99.0
+
+        builder = TripleBarrierTargetBuilder(pt_mult=1.5, sl_mult=0.75, max_holding_bars=10)
+        res = builder.build_barriers(df)
+
+        self.assertEqual(res["barrier_label"].iloc[0], -1)
+        self.assertEqual(res["exit_reason"].iloc[0], "STOP_LOSS")
+        self.assertLess(res["net_return"].iloc[0], 0.0)
+
+    def test_meta_label_generation(self) -> None:
+        """Verify binary meta-label correctly identifies profitable trade signals."""
+        primary_sides = pd.Series([1, 1, -1, -1])
+        barrier_labels = pd.Series([1, -1, -1, 1])
+
+        meta = TripleBarrierTargetBuilder.generate_meta_labels(primary_sides, barrier_labels)
+        # 1 * 1 > 0 -> 1
+        # 1 * -1 < 0 -> 0
+        # -1 * -1 > 0 -> 1
+        # -1 * 1 < 0 -> 0
+        self.assertListEqual(meta.tolist(), [1, 0, 1, 0])
+
 
 
 if __name__ == "__main__":

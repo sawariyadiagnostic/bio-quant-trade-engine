@@ -5,7 +5,7 @@ Intraday N-bars, and Multi-Day Swing), deducts applicable statutory frictions,
 and generates continuous targets, binary hurdle classifications, and sample weighting masks.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
@@ -223,3 +223,145 @@ class OvernightTargetBuilder:
 
 
 MultiHorizonTargetBuilder = OvernightTargetBuilder
+
+
+class TripleBarrierTargetBuilder:
+    """Computes path-dependent Triple Barrier labels and Meta-Labels.
+
+    Following Marcos Lopez de Prado (AFML Ch 3), labels are generated based on the
+    first barrier touched:
+    +1: Upper Profit-Take Barrier (lambda_pt * ATR)
+    -1: Lower Stop-Loss Barrier (lambda_sl * ATR)
+     0: Vertical Time Barrier (max_holding_bars or session end)
+    """
+
+    def __init__(
+        self,
+        pt_mult: float = 1.50,
+        sl_mult: float = 0.75,
+        max_holding_bars: int = 12,
+        intraday_cutoff_time: str = "15:10",
+        capital_inr: float = 200000.0,
+    ) -> None:
+        self.pt_mult = float(max(0.1, pt_mult))
+        self.sl_mult = float(max(0.1, sl_mult))
+        self.max_holding_bars = int(max(1, max_holding_bars))
+        self.intraday_cutoff_time = intraday_cutoff_time
+        self.friction_model = IntradayFrictionModel(default_capital_inr=capital_inr)
+
+    def build_barriers(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Compute path-dependent barrier events for each valid bar in DataFrame."""
+        if not isinstance(df.index, pd.DatetimeIndex):
+            raise ValueError("DataFrame index must be a DatetimeIndex")
+
+        n = len(df)
+        labels = np.zeros(n, dtype=np.int32)
+        gross_returns = np.zeros(n, dtype=np.float64)
+        net_returns = np.zeros(n, dtype=np.float64)
+        holding_bars = np.zeros(n, dtype=np.int32)
+        exit_reasons = ["NONE"] * n
+
+        if n < 2:
+            return self._package_df(df.index, labels, gross_returns, net_returns, holding_bars, exit_reasons)
+
+        atr_series = self._extract_atr(df)
+        session_dates = df.index.normalize()
+
+        for t in range(n - 1):
+            if df.index[t].strftime("%H:%M") > self.intraday_cutoff_time:
+                continue
+
+            entry_p = float(df["Open"].iloc[t + 1])
+            atr_val = float(atr_series.iloc[t])
+            if entry_p <= 0.0 or atr_val <= 0.0:
+                continue
+
+            lbl, g_ret, bars, reason = self._simulate_path(
+                df, t + 1, entry_p, atr_val, session_dates[t + 1]
+            )
+            labels[t] = lbl
+            gross_returns[t] = g_ret
+            net_returns[t] = self.friction_model.apply_friction(g_ret)
+            holding_bars[t] = bars
+            exit_reasons[t] = reason
+
+        return self._package_df(df.index, labels, gross_returns, net_returns, holding_bars, exit_reasons)
+
+    def _simulate_path(
+        self,
+        df: pd.DataFrame,
+        entry_idx: int,
+        entry_p: float,
+        atr_val: float,
+        session_date: pd.Timestamp,
+    ) -> Tuple[int, float, int, str]:
+        """Simulate future price trajectory until first barrier touch."""
+        upper = entry_p + (self.pt_mult * atr_val)
+        lower = max(1e-4, entry_p - (self.sl_mult * atr_val))
+        n = len(df)
+        max_idx = min(n, entry_idx + self.max_holding_bars)
+
+        for i in range(entry_idx, max_idx):
+            if df.index[i].normalize() != session_date or df.index[i].strftime("%H:%M") >= "15:15":
+                exit_p = float(df["Close"].iloc[i])
+                ret = (exit_p - entry_p) / entry_p
+                return int(np.sign(ret)), ret, i - entry_idx + 1, "VERTICAL_SESSION_CUTOFF"
+
+            high_i = float(df["High"].iloc[i])
+            low_i = float(df["Low"].iloc[i])
+
+            hit_upper = high_i >= upper
+            hit_lower = low_i <= lower
+
+            if hit_upper and not hit_lower:
+                ret = (upper - entry_p) / entry_p
+                return 1, ret, i - entry_idx + 1, "PROFIT_TAKE"
+            if hit_lower and not hit_upper:
+                ret = (lower - entry_p) / entry_p
+                return -1, ret, i - entry_idx + 1, "STOP_LOSS"
+            if hit_upper and hit_lower:
+                ret = (lower - entry_p) / entry_p
+                return -1, ret, i - entry_idx + 1, "STOP_LOSS_SIMULTANEOUS"
+
+        last_idx = max_idx - 1
+        exit_p = float(df["Close"].iloc[last_idx])
+        ret = (exit_p - entry_p) / entry_p
+        return int(np.sign(ret)), ret, max_idx - entry_idx, "VERTICAL_TIME_BARRIER"
+
+    def _extract_atr(self, df: pd.DataFrame) -> pd.Series:
+        """Extract or compute 14-bar Average True Range."""
+        if "ATR_14" in df.columns:
+            return df["ATR_14"].fillna(df["Close"] * 0.005)
+        h, l, c = df["High"], df["Low"], df["Close"]
+        tr = np.maximum(h - l, np.maximum((h - c.shift(1)).abs(), (l - c.shift(1)).abs()))
+        return tr.rolling(14, min_periods=1).mean().bfill()
+
+    def _package_df(
+        self,
+        index: pd.DatetimeIndex,
+        labels: np.ndarray,
+        gross: np.ndarray,
+        net: np.ndarray,
+        bars: np.ndarray,
+        reasons: List[str],
+    ) -> pd.DataFrame:
+        """Package barrier results into clean output DataFrame."""
+        return pd.DataFrame(
+            {
+                "barrier_label": labels,
+                "gross_return": gross,
+                "net_return": net,
+                "bars_held": bars,
+                "exit_reason": reasons,
+            },
+            index=index,
+        )
+
+    @staticmethod
+    def generate_meta_labels(primary_side: pd.Series, barrier_label: pd.Series) -> pd.Series:
+        """Generate binary meta-label y* = 1 if primary side correctly matches barrier return."""
+        correct = (primary_side * barrier_label) > 0
+        meta = correct.astype(int)
+        meta.name = "meta_label"
+        return meta
+

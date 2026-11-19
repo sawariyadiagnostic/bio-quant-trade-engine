@@ -257,3 +257,46 @@ class DecisionRiskShield:
 
         open_px = float(today_bar.get("Open", 0.0))
         return False, open_px, "STANDARD_MORNING_EXIT"
+
+    def evaluate_cross_asset_macro_shock(
+        self,
+        macro_snapshot: Dict[str, Any],
+    ) -> Tuple[bool, str, float]:
+        """Evaluate systemic cross-asset macro shock via deterministic tripwires & Gemini veto.
+
+        Returns (is_shock, action_reason, severity_prob).
+        """
+        vix_delta = float(macro_snapshot.get("india_vix_delta_pct", 0.0))
+        nifty_ret = float(macro_snapshot.get("nifty_5m_ret", 0.0))
+        gold_ret = float(macro_snapshot.get("gold_ret", 0.0))
+
+        # 1. Deterministic zero-latency tripwires
+        if vix_delta >= 0.15:
+            return True, "MACRO_VIX_SPIKE_PANIC", 1.0
+        if nifty_ret <= -0.012:
+            return True, "MACRO_INDEX_GAP_DOWN", 1.0
+        if gold_ret >= 0.015 and nifty_ret <= -0.008:
+            return True, "MACRO_SAFE_HAVEN_DIVERGENCE", 1.0
+
+        # 2. Gemini Decision API categorical evaluation
+        context = (
+            f"Macro volatility assessment: VIX 30m delta: {vix_delta*100:.1f}%, "
+            f"Nifty 5m ret: {nifty_ret*100:.2f}%, Gold ret: {gold_ret*100:.2f}%."
+        )
+        questions = [
+            Question(
+                key="is_systemic_macro_shock",
+                question="Is there an imminent systemic macroeconomic or liquidity shock triggering flight to safety?",
+                decision_type=DecisionType.NOUL,
+            ),
+        ]
+        resp = self.client.evaluate(context, questions)
+        res = resp.results.get("is_systemic_macro_shock")
+        prob = res.probability if (res and res.probability is not None) else 0.0
+
+        is_shock = prob >= 0.70
+        status = "APPLIED" if is_shock else "BYPASSED"
+        self._record_audit("SYSTEM", "macro_regime_shield", "5m", res, status, resp.latency_ms)
+
+        reason = "GEMINI_MACRO_CRISIS_VETO" if is_shock else "MACRO_REGIME_STABLE"
+        return is_shock, reason, prob

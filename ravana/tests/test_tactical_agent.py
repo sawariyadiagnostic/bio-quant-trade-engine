@@ -82,6 +82,45 @@ class TestTacticalExecutionAgent(unittest.TestCase):
         self.assertFalse(res.is_filled)
         self.assertEqual(res.reason, "TACTICAL_TIMEOUT")
 
+    def test_passive_limit_sell_fill(self) -> None:
+        sell_intent = StrategicIntent(
+            ticker="ITBEES",
+            side=OrderSide.SELL,
+            shares=500,
+            alpha_timestamp=self.now,
+            alpha_reference_price=42.40,
+            trigger_name="ClosingVWAPSnapbackTrigger",
+            conviction=0.75,
+            max_wait_bars=3,
+        )
+        bar = pd.Series({
+            "Open": 42.40,
+            "High": 42.60,
+            "Low": 42.35,
+            "Close": 42.45,
+            "VWAP": 42.42,
+            "SPREAD_BPS": 2.0,
+        })
+        res = self.agent.evaluate_tactical_fill(sell_intent, bar, self.now, bars_waited=1)
+        self.assertTrue(res.is_filled)
+        self.assertEqual(res.reason, "LIMIT_LIFT_FILLED")
+        self.assertGreaterEqual(res.executed_price, 42.45)
+
+    def test_escalation_sweep_on_max_wait(self) -> None:
+        # High conviction buy waiting on bar 3 with market never dipping to limit
+        bar = pd.Series({
+            "Open": 42.50,
+            "High": 42.55,
+            "Low": 42.49,
+            "Close": 42.50,
+            "VWAP": 42.50,
+            "SPREAD_BPS": 2.0,
+        })
+        res = self.agent.evaluate_tactical_fill(self.intent, bar, self.now, bars_waited=3)
+        self.assertTrue(res.is_filled)
+        self.assertEqual(res.reason, "ESCALATION_SWEEP_FILLED")
+        self.assertEqual(res.executed_price, 42.50)
+
 
 if __name__ == "__main__":
     unittest.main()
