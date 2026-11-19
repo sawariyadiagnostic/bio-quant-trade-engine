@@ -25,7 +25,7 @@ from ravana.evolution.graveyard import IdeaGraveyard
 from ravana.evolution.map_elites import MapElitesArchive
 from ravana.features.config import FeatureRegistry
 from ravana.fitness import FitnessConfig, MultiObjectiveFitnessEngine, ObjectiveWeights
-from ravana.fitness.metrics import compute_ic_and_rank_ic
+from ravana.fitness.metrics import compute_ic_and_rank_ic, compute_strategy_returns
 
 
 class GeneticAlphaEngine:
@@ -142,9 +142,13 @@ class GeneticAlphaEngine:
             ind.metrics = m.to_dict()
 
             if np.isfinite(m.composite_fitness) and m.composite_fitness > -5.0:
+                strat_rets = compute_strategy_returns(sig_entry[idx], y_entry, long_only=True)
+                valid_r = strat_rets[np.isfinite(strat_rets)]
+                std_r = float(np.std(valid_r, ddof=1)) if len(valid_r) > 2 else 0.005
+                vol_ann = float(np.clip(std_r * np.sqrt(fit_cfg.annualization_factor), 0.01, 0.40))
                 self.archive.add(
                     formula_str=ind.formula_str(),
-                    volatility=float(min(0.40, max(0.01, m.max_drawdown * 1.5))),
+                    volatility=vol_ann,
                     turnover=float(min(1.0, max(0.0, m.turnover))),
                     fitness=float(m.composite_fitness),
                     ic=float(m.ic),

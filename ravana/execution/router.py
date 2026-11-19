@@ -213,10 +213,17 @@ class BrokerOrderRouter:
             curr_qty = holdings.get(sym, 0)
             targ_qty = target_shares.get(sym, 0)
             delta = targ_qty - curr_qty
+            ref_px = prices.get(sym, 100.0)
+
             if delta > 0:
                 orders.append(Order(f"BUY_{sym}_{int(ts.timestamp())}", ts, sym, OrderSide.BUY, delta))
             elif delta < 0:
-                sell_shares = min(curr_qty, abs(delta)) if not self.allow_shorting else abs(delta)
+                # Clean-sweep liquidation: if target is 0 or residual position < ₹15k, fully exit to prevent micro DP drag
+                if (targ_qty * ref_px < 15000.0) or targ_qty == 0:
+                    sell_shares = curr_qty
+                else:
+                    sell_shares = min(curr_qty, abs(delta)) if not self.allow_shorting else abs(delta)
+
                 if sell_shares <= 0:
                     continue
 

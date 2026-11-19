@@ -212,6 +212,10 @@ class TestDataQualityEngine(unittest.TestCase):
         self.assertIsNotNone(spread)
         # Should snap exactly to 100.0 across all rows
         self.assertTrue((spread["Multiplier"] == 100.0).all())
+        # Schema alias bridge verified
+        self.assertIn("SPREAD_BPS", spread.columns)
+        self.assertIn("SPREAD_ZSCORE_20", spread.columns)
+        self.assertTrue((spread["SPREAD_BPS"] == spread["Basis_Bps"]).all())
 
     def test_data_cleaning_engine_full_pipeline(self) -> None:
         """Verify DataCleaningEngine transforms IngestedDataset into CleanedDataset contract with zero NaNs."""

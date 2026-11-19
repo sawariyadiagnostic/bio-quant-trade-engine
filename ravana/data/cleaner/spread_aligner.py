@@ -8,12 +8,8 @@ import pandas as pd
 
 CANONICAL_ETF_CONTRACT_MULTIPLIERS: Dict[str, float] = {
     "NIFTYBEES": 100.0,
-    "BANKBEES": 100.0,
     "PSUBNKBEES": 100.0,
     "JUNIORBEES": 100.0,
-    "CPSEETF": 100.0,
-    "AUTOBEES": 100.0,
-    "PHARMABEES": 100.0,
 }
 
 
@@ -94,14 +90,14 @@ class ETFBUSpreadAligner:
         first_valid = combined.dropna().iloc[0] if not combined.dropna().empty else 1.0
         resolved_series = combined.fillna(first_valid).round(2)
 
-        # Invariant snap: eliminate rolling basis noise if within 5% of canonical specification
+        # Invariant snap: eliminate rolling basis noise if within 0.5% of statutory contract invariant
         if ticker:
             sym_clean = ticker.upper().replace(".NS", "").replace(".BO", "").strip()
             if sym_clean in CANONICAL_ETF_CONTRACT_MULTIPLIERS:
                 canonical = CANONICAL_ETF_CONTRACT_MULTIPLIERS[sym_clean]
-                median_est = float(resolved_series.median())
-                if abs(median_est - canonical) / canonical <= 0.05:
-                    return pd.Series(canonical, index=etf_close.index)
+                exp_med = resolved_series.expanding(min_periods=1).median()
+                close_mask = (np.abs(exp_med - canonical) / canonical) <= 0.005
+                resolved_series = resolved_series.mask(close_mask, canonical)
 
         return resolved_series
 
@@ -121,6 +117,10 @@ class ETFBUSpreadAligner:
         r_std = np.maximum(r_std, 1.0)  # noise floor 1 bps
 
         df["Spread_ZScore"] = (basis - r_mean) / r_std
+
+        # Standardized schema alias bridge for execution and trigger modules
+        df["SPREAD_BPS"] = df["Basis_Bps"]
+        df["SPREAD_ZSCORE_20"] = df["Spread_ZScore"]
 
         # Rolling correlation between ETF and Index returns
         etf_ret = df["ETF_Close"].pct_change().fillna(0.0)

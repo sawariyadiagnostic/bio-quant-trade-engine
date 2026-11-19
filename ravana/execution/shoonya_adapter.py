@@ -87,6 +87,7 @@ class ShoonyaBrokerGateway(BrokerGateway):
         self.clordid_ledger: Dict[str, Trade] = {}
         self._auth_lock = threading.Lock()
         self.continuation_holds_count: int = 0
+        self.debited_dates: Set[Tuple[str, str]] = set()
 
         creds = self.config.credentials or ShoonyaCredentials.from_env()
         self.gateway = ShoonyaGateway(
@@ -180,6 +181,14 @@ class ShoonyaBrokerGateway(BrokerGateway):
             order.status = OrderStatus.REJECTED
             return None
 
+        date_str = order.timestamp.strftime("%Y-%m-%d") if hasattr(order.timestamp, "strftime") else str(order.timestamp)[:10]
+        dp_key = (order.ticker, date_str)
+        is_dp_eligible = False
+        if order.side == OrderSide.SELL:
+            if dp_key not in self.debited_dates:
+                is_dp_eligible = True
+                self.debited_dates.add(dp_key)
+
         friction = IndianFrictionModel.calculate_friction(
             side=order.side.value,
             price=fill.executed_price,
@@ -188,6 +197,7 @@ class ShoonyaBrokerGateway(BrokerGateway):
             regime=self.config.regime,
             fixed_dp_fee_inr=self.config.statutory_dp_fee_inr,
             brokerage_per_order_inr=self.config.brokerage_per_order_inr,
+            is_dp_eligible=is_dp_eligible,
         )
         order.status = (
             OrderStatus.FILLED if fill.filled_shares == order.shares else OrderStatus.PARTIALLY_FILLED
@@ -392,6 +402,14 @@ class ShoonyaBrokerGateway(BrokerGateway):
         sign = 1.0 if order.side == OrderSide.BUY else -1.0
         slippage_bps = sign * ((executed_price - reference_price) / max(1e-4, reference_price)) * 10000.0
 
+        date_str = order.timestamp.strftime("%Y-%m-%d") if hasattr(order.timestamp, "strftime") else str(order.timestamp)[:10]
+        dp_key = (order.ticker, date_str)
+        is_dp_eligible = False
+        if order.side == OrderSide.SELL:
+            if dp_key not in self.debited_dates:
+                is_dp_eligible = True
+                self.debited_dates.add(dp_key)
+
         friction = IndianFrictionModel.calculate_friction(
             side=order.side.value,
             price=executed_price,
@@ -400,6 +418,7 @@ class ShoonyaBrokerGateway(BrokerGateway):
             regime=self.config.regime,
             fixed_dp_fee_inr=self.config.statutory_dp_fee_inr,
             brokerage_per_order_inr=self.config.brokerage_per_order_inr,
+            is_dp_eligible=is_dp_eligible,
         )
         order.status = (
             OrderStatus.FILLED if filled_shares == order.shares else OrderStatus.PARTIALLY_FILLED

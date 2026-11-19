@@ -175,8 +175,10 @@ class BoundedASTModulator:
         mu = raw_s.rolling(self.zscore_window, min_periods=1).mean().fillna(0.0)
         sigma = raw_s.rolling(self.zscore_window, min_periods=1).std().fillna(0.0)
         atr14 = self._extract_atr14(df)
+        close_px = df["Close"] if "Close" in df.columns else pd.Series(100.0, index=df.index)
+        rel_atr = atr14 / np.maximum(1.0, close_px)
 
-        safe_epsilon = np.maximum(1e-4, 0.10 * atr14)
+        safe_epsilon = np.maximum(1e-4, 0.10 * rel_atr)
         z = np.clip(
             (raw_s - mu) / (sigma + safe_epsilon),
             self.clip_z_min,

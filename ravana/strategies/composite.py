@@ -208,7 +208,7 @@ class TriggerCompositeStrategy:
         triggers: Optional[List[StructuralTrigger]] = None,
         modulator: Optional[BoundedASTModulator] = None,
         bandit: Optional[StrategyBanditAllocator] = None,
-        max_concurrent_positions: int = 2,
+        max_concurrent_positions: int = 4,
         vr_threshold: float = 1.05,
     ) -> None:
         """Initialize composite strategy with all 10 structural triggers."""
