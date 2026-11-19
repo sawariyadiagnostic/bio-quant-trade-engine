@@ -41,12 +41,12 @@ class OverfittingGuardEngine:
             return float("inf")
 
         z_alpha = float(stats.norm.ppf(self.config.confidence_level))
-        non_normal_adj = (
+        non_normal_adj = max(
+            0.05,
             1.0
             - skewness * sharpe_per_period
-            + ((kurtosis - 1.0) / 4.0) * (sharpe_per_period ** 2)
+            + ((kurtosis - 1.0) / 4.0) * (sharpe_per_period ** 2),
         )
-        non_normal_adj = max(0.1, non_normal_adj)
         min_trl = 1.0 + non_normal_adj * ((z_alpha / (sharpe_per_period - benchmark_sharpe_per_period)) ** 2)
         return float(min_trl)
 
@@ -59,6 +59,35 @@ class OverfittingGuardEngine:
         z2 = float(stats.norm.ppf(1.0 - 1.0 / (num_trials * math.e)))
         return max(0.0, std_sharpe_trials * ((1.0 - EULER_MASCHERONI) * z1 + EULER_MASCHERONI * z2))
 
+    def _evaluate_dsr_metrics(
+        self,
+        valid: np.ndarray,
+        periods_per_yr: float,
+        num_trials: int,
+        trial_sharpes: Optional[np.ndarray],
+    ) -> Tuple[float, float, float, float, float, int, float, float, float, float]:
+        """Compute sample moments, trial deflation, DSR, and MinTRL."""
+        rf_per_period = self.config.risk_free_rate_annual / periods_per_yr
+        sqrt_ann = math.sqrt(periods_per_yr)
+        n_obs = len(valid)
+
+        mean, std, skew, kurt = compute_moments(valid)
+        sr_per_period = (mean - rf_per_period) / std if std > 1e-8 else 0.0
+        sr_annual = sr_per_period * sqrt_ann
+
+        rho = getattr(self.config, "trials_cross_correlation", 0.50)
+        n_eff = max(1, int(round(1.0 + (num_trials - 1) * (1.0 - rho))))
+
+        if trial_sharpes is not None and len(trial_sharpes) > 2:
+            std_sr = float(np.std(trial_sharpes, ddof=1))
+        else:
+            std_sr = 1.0 / math.sqrt(max(2, n_obs))
+
+        sr_star = self.expected_max_sharpe_from_std(n_eff, std_sr)
+        dsr = compute_psr(sr_per_period, sr_star, n_obs, skewness=skew, kurtosis=kurt)
+        min_trl = self.compute_min_track_record_length(sr_per_period, sr_star, skewness=skew, kurtosis=kurt)
+        return sr_annual, sr_per_period, sr_star, sr_star * sqrt_ann, std_sr, n_eff, dsr, min_trl, skew, kurt
+
     def audit_strategy(
         self,
         champion_returns: np.ndarray,
@@ -68,55 +97,33 @@ class OverfittingGuardEngine:
         """Audit a candidate strategy's returns against selection bias and sample length."""
         valid = champion_returns[np.isfinite(champion_returns)]
         n_obs = len(valid)
-        rf_per_period = self.config.risk_free_rate_annual / self.config.periods_per_year
-        sqrt_ann = math.sqrt(self.config.periods_per_year)
+        periods_per_yr = getattr(self.config, "periods_per_year", 252.0)
+        friction_bps = getattr(self.config, "statutory_friction_bps", 0.0)
+        if friction_bps > 0:
+            valid = valid - (friction_bps / 10000.0) / 75.0
 
-        mean, std, skew, kurt = compute_moments(valid)
-        sr_per_period = (mean - rf_per_period) / std if std > 1e-8 else 0.0
-        sr_annual = sr_per_period * sqrt_ann
-
-        # Empirical cross-sectional standard deviation of per-period Sharpe ratios across trials
-        if trial_sharpes_per_period is not None and len(trial_sharpes_per_period) > 2:
-            empirical_std_sr = float(np.std(trial_sharpes_per_period, ddof=1))
-        else:
-            # Theoretical null variance of per-period Sharpe across N observations is ~ 1 / sqrt(n_obs)
-            empirical_std_sr = 1.0 / math.sqrt(max(2, n_obs))
-
-        sr_star_per_period = self.expected_max_sharpe_from_std(num_trials, empirical_std_sr)
-        sr_star_annual = sr_star_per_period * sqrt_ann
-
-        dsr = compute_psr(
-            sharpe_hat=sr_per_period,
-            benchmark_sharpe=sr_star_per_period,
-            num_samples=n_obs,
-            skewness=skew,
-            kurtosis=kurt,
+        (sr_ann, sr_p, sr_star_p, sr_star_ann, std_sr, n_eff, dsr, min_trl, skew, kurt) = self._evaluate_dsr_metrics(
+            valid, periods_per_yr, num_trials, trial_sharpes_per_period
         )
 
-        min_trl = self.compute_min_track_record_length(
-            sharpe_per_period=sr_per_period,
-            benchmark_sharpe_per_period=sr_star_per_period,
-            skewness=skew,
-            kurtosis=kurt,
-        )
-
+        bars_per_day = 75.0 if periods_per_yr >= 18000.0 else 1.0
+        min_trl_days = min_trl / bars_per_day if math.isfinite(min_trl) else float("inf")
+        min_trl_years = min_trl / periods_per_yr if math.isfinite(min_trl) else float("inf")
         has_track_record = float(n_obs) >= min_trl
         reasons: List[str] = []
 
         if not has_track_record:
             trl_str = f"{min_trl:.0f}" if math.isfinite(min_trl) else "INF (SR <= E[max SR])"
-            reasons.append(f"Insufficient sample length: {n_obs} bars < MinTRL ({trl_str} bars required).")
+            reasons.append(f"Insufficient sample length: {n_obs} bars < MinTRL ({trl_str} bars / {min_trl_days:.1f} days required).")
         if dsr < self.config.min_dsr_threshold:
-            reasons.append(
-                f"DSR ({dsr:.3f}) below {self.config.min_dsr_threshold:.2f} confidence threshold after {num_trials} trials."
-            )
+            reasons.append(f"DSR ({dsr:.3f}) below {self.config.min_dsr_threshold:.2f} threshold after {num_trials} trials ({n_eff} eff).")
 
         return DSRGuardReport(
-            observed_sharpe_annual=round(sr_annual, 4),
-            observed_sharpe_per_period=round(sr_per_period, 5),
-            expected_max_sharpe_per_period=round(sr_star_per_period, 5),
-            expected_max_sharpe_annual=round(sr_star_annual, 4),
-            empirical_trial_std_per_period=round(empirical_std_sr, 5),
+            observed_sharpe_annual=round(sr_ann, 4),
+            observed_sharpe_per_period=round(sr_p, 5),
+            expected_max_sharpe_per_period=round(sr_star_p, 5),
+            expected_max_sharpe_annual=round(sr_star_ann, 4),
+            empirical_trial_std_per_period=round(std_sr, 5),
             num_independent_trials=num_trials,
             sample_length_bars=n_obs,
             min_track_record_length=round(min_trl, 2) if math.isfinite(min_trl) else float("inf"),
@@ -125,5 +132,8 @@ class OverfittingGuardEngine:
             kurtosis=round(kurt, 4),
             has_sufficient_track_record=has_track_record,
             passed_guard=(has_track_record and dsr >= self.config.min_dsr_threshold),
+            effective_trials=n_eff,
+            min_track_record_days=round(min_trl_days, 2) if math.isfinite(min_trl_days) else float("inf"),
+            min_track_record_years=round(min_trl_years, 2) if math.isfinite(min_trl_years) else float("inf"),
             rejection_reasons=reasons,
         )

@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import hashlib
+import json
+import time
 from typing import Any, Dict, List, Optional
 import numpy as np
 
@@ -16,6 +19,9 @@ class WalkForwardConfig:
     min_oos_sharpe: float = 1.0
     min_oos_ic: float = 0.02
     min_wfe: float = 0.50   # Walk-Forward Efficiency (OOS Sharpe / IS Sharpe)
+    periods_per_year: float = 252.0  # 252.0 for daily, 18900.0 for 5m intraday (75 bars/day * 252)
+    timeframe: str = "daily"
+    adjust_autocorrelation: bool = True
 
 
 @dataclass(frozen=True)
@@ -33,6 +39,8 @@ class WalkForwardFold:
     is_sharpe: float
     oos_sharpe: float
     oos_return: float
+    wfe: float = 0.0
+    is_return: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -48,6 +56,8 @@ class WalkForwardResult:
     aggregate_oos_mdd: float
     walk_forward_efficiency: float
     passed_validation: bool
+    min_fold_wfe: float = 0.0
+    consistency_score: float = 1.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -58,6 +68,8 @@ class WalkForwardResult:
             "aggregate_oos_sharpe": self.aggregate_oos_sharpe,
             "aggregate_oos_mdd": self.aggregate_oos_mdd,
             "walk_forward_efficiency": self.walk_forward_efficiency,
+            "min_fold_wfe": self.min_fold_wfe,
+            "consistency_score": self.consistency_score,
             "passed_validation": self.passed_validation,
         }
 
@@ -70,7 +82,9 @@ class CPCVConfig:
     k_test_groups: int = 2
     purge_window: int = 1
     embargo_pct: float = 0.02
-    max_pbo_threshold: float = 0.20
+    max_pbo_threshold: float = 0.15
+    max_hold_lookback_bars: int = 150
+    periods_per_year: float = 252.0
 
 
 @dataclass(frozen=True)
@@ -85,6 +99,8 @@ class CPCVResult:
     median_oos_sharpe: float
     logit_distribution: List[float]
     passed_pbo_gate: bool
+    synthetic_path_sharpes: List[float] = field(default_factory=list)
+    worst_path_mdd: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return self.__dict__.copy()
@@ -98,6 +114,8 @@ class DSRGuardConfig:
     min_dsr_threshold: float = 0.95
     risk_free_rate_annual: float = 0.065
     periods_per_year: float = 252.0
+    trials_cross_correlation: float = 0.50
+    statutory_friction_bps: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -117,12 +135,19 @@ class DSRGuardReport:
     kurtosis: float
     has_sufficient_track_record: bool
     passed_guard: bool
+    effective_trials: int = 1
+    min_track_record_days: float = float("inf")
+    min_track_record_years: float = float("inf")
     rejection_reasons: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         d = self.__dict__.copy()
         if not np.isfinite(d["min_track_record_length"]):
             d["min_track_record_length"] = 999999.0
+        if not np.isfinite(d.get("min_track_record_days", float("inf"))):
+            d["min_track_record_days"] = 999999.0
+        if not np.isfinite(d.get("min_track_record_years", float("inf"))):
+            d["min_track_record_years"] = 999999.0
         return d
 
 
@@ -134,7 +159,8 @@ class MonteCarloConfig:
     block_size: Optional[int] = None
     caution_drawdown_threshold: float = 0.04  # Matches Muscle 12 CAUTION_HALVED (4% DD)
     ruin_drawdown_threshold: float = 0.08     # Matches Muscle 12 HALTED (8% DD)
-    max_acceptable_ruin_prob: float = 0.05
+    max_acceptable_ruin_prob: float = 0.01    # Max 1.0% institutional ruin probability
+    max_acceptable_caution_prob: float = 0.10 # Max 10.0% caution probability
     periods_per_year: float = 252.0
     random_seed: int = 42
 
@@ -155,6 +181,7 @@ class MonteCarloReport:
     probability_of_caution: float
     probability_of_ruin: float
     passed_stress_test: bool
+    cdar_95: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return self.__dict__.copy()
@@ -171,14 +198,24 @@ class ValidationCertificate:
     dsr_guard: DSRGuardReport
     monte_carlo: MonteCarloReport
     is_certified_for_live: bool
+    certificate_hash: str = ""
+    timestamp_utc: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        data = {
             "ticker": self.ticker,
             "champion_formula": self.champion_formula,
             "is_certified_for_live": self.is_certified_for_live,
+            "certificate_hash": self.certificate_hash,
+            "timestamp_utc": self.timestamp_utc,
             "walk_forward": self.walk_forward.to_dict(),
             "cpcv": self.cpcv.to_dict(),
             "dsr_guard": self.dsr_guard.to_dict(),
             "monte_carlo": self.monte_carlo.to_dict(),
         }
+        return data
+
+    def compute_sha256(self) -> str:
+        """Compute cryptographic hash of the validation verdict."""
+        payload = f"{self.ticker}:{self.champion_formula}:{self.is_certified_for_live}:{self.walk_forward.aggregate_oos_sharpe}:{self.cpcv.pbo}:{self.dsr_guard.deflated_sharpe_ratio}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()

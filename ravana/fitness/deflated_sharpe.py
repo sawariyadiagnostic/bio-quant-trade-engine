@@ -55,12 +55,9 @@ def compute_psr(
     if num_samples <= 2:
         return 0.5
 
-    # Standard error of estimated Sharpe ratio under non-normality
-    var_sharpe = (
-        1.0
-        - skewness * sharpe_hat
-        + ((kurtosis - 1.0) / 4.0) * (sharpe_hat ** 2)
-    ) / float(num_samples - 1)
+    # Standard error of estimated Sharpe ratio under non-normality (Mertens 2002, Bailey 2012)
+    omega = max(0.05, 1.0 - skewness * sharpe_hat + ((kurtosis - 1.0) / 4.0) * (sharpe_hat ** 2))
+    var_sharpe = omega / float(num_samples - 1)
 
     std_sharpe = math.sqrt(max(1e-12, var_sharpe))
     z_stat = (sharpe_hat - benchmark_sharpe) / std_sharpe

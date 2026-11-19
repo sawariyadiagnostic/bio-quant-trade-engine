@@ -1,4 +1,6 @@
 """Unit tests for Phase 5 (Muscles 13-16): Quantitative Rigor & Overfitting Defense."""
+import math
+import os
 import unittest
 import numpy as np
 import pandas as pd
@@ -176,6 +178,68 @@ class TestValidationEngines(unittest.TestCase):
         self.assertEqual(cert.champion_formula, "LOG_RET_1")
         self.assertIsInstance(cert.to_dict(), dict)
         self.assertTrue(cert.walk_forward.passed_validation)
+
+    def test_muscle13_anchored_vs_rolling_comparison(self) -> None:
+        """Verify Muscle 13 compares expanding anchored vs rolling walk-forward efficiency."""
+        wf = WalkForwardEngine(WalkForwardConfig(n_splits=3, purge_bars=5, min_oos_sharpe=0.5))
+        node = ASTNode("FEATURE", val="LOG_RET_1")
+        comp = wf.compare_anchored_vs_rolling(node, self.features_df, self.targets_df)
+        self.assertIn("rolling_wfe", comp)
+        self.assertIn("anchored_wfe", comp)
+        self.assertIn("regime_memory_decay", comp)
+        self.assertIsInstance(comp["regime_memory_decay"], bool)
+
+    def test_muscle14_multi_asset_cpcv_and_synthetic_paths(self) -> None:
+        """Verify Muscle 14 evaluates multi-asset portfolio CPCV and tracks synthetic paths."""
+        cpcv = CombinatorialPurgedCV(CPCVConfig(n_groups=5, k_test_groups=2, max_pbo_threshold=0.25))
+        f_dict = {"PSUBNK": self.features_df, "BANK": self.features_df}
+        t_dict = {"PSUBNK": self.targets_df, "BANK": self.targets_df}
+        candidates = [ASTNode("FEATURE", val="LOG_RET_1"), ASTNode("FEATURE", val="VWAP_DRIFT")]
+        res = cpcv.evaluate_multi_asset_pbo(candidates, f_dict, t_dict)
+        self.assertEqual(res.num_combinations, 10)  # C(5, 2) = 10
+        self.assertGreater(len(res.synthetic_path_sharpes), 0)
+        self.assertIsInstance(res.worst_path_mdd, float)
+
+    def test_muscle15_dsr_variance_collapse_guard_and_eff_trials(self) -> None:
+        """Verify Muscle 15 prevents variance collapse on high-skew high-Sharpe strategies."""
+        guard = OverfittingGuardEngine(DSRGuardConfig(confidence_level=0.95, min_dsr_threshold=0.95))
+        high_skew_rets = np.array([0.05, 0.04, 0.06, 0.08, -0.01, 0.05] * 20)
+        report = guard.audit_strategy(high_skew_rets, num_trials=500)
+        self.assertIsInstance(report.effective_trials, int)
+        self.assertLessEqual(report.effective_trials, 500)
+        self.assertTrue(math.isfinite(report.deflated_sharpe_ratio))
+        self.assertTrue(0.0 <= report.deflated_sharpe_ratio <= 1.0)
+
+    def test_muscle16_stationary_bootstrap_and_cdar(self) -> None:
+        """Verify Muscle 16 computes CDaR-95 and tracks circuit breaker breaches."""
+        mc = MonteCarloStressTester(MonteCarloConfig(num_simulations=200, random_seed=42))
+        rets = np.random.normal(0.001, 0.005, 300)
+        report = mc.run_stress_test(rets)
+        self.assertGreaterEqual(report.cdar_95, report.dd_95_percentile)
+        self.assertIsInstance(report.probability_of_caution, float)
+        self.assertIsInstance(report.probability_of_ruin, float)
+
+    def test_validation_pipeline_certificate_hash_and_persistence(self) -> None:
+        """Verify ValidationPipeline produces a cryptographic SHA-256 certificate and saves to disk."""
+        pipe = ValidationPipeline(
+            wf_config=WalkForwardConfig(n_splits=3, purge_bars=5, min_oos_sharpe=0.5, min_oos_ic=0.05),
+            cpcv_config=CPCVConfig(n_groups=5, k_test_groups=2, purge_window=1),
+            dsr_config=DSRGuardConfig(min_dsr_threshold=0.50),
+            mc_config=MonteCarloConfig(num_simulations=100, random_seed=42),
+        )
+        champ_tree = ASTNode("FEATURE", val="LOG_RET_1")
+        mock_ind = Individual(tree=champ_tree, fitness=0.85, ic=0.45)
+        mock_evo = EvolutionResult(
+            champion=mock_ind,
+            best_individual=mock_ind,
+            final_population=[mock_ind],
+            generation_history=[],
+            graveyard_count=0,
+            total_trials_evaluated=10,
+        )
+        cert = pipe.certify_evolution_result("BANKBEES", mock_evo, self.features_df, self.targets_df)
+        self.assertGreater(len(cert.certificate_hash), 30)
+        self.assertTrue(os.path.exists("audit/validation_cert.json"))
 
 
 if __name__ == "__main__":

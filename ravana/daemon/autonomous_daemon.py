@@ -189,7 +189,33 @@ class AutonomousExecutionDaemon:
             len(reconciliation["adopted"]),
             len(reconciliation["closed"]),
         )
+        cert_valid = self.verify_morning_validation_certificate()
+        reconciliation["phase5_certified"] = cert_valid
         return reconciliation
+
+    def verify_morning_validation_certificate(self, cert_path: str = "audit/validation_cert.json") -> bool:
+        """Execute Phase 5 (Muscles 13-16) 09:00 IST Morning Self-Certification Gate."""
+        if not os.path.exists(cert_path):
+            logger.warning("[Phase 5] Validation certificate not found at %s. Uncertified mode.", cert_path)
+            return False
+        try:
+            with open(cert_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            is_certified = bool(data.get("is_certified_for_live", False))
+            pbo = float(data.get("cpcv", {}).get("pbo", 1.0))
+            dsr = float(data.get("dsr_guard", {}).get("deflated_sharpe_ratio", 0.0))
+            cert_hash = str(data.get("certificate_hash", ""))
+            logger.info(
+                "[Phase 5 09:00 Gate] Certificate Verified: Certified=%s, PBO=%.2f, DSR=%.2f, Hash=%s",
+                is_certified,
+                pbo,
+                dsr,
+                cert_hash[:12] if cert_hash else "NONE",
+            )
+            return is_certified
+        except Exception as e:
+            logger.error("[Phase 5] Failed reading validation certificate: %s", str(e))
+            return False
 
     # -------------------------------------------------------------------------
     # 2. Portfolio Risk & Contention Manager
